@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -39,6 +40,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "corsheaders",
+    "accounts",
 ]
 
 MIDDLEWARE = [
@@ -77,8 +79,12 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.environ.get("DB_NAME", "aftertaste"),
+        "USER": os.environ.get("DB_USER", "postgres"),
+        "PASSWORD": os.environ.get("DB_PASSWORD", "postgres"),
+        "HOST": os.environ.get("DB_HOST", "localhost"),
+        "PORT": os.environ.get("DB_PORT", "5432"),
     }
 }
 
@@ -129,10 +135,26 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 
+# Firebase Authentication
+# 서비스 계정 키 파일 경로. 아직 준비되지 않았다면 파일이 없어도 서버는 정상 부팅되고,
+# 실제로 토큰을 검증하려는 시점에만 에러가 난다 (accounts/firebase.py 참고).
+FIREBASE_CREDENTIALS_PATH = os.environ.get(
+    "FIREBASE_CREDENTIALS_PATH", str(BASE_DIR / "firebase-service-account.json")
+)
+
+
 # Django REST Framework
 # https://www.django-rest-framework.org/api-guide/settings/
 
-REST_FRAMEWORK = {}
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "accounts.authentication.FirebaseAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.AllowAny",
+    ],
+    "EXCEPTION_HANDLER": "accounts.exceptions.custom_exception_handler",
+}
 
 
 # Email
