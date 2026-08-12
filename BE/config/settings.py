@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
+    "drf_spectacular",
     "corsheaders",
     "accounts",
 ]
@@ -154,6 +155,16 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.AllowAny",
     ],
     "EXCEPTION_HANDLER": "accounts.exceptions.custom_exception_handler",
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+# drf-spectacular (Swagger/OpenAPI 문서)
+# https://drf-spectacular.readthedocs.io/
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Aftertaste API",
+    "DESCRIPTION": "촬영 명소 추천 서비스 백엔드 API",
+    "VERSION": "0.1.0",
+    "SERVE_INCLUDE_SCHEMA": False,
 }
 
 
