@@ -11,8 +11,10 @@ from accounts.firebase import InvalidFirebaseToken, verify_id_token
 from accounts.models import Member
 from accounts.serializers import (
     ErrorDetailSerializer,
+    LocaleResponseSerializer,
     LoginRequestSerializer,
     MemberSerializer,
+    MemberUpdateSerializer,
 )
 
 PROVIDER_BY_SIGN_IN_PROVIDER = {
@@ -148,3 +150,38 @@ class MeView(APIView):
     )
     def get(self, request):
         return Response(MemberSerializer(request.user).data)
+
+
+class LocaleView(APIView):
+    """국적·언어를 설정한다. 로그인 여부와 상관없이 호출할 수 있다.
+
+    - 로그인한 사용자(Authorization 헤더에 유효한 토큰이 있으면)는 그 회원의
+      국적·언어를 서버에 저장한다.
+    - 로그인하지 않은 사용자는 저장할 회원이 없으므로 값만 검증하고 응답만 돌려준다.
+      비로그인 사용자의 실제 보관은 프론트엔드(localStorage) 몫이다 (DETAIL_SPEC 6-1 #8).
+
+    별도로 permission_classes를 지정하지 않는다 — 프로젝트 기본값(AllowAny)이 이미
+    "로그인 없이도 호출 가능"과 맞고, FirebaseAuthentication은 토큰이 없으면 그냥
+    None을 돌려줘서 request.user가 AnonymousUser가 될 뿐 에러를 내지 않는다.
+
+    "400 지원하지 않는 언어" 에러케이스는 아직 만들지 않았다. 지원 언어 목록이
+    PRD에서 확정되면(DETAIL_SPEC 7장 #8) 그때 검증 로직을 추가해야 한다.
+    """
+
+    @extend_schema(
+        summary="국적·언어 설정",
+        description=(
+            "국적·언어를 저장한다. 로그인한 사용자면 회원 정보에 저장하고, "
+            "로그인하지 않았으면 값만 검증하고 응답만 돌려준다(실제 보관은 프론트엔드 책임).\n\n"
+            "국적에 맞는 언어를 서버가 자동으로 정해주지는 않는다 — 프론트엔드가 보낸 값을 그대로 쓴다."
+        ),
+        request=MemberUpdateSerializer,
+        responses={200: LocaleResponseSerializer},
+    )
+    def patch(self, request):
+        member = request.user if request.user.is_authenticated else None
+        serializer = MemberUpdateSerializer(member, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        if member is not None:
+            serializer.save()
+        return Response({"language": serializer.validated_data.get("language")})

@@ -430,6 +430,11 @@ PRD에 "탈퇴해도 리뷰는 익명으로 남긴다"고 되어 있습니다. �
 | 5 | 100m 거리 매칭으로 새 출처가 기존 명소에 연결될 때 이름·주소·좌표를 새 값으로 덮어쓸지 | 덮어쓰지 않는다. `PlaceSource`만 추가하고 기존 값은 그대로 둔다 — 여러 출처 값이 겹칠 때 뭘 우선할지(7장 참고)가 정해지기 전까지는 아무것도 안 건드리는 쪽이 안전하다 (`places/services.py:save_place_from_source`) (2026-08-17) |
 | 6 | 한국문화정보원 CSV의 영업시간(공공데이터)을 관리자 전용 필드(`Place.business_hours`)에 어떻게 반영할지 | 명소를 새로 만들 때만 시작값으로 채우고, 그 뒤로는(재수집·거리매칭 포함) 절대 건드리지 않는다. 관리자가 고친 값은 항상 보존된다. 장소설명(description)은 아예 안 가져온다 — 처음부터 끝까지 관리자 전용 (`places/management/commands/import_kcisa.py`) (2026-08-17) |
 | 7 | 명소(Place) 데이터 실제 저장 파이프라인 | 경기 데이터 드림(`import_gyeonggi_data_dream` — API 호출 + 카카오 지오코딩)과 한국문화정보원(`import_kcisa` — CSV 파싱)을 각각 실제로 실행해 `Place`/`PlaceSource`를 채우는 명령어를 만들었다. 둘 다 위 #4·#5·#6 규칙을 그대로 따른다 (2026-08-17) |
+| 8 | 비로그인 사용자의 국적 선택 값을 어디에 저장할지 | 프론트엔드(localStorage)가 저장한다. 백엔드는 익명 사용자를 위한 세션·쿠키 저장 로직을 만들지 않는다 (2026-08-17) |
+| 9 | 로그인한 회원의 국적·언어 저장 방법 | ~~`Member.nationality`/`Member.language`는 이미 자리만 있었다("자리만 만들어 둔다" 주석). `MeView`에 PATCH를 추가해 로그인한 본인만 자기 국적·언어를 저장할 수 있게 한다 (`accounts/views.py`, `accounts/serializers.py`의 `MemberUpdateSerializer`) (2026-08-17)~~ → **정정 (2026-08-17)**: 실제 API 명세서(`docs/여운 API 명세서.xlsx` 5행 "국적/언어 설정")를 다시 확인한 결과 `PATCH /account`가 아니라 **`PATCH /account/locale`**이 맞는 경로였고, 이 API는 **로그인이 필요 없다**(명세서 "로그인여부: 불필요"). `MeView`(`GET /account`, 로그인 필요)에 잘못 얹었던 PATCH를 제거하고, 새 `LocaleView`(`PATCH /account/locale/`)를 따로 만들었다. 로그인한 사용자가 호출하면 `Member.nationality`/`Member.language`에 저장하고, 비로그인 사용자가 호출하면 값만 검증하고 저장 없이 응답만 돌려준다(비로그인 저장은 여전히 #8대로 프론트엔드 localStorage 책임). 응답은 명세서대로 `{ language }`만 돌려준다 (`accounts/views.py`의 `LocaleView`, `accounts/urls.py`) |
+| 10 | 국적→언어 자동 매핑 로직을 만들지 여부 | 만들지 않는다. 지원 언어 범위(PRD 6장 #9)가 아직 안 정해졌으므로, 프론트엔드가 보내주는 국적·언어 값을 그대로 저장만 한다 (2026-08-17) |
+| 11 | "국적을 고르지 않으면 한국어로 보인다"를 서버가 처리해야 하는지 | 서버 로직을 새로 만들지 않는다. `nationality`/`language`는 원래부터 `null=True, blank=True`라 선택하지 않으면 비어 있는 상태 그대로다. 이 값을 읽어 실제로 화면 언어를 바꾸는 건 Phase 4(번역)의 몫이라, 지금은 "기본값이 비어있다"는 사실 자체로 충분하다 (2026-08-17) |
+| 12 | 배너를 어느 방에 둘지 | 기존 네 개의 방(회원/명소·작품/리뷰/즐겨찾기) 어디에도 안 맞아 새 앱 `main`을 만든다. `Banner` 모델은 이미지 URL·링크 URL·노출순서·활성화 여부만 가지며, 관리자가 Django admin에서 관리하고 로그인 없이 조회 가능한 GET 목록 API를 제공한다 (`main/models.py`) (2026-08-17) |
 
 ## 7. 아직 안 정한 것
 
