@@ -13,12 +13,6 @@ class Place(models.Model):
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
 
-    # 공공데이터 원본 식별자. 여러 공공데이터 출처를 함께 쓸 수도 있어서,
-    # 출처 이름(source)과 그 출처 안에서의 원본 번호(source_id)를 같이 저장한다.
-    # 이 둘을 합쳐서 "같은 명소인지"를 판단하므로, 재수집해도 중복으로 쌓이지 않는다.
-    source = models.CharField(max_length=50)
-    source_id = models.CharField(max_length=100)
-
     # 관리자가 직접 채우는 값 (가져오기로 덮어쓰지 않는다)
     description = models.TextField(blank=True)
     photo_url = models.URLField(blank=True)
@@ -26,11 +20,27 @@ class Place(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
+    def __str__(self):
+        return self.name
+
+
+class PlaceSource(models.Model):
+    """이 명소가 어느 공공데이터 출처에서 왔는지 기록하는 자리.
+
+    서로 다른 출처(예: 한국문화정보원, 경기 데이터 드림)가 같은 물리적 장소를
+    가리키는 경우가 있어서, 명소 하나(Place)가 출처를 여러 개 가질 수 있다.
+    "같은 출처 + 같은 원본 번호"는 항상 같은 명소를 가리키므로 중복을 막는다.
+    """
+
+    place = models.ForeignKey(Place, on_delete=models.CASCADE, related_name="sources")
+    source = models.CharField(max_length=50)
+    source_id = models.CharField(max_length=100)
+
     class Meta:
         unique_together = ("source", "source_id")
 
     def __str__(self):
-        return self.name
+        return f"{self.place} - {self.source}:{self.source_id}"
 
 
 class Work(models.Model):

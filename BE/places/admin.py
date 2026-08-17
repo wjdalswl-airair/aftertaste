@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from places.models import Place, PlaceTranslation, PlaceWork, Work, WorkTranslation
+from places.models import Place, PlaceSource, PlaceTranslation, PlaceWork, Work, WorkTranslation
 
 
 class PlaceWorkInline(admin.TabularInline):
@@ -10,11 +10,24 @@ class PlaceWorkInline(admin.TabularInline):
     extra = 1
 
 
+class PlaceSourceInline(admin.TabularInline):
+    """명소 관리 화면에서 이 명소가 어느 출처들에서 왔는지 바로 확인할 수 있게 한다."""
+
+    model = PlaceSource
+    extra = 1
+
+
 @admin.register(Place)
 class PlaceAdmin(admin.ModelAdmin):
-    list_display = ("name", "address", "source", "source_id", "created_at")
+    list_display = ("name", "address", "created_at")
     search_fields = ("name", "address")
-    inlines = [PlaceWorkInline]
+    inlines = [PlaceSourceInline, PlaceWorkInline]
+
+
+@admin.register(PlaceSource)
+class PlaceSourceAdmin(admin.ModelAdmin):
+    list_display = ("place", "source", "source_id")
+    search_fields = ("source", "source_id", "place__name")
 
 
 @admin.register(Work)

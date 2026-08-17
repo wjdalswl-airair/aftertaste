@@ -13,8 +13,13 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# .env 파일(git에 안 올라감)에 적어둔 값을 환경변수로 읽어들인다.
+load_dotenv(BASE_DIR / ".env")
 
 
 # Quick-start development settings - unsuitable for production
@@ -135,6 +140,19 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:5173",
 ]
+
+
+# 외부 공공데이터 API 키
+# 어느 출처를 실제로 쓸지는 아직 확정되지 않았다 (docs/DETAIL_SPEC.md 7장 참고).
+# 아직 이 키들을 실제로 호출하는 코드는 없고, 값만 읽어올 수 있게 자리만 만들어둔 상태다.
+KOBIS_API_KEY = os.environ.get("KOBIS_API_KEY", "")
+GYEONGGI_DATA_DREAM_API_KEY = os.environ.get("GYEONGGI_DATA_DREAM_API_KEY", "")
+KCISA_API_KEY = os.environ.get("KCISA_API_KEY", "")
+
+# 카카오맵 지오코딩용 REST API 키. 좌표가 없는 출처(경기 데이터 드림)의 장소명을
+# 좌표로 바꿔서, 좌표가 있는 다른 출처(한국문화정보원)와 같은 명소인지 비교하는 데 쓴다.
+# 아직 이 키를 실제로 호출하는 코드는 없고, 값만 읽어올 수 있게 자리만 만들어둔 상태다.
+KAKAO_API_KEY = os.environ.get("KAKAO_API_KEY", "")
 
 
 # Firebase Authentication

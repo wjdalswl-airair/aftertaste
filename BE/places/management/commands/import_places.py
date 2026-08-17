@@ -3,19 +3,23 @@ from decimal import Decimal, InvalidOperation
 
 from django.core.management.base import BaseCommand, CommandError
 
-from places.models import Place
+from places.models import Place, PlaceSource
 
 
 class Command(BaseCommand):
     """로컬 JSON 파일에서 명소 목록을 가져와 채운다.
 
-    같은 명소를 다시 가져와도 source + source_id로 이미 있는 명소를 찾아서
-    이름/주소/위치만 갱신하고, 관리자가 채운 설명/사진/영업시간은 건드리지 않는다.
+    같은 명소를 다시 가져와도 source + source_id로 이미 있는 PlaceSource를 찾아서
+    그 명소의 이름/주소/위치만 갱신하고, 관리자가 채운 설명/사진/영업시간은 건드리지 않는다.
 
     실제로 어떤 공공데이터 API를 쓸지는 아직 안 정해졌다 (docs/DETAIL_SPEC.md 7장 #1 참고).
     한 API에서 필요한 정보를 다 못 가져와서 여러 API를 조합해야 하는 상황이라,
     API 호출 코드는 아직 만들지 않았다. 지금은 이미 내려받은 JSON 파일을 --file로
     넣는 방식만 지원한다. 실제 API가 정해지면 이 명령어에 호출 로직을 추가하면 된다.
+
+    다른 출처가 같은 물리적 장소를 가리키는 경우(좌표 100m 이내)를 찾아서 하나로 합치는
+    로직은 아직 없다 (docs/DETAIL_SPEC.md 7장 #1-(c) 참고). 지금은 source + source_id로만
+    같은 명소인지 판단하므로, 처음 보는 출처는 항상 새 명소를 만든다.
     """
 
     help = "로컬 JSON 파일에서 촬영지 목록을 가져와 Place를 만들거나 갱신한다."
@@ -54,15 +58,16 @@ class Command(BaseCommand):
                 # 이름/주소만이라도 저장하고, 실패 건수만 세어서 나중에 보여준다.
                 coord_failed_count += 1
 
-            place, created = Place.objects.get_or_create(
-                source=source_name,
-                source_id=source_id,
-                defaults=fields,
-            )
+            place_source = PlaceSource.objects.select_related("place").filter(
+                source=source_name, source_id=source_id
+            ).first()
 
-            if created:
+            if place_source is None:
+                place = Place.objects.create(**fields)
+                PlaceSource.objects.create(place=place, source=source_name, source_id=source_id)
                 created_count += 1
             else:
+                place = place_source.place
                 # 공공데이터 쪽 정보(이름/주소/위치)만 최신값으로 갱신한다.
                 # description, photo_url, business_hours는 관리자가 채운 값이라 그대로 둔다.
                 # 새로 받은 값이 비어있으면(값이 없거나 좌표 파싱 실패) 기존 값을 지우지 않고 그대로 둔다.
