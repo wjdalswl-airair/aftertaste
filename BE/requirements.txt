@@ -6,5 +6,6 @@ drf-spectacular==0.30.0
 firebase-admin==6.9.0
 psycopg2-binary==2.9.10
 python-dotenv==1.2.3
+requests==2.34.2
 sqlparse==0.5.5
 tzdata==2026.3

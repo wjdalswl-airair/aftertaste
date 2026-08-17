@@ -5,13 +5,14 @@ import json
 import os
 import tempfile
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.core.management import call_command
 from django.test import TestCase
 
 from places.management.commands.import_places import Command as ImportPlacesCommand
 from places.models import Place, PlaceSource, PlaceTranslation, PlaceWork, Work, WorkTranslation
-from places.services import haversine_distance_meters
+from places.services import build_composite_source_id, haversine_distance_meters, save_place_from_source
 
 SAMPLE_DIR = os.path.join(os.path.dirname(__file__), "sample_data")
 SAMPLE_V1 = os.path.join(SAMPLE_DIR, "sample_places_v1.json")
@@ -327,3 +328,439 @@ class ImportEdgeCaseHelperTest(TestCase):
         self.assertEqual(place.address, "")
         self.assertIsNone(place.latitude)
         self.assertIsNone(place.longitude)
+
+
+class ImportPlacesDistanceMergeTest(TestCase):
+    """import_places도 100m 거리 매칭을 타는지 확인 (services.save_place_from_source 재사용 회귀 테스트)."""
+
+    def test_new_source_within_100m_merges_instead_of_duplicating(self):
+        existing = create_place_with_source(
+            "기존명소",
+            "OTHER_SOURCE",
+            "O1",
+            address="기존주소",
+            latitude=Decimal("37.579617"),
+            longitude=Decimal("126.977041"),
+        )
+        path = write_json(
+            [
+                {
+                    "고유번호": "NEW1",
+                    "장소명": "다른이름",
+                    "소재지": "다른주소",
+                    "위도": "37.579617",
+                    "경도": "126.977041",
+                },
+            ]
+        )
+        try:
+            output = run_import(path, source="TEST_SOURCE")
+        finally:
+            os.remove(path)
+
+        self.assertEqual(Place.objects.count(), 1)
+        existing.refresh_from_db()
+        self.assertEqual(existing.name, "기존명소")
+        self.assertEqual(existing.address, "기존주소")
+        self.assertTrue(PlaceSource.objects.filter(place=existing, source="TEST_SOURCE", source_id="NEW1").exists())
+        self.assertIn("병합 1건", output)
+
+
+class SavePlaceFromSourceTest(TestCase):
+    """places.services.save_place_from_source의 3단계 판단(원본번호 조회 → 100m 매칭 → 신규 생성)."""
+
+    def test_known_source_id_updates_only_non_empty_fields(self):
+        place = create_place_with_source("경복궁", "SRC", "1", address="옛주소")
+
+        result_place, created, matched_by = save_place_from_source(
+            source="SRC", source_id="1", name="경복궁(새이름)", address="", latitude=None, longitude=None
+        )
+
+        self.assertFalse(created)
+        self.assertEqual(matched_by, "source_id")
+        self.assertEqual(result_place.pk, place.pk)
+        place.refresh_from_db()
+        self.assertEqual(place.name, "경복궁(새이름)")
+        self.assertEqual(place.address, "옛주소")
+
+    def test_unknown_source_id_without_nearby_place_creates_new(self):
+        place, created, matched_by = save_place_from_source(
+            source="SRC", source_id="new-1", name="새명소", latitude=Decimal("37.1"), longitude=Decimal("127.1")
+        )
+
+        self.assertTrue(created)
+        self.assertEqual(matched_by, "new")
+        self.assertEqual(Place.objects.count(), 1)
+
+    def test_unknown_source_id_with_nearby_place_attaches_source_without_overwriting_fields(self):
+        existing = create_place_with_source(
+            "기존명소",
+            "OTHER_SOURCE",
+            "O1",
+            address="기존주소",
+            latitude=Decimal("37.566295"),
+            longitude=Decimal("126.977945"),
+        )
+
+        place, created, matched_by = save_place_from_source(
+            source="NEW_SOURCE",
+            source_id="N1",
+            name="다른이름",
+            address="다른주소",
+            latitude=Decimal("37.566595"),
+            longitude=Decimal("126.977945"),
+        )
+
+        self.assertFalse(created)
+        self.assertEqual(matched_by, "distance")
+        self.assertEqual(place.pk, existing.pk)
+        self.assertEqual(Place.objects.count(), 1)
+        existing.refresh_from_db()
+        self.assertEqual(existing.name, "기존명소")
+        self.assertEqual(existing.address, "기존주소")
+        self.assertEqual(
+            PlaceSource.objects.filter(place=existing, source="NEW_SOURCE", source_id="N1").count(), 1
+        )
+
+    def test_create_only_fields_applied_only_when_creating(self):
+        place, created, matched_by = save_place_from_source(
+            source="SRC", source_id="biz-1", name="영업시간있는명소", create_only_fields={"business_hours": "09:00~18:00"}
+        )
+
+        self.assertTrue(created)
+        self.assertEqual(place.business_hours, "09:00~18:00")
+
+    def test_create_only_fields_ignored_on_source_id_match(self):
+        place = create_place_with_source("경복궁", "SRC", "biz-2", business_hours="원래시간")
+
+        save_place_from_source(
+            source="SRC", source_id="biz-2", name="경복궁", create_only_fields={"business_hours": "새시간"}
+        )
+
+        place.refresh_from_db()
+        self.assertEqual(place.business_hours, "원래시간")
+
+    def test_create_only_fields_ignored_on_distance_match(self):
+        existing = create_place_with_source(
+            "경복궁",
+            "OTHER_SOURCE",
+            "O2",
+            business_hours="원래시간",
+            latitude=Decimal("37.566295"),
+            longitude=Decimal("126.977945"),
+        )
+
+        save_place_from_source(
+            source="NEW_SOURCE",
+            source_id="N2",
+            name="경복궁",
+            latitude=Decimal("37.566295"),
+            longitude=Decimal("126.977945"),
+            create_only_fields={"business_hours": "새시간"},
+        )
+
+        existing.refresh_from_db()
+        self.assertEqual(existing.business_hours, "원래시간")
+
+    def test_empty_create_only_field_value_is_not_set(self):
+        place, created, matched_by = save_place_from_source(
+            source="SRC", source_id="biz-3", name="명소", create_only_fields={"business_hours": ""}
+        )
+
+        self.assertEqual(place.business_hours, "")
+
+
+class BuildCompositeSourceIdTest(TestCase):
+    """경기데이터드림처럼 원본에 고유번호가 없는 출처를 위한 합성 키 생성."""
+
+    def test_same_inputs_produce_same_key(self):
+        key1 = build_composite_source_id("고양시", "2022", "드라마", "작품A", "장소A")
+        key2 = build_composite_source_id("고양시", "2022", "드라마", "작품A", "장소A")
+        self.assertEqual(key1, key2)
+
+    def test_different_field_produces_different_key(self):
+        key1 = build_composite_source_id("고양시", "2022", "드라마", "작품A", "장소A")
+        key2 = build_composite_source_id("고양시", "2022", "드라마", "작품A", "장소B")
+        self.assertNotEqual(key1, key2)
+
+    def test_none_is_treated_as_empty_string(self):
+        key = build_composite_source_id("고양시", None, "드라마")
+        self.assertEqual(key, "고양시||드라마")
+
+
+def _fake_gg_fetch(page_index, page_size):
+    pages = {
+        1: {
+            "total_count": 3,
+            "items": [
+                {
+                    "sigun_nm": "고양시",
+                    "potogrf_yy": "2022",
+                    "potogrf_div_nm": "드라마",
+                    "work_nm": "작품A",
+                    "potogrf_plc_nm": "장소A",
+                },
+                {
+                    "sigun_nm": "고양시",
+                    "potogrf_yy": "2022",
+                    "potogrf_div_nm": "드라마",
+                    "work_nm": "작품B",
+                    "potogrf_plc_nm": "",
+                },
+            ],
+        },
+        2: {
+            "total_count": 3,
+            "items": [
+                {
+                    "sigun_nm": "고양시",
+                    "potogrf_yy": "2022",
+                    "potogrf_div_nm": "드라마",
+                    "work_nm": "작품C",
+                    "potogrf_plc_nm": "장소C",
+                },
+            ],
+        },
+    }
+    return pages[page_index]
+
+
+def _fake_gg_search_place(query, size=1):
+    if "장소A" in query:
+        return [
+            {
+                "place_name": "장소A",
+                "address_name": "경기도 고양시 장소A",
+                "road_address_name": "경기도 고양시 장소A로 1",
+                "latitude": 37.1,
+                "longitude": 127.1,
+                "category_name": "",
+            }
+        ]
+    if "장소C" in query:
+        return [
+            {
+                "place_name": "장소C",
+                "address_name": "경기도 고양시 장소C",
+                "road_address_name": "",
+                "latitude": 37.9,
+                "longitude": 127.9,
+                "category_name": "",
+            }
+        ]
+    return []
+
+
+class ImportGyeonggiDataDreamCommandTest(TestCase):
+    """경기 데이터 드림 명령어: 페이지네이션, 지오코딩 연동, 스킵 집계. 실제 네트워크 호출은 안 한다."""
+
+    def _run(self, **options):
+        out = io.StringIO()
+        call_command("import_gyeonggi_data_dream", stdout=out, stderr=out, **options)
+        return out.getvalue()
+
+    @patch("places.management.commands.import_gyeonggi_data_dream.kakao_geocoding.search_place")
+    @patch("places.management.commands.import_gyeonggi_data_dream.gyeonggi_data_dream.fetch_photography_support")
+    def test_paginates_and_creates_places(self, mock_fetch, mock_search):
+        mock_fetch.side_effect = _fake_gg_fetch
+        mock_search.side_effect = _fake_gg_search_place
+
+        output = self._run()
+
+        self.assertEqual(Place.objects.count(), 2)
+        self.assertIn("새로 만듦 2건", output)
+        self.assertIn("장소명 없어서 건너뜀 1건", output)
+
+        place_a = Place.objects.get(name="장소A")
+        self.assertEqual(place_a.address, "경기도 고양시 장소A로 1")
+        place_c = Place.objects.get(name="장소C")
+        self.assertEqual(place_c.address, "경기도 고양시 장소C")
+
+    @patch("places.management.commands.import_gyeonggi_data_dream.kakao_geocoding.search_place")
+    @patch("places.management.commands.import_gyeonggi_data_dream.gyeonggi_data_dream.fetch_photography_support")
+    def test_skips_when_geocoding_returns_no_results(self, mock_fetch, mock_search):
+        mock_fetch.side_effect = _fake_gg_fetch
+        mock_search.return_value = []
+
+        output = self._run()
+
+        self.assertEqual(Place.objects.count(), 0)
+        self.assertIn("지오코딩 결과 없어서 건너뜀 2건", output)
+
+    @patch("places.management.commands.import_gyeonggi_data_dream.kakao_geocoding.search_place")
+    @patch("places.management.commands.import_gyeonggi_data_dream.gyeonggi_data_dream.fetch_photography_support")
+    def test_rerunning_does_not_duplicate(self, mock_fetch, mock_search):
+        mock_fetch.side_effect = _fake_gg_fetch
+        mock_search.side_effect = _fake_gg_search_place
+
+        self._run()
+        count_after_first = Place.objects.count()
+        self._run()
+        count_after_second = Place.objects.count()
+
+        self.assertEqual(count_after_first, count_after_second)
+
+    @patch("places.management.commands.import_gyeonggi_data_dream.kakao_geocoding.search_place")
+    @patch("places.management.commands.import_gyeonggi_data_dream.gyeonggi_data_dream.fetch_photography_support")
+    def test_max_pages_cap_stops_without_hanging(self, mock_fetch, mock_search):
+        mock_fetch.return_value = {
+            "total_count": 999999,
+            "items": [
+                {
+                    "sigun_nm": "고양시",
+                    "potogrf_yy": "2022",
+                    "potogrf_div_nm": "드라마",
+                    "work_nm": "무한작품",
+                    "potogrf_plc_nm": "무한장소",
+                }
+            ],
+        }
+        mock_search.return_value = []
+
+        output = self._run(max_pages=3)
+
+        self.assertEqual(mock_fetch.call_count, 3)
+        self.assertIn("페이지 상한", output)
+
+
+def _fake_kcisa_rows():
+    return [
+        {
+            "sequence_no": "1",
+            "media_type": "drama",
+            "title": "제목1",
+            "place_name": "카페1",
+            "place_type": "cafe",
+            "description": "설명1",
+            "business_hours": "09:00~21:00",
+            "break_time": "",
+            "closed_days": "",
+            "address": "경기도 고양시 1",
+            "latitude": "37.1",
+            "longitude": "127.1",
+            "phone": "",
+            "last_updated": "",
+        },
+        {
+            "sequence_no": "",
+            "media_type": "drama",
+            "title": "제목2",
+            "place_name": "연번없음",
+            "place_type": "cafe",
+            "description": "",
+            "business_hours": "",
+            "break_time": "",
+            "closed_days": "",
+            "address": "",
+            "latitude": "",
+            "longitude": "",
+            "phone": "",
+            "last_updated": "",
+        },
+        {
+            "sequence_no": "3",
+            "media_type": "drama",
+            "title": "제목3",
+            "place_name": "좌표이상함",
+            "place_type": "cafe",
+            "description": "",
+            "business_hours": "10:00~20:00",
+            "break_time": "",
+            "closed_days": "",
+            "address": "경기도 어딘가",
+            "latitude": "정보없음",
+            "longitude": "정보없음",
+            "phone": "",
+            "last_updated": "",
+        },
+    ]
+
+
+class ImportKcisaCommandTest(TestCase):
+    """한국문화정보원 CSV 명령어: business_hours는 생성 시에만 채워지고 그 뒤로는 보존된다."""
+
+    def _run(self, file_path="dummy.csv"):
+        out = io.StringIO()
+        call_command("import_kcisa", file=file_path, stdout=out)
+        return out.getvalue()
+
+    @patch("places.management.commands.import_kcisa.kcisa_csv.parse_filming_locations")
+    def test_creates_places_and_fills_business_hours_only_on_create(self, mock_parse):
+        mock_parse.return_value = _fake_kcisa_rows()
+
+        output = self._run()
+
+        self.assertEqual(Place.objects.count(), 2)
+        self.assertIn("새로 만듦 2건", output)
+        self.assertIn("연번 없어서 건너뜀 1건", output)
+        self.assertIn("좌표 파싱 실패 1건", output)
+
+        cafe1 = get_place_by_source("KCISA", "1")
+        self.assertEqual(cafe1.business_hours, "09:00~21:00")
+        self.assertEqual(cafe1.description, "")
+
+    @patch("places.management.commands.import_kcisa.kcisa_csv.parse_filming_locations")
+    def test_reimport_does_not_overwrite_business_hours(self, mock_parse):
+        mock_parse.return_value = _fake_kcisa_rows()
+        self._run()
+
+        changed_rows = _fake_kcisa_rows()
+        changed_rows[0]["business_hours"] = "00:00~24:00"
+        mock_parse.return_value = changed_rows
+        self._run()
+
+        cafe1 = get_place_by_source("KCISA", "1")
+        self.assertEqual(cafe1.business_hours, "09:00~21:00")
+
+    @patch("places.management.commands.import_kcisa.kcisa_csv.parse_filming_locations")
+    def test_admin_edit_survives_reimport(self, mock_parse):
+        mock_parse.return_value = _fake_kcisa_rows()
+        self._run()
+
+        cafe1 = get_place_by_source("KCISA", "1")
+        cafe1.business_hours = "관리자가고침"
+        cafe1.save()
+
+        self._run()
+
+        cafe1.refresh_from_db()
+        self.assertEqual(cafe1.business_hours, "관리자가고침")
+
+    @patch("places.management.commands.import_kcisa.kcisa_csv.parse_filming_locations")
+    def test_missing_file_raises_command_error(self, mock_parse):
+        from django.core.management.base import CommandError
+
+        mock_parse.side_effect = FileNotFoundError()
+        with self.assertRaises(CommandError):
+            call_command("import_kcisa", file="no_such_file.csv")
+
+    @patch("places.management.commands.import_kcisa.kcisa_csv.parse_filming_locations")
+    def test_distance_match_does_not_overwrite_name_address_or_business_hours(self, mock_parse):
+        existing = create_place_with_source(
+            "기존카페",
+            "GYEONGGI_DATA_DREAM",
+            "G1",
+            address="기존주소",
+            business_hours="기존시간",
+            latitude=Decimal("37.566295"),
+            longitude=Decimal("126.977945"),
+        )
+        mock_parse.return_value = [
+            {
+                "sequence_no": "99",
+                "place_name": "새이름",
+                "address": "새주소",
+                "business_hours": "새시간",
+                "latitude": "37.566295",
+                "longitude": "126.977945",
+            },
+        ]
+
+        output = self._run()
+
+        self.assertEqual(Place.objects.count(), 1)
+        existing.refresh_from_db()
+        self.assertEqual(existing.name, "기존카페")
+        self.assertEqual(existing.address, "기존주소")
+        self.assertEqual(existing.business_hours, "기존시간")
+        self.assertIn("좌표 100m 이내 기존 명소와 병합 1건", output)

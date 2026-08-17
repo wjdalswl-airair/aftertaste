@@ -34,7 +34,9 @@ class PlaceSource(models.Model):
 
     place = models.ForeignKey(Place, on_delete=models.CASCADE, related_name="sources")
     source = models.CharField(max_length=50)
-    source_id = models.CharField(max_length=100)
+    # 경기 데이터 드림처럼 원본에 고유번호가 없는 출처는 여러 필드를 합친 문자열을 넣는다
+    # (build_composite_source_id 참고). 그래서 일반적인 ID 필드보다 넉넉하게 잡는다.
+    source_id = models.CharField(max_length=500)
 
     class Meta:
         unique_together = ("source", "source_id")
