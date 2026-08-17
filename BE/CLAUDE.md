@@ -41,3 +41,7 @@
 2. 명확하지 않은 문제나 선택지가 있으면 먼저 사용자에게 물어보고 진행한다.
 3. 코드 주석은 비전공자/신입 팀원도 이해할 수 있도록 쉬운 단어로 간결하게 작성한다.
 4. 사용자에게 코드나 결정사항을 설명할 때도 쉬운 단어로 단순명료하게 설명한다.
+
+# 알려진 도구 이슈
+
+- `Workflow` 툴로 phase-harness(coding→test→verify→review→compound)를 자동 실행하면 권한 처리기 오류("script contains control characters that would be hidden in the approval dialog")로 실패할 수 있다 (2026-08-13, 2026-08-17 재현됨). 하네스 문서로 고칠 수 있는 문제가 아니라 도구 자체의 버그다. 재발하면 `Agent` 툴로 coding→test→verify→review→compound를 순서대로 수동 호출해 동일한 흐름을 대체 수행한다.
