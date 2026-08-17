@@ -17,10 +17,13 @@ Including another URLconf
 
 from django.contrib import admin
 from django.urls import include, path
+from drf_spectacular.utils import extend_schema
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 
+@extend_schema(exclude=True)
 @api_view(["GET"])
 def health_check(request):
     return Response({"status": "ok"})
@@ -29,5 +32,11 @@ def health_check(request):
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/health/", health_check, name="health-check"),
-    path("api/auth/", include("accounts.urls")),
+    path("api/account/", include("accounts.urls")),
+    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
+    path(
+        "api/docs/",
+        SpectacularSwaggerView.as_view(url_name="schema"),
+        name="swagger-ui",
+    ),
 ]

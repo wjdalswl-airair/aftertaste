@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Firebase 로그인 토큰 테스트</title>
+<style>
+  body { font-family: sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; }
+  label { display: block; margin-top: 12px; font-size: 14px; color: #333; }
+  input { width: 100%; padding: 6px; box-sizing: border-box; }
+  button { margin-top: 16px; padding: 8px 16px; cursor: pointer; }
+  textarea { width: 100%; height: 140px; margin-top: 12px; font-family: monospace; font-size: 12px; }
+  pre { background: #f4f4f4; padding: 12px; white-space: pre-wrap; word-break: break-all; }
+</style>
+</head>
+<body>
+  <h2>Firebase 로그인 토큰 테스트</h2>
+  <p>Firebase 콘솔 &gt; 프로젝트 설정 &gt; 일반 &gt; 내 앱(웹 앱)에서 나오는 값을 아래에 입력하세요.<br>
+  웹 앱이 없으면 "앱 추가 &gt; 웹(&lt;/&gt;)"으로 하나 등록하면 됩니다. 실제 서비스용 앱이 아니라 설정값만 얻는 용도입니다.</p>
+
+  <label>API Key <input id="apiKey"></label>
+  <label>Auth Domain <input id="authDomain" placeholder="xxxx.firebaseapp.com"></label>
+  <label>Project ID <input id="projectId"></label>
+
+  <button id="saveBtn">설정 저장</button>
+  <button id="loginBtn">Google로 로그인</button>
+
+  <h3>ID 토큰 (Postman Authorization: Bearer 뒤에 붙여넣기)</h3>
+  <textarea id="tokenBox" readonly></textarea>
+  <button id="copyBtn">복사</button>
+
+  <h3>디코딩된 내용 (확인용)</h3>
+  <pre id="decoded"></pre>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+
+    const fields = ["apiKey", "authDomain", "projectId"];
+    for (const f of fields) {
+      const el = document.getElementById(f);
+      el.value = localStorage.getItem("fb_" + f) || "";
+    }
+
+    document.getElementById("saveBtn").onclick = () => {
+      for (const f of fields) {
+        localStorage.setItem("fb_" + f, document.getElementById(f).value);
+      }
+      alert("저장했습니다.");
+    };
+
+    document.getElementById("loginBtn").onclick = async () => {
+      const config = {};
+      for (const f of fields) config[f] = document.getElementById(f).value;
+      if (!config.apiKey || !config.authDomain || !config.projectId) {
+        alert("설정값을 먼저 입력하고 저장하세요.");
+        return;
+      }
+      try {
+        const app = initializeApp(config);
+        const auth = getAuth(app);
+        const provider = new GoogleAuthProvider();
+        const result = await signInWithPopup(auth, provider);
+        const idToken = await result.user.getIdToken();
+        document.getElementById("tokenBox").value = idToken;
+
+        const payload = JSON.parse(atob(idToken.split(".")[1]));
+        document.getElementById("decoded").textContent = JSON.stringify(payload, null, 2);
+      } catch (e) {
+        alert("로그인 실패: " + e.message);
+      }
+    };
+
+    document.getElementById("copyBtn").onclick = () => {
+      const box = document.getElementById("tokenBox");
+      box.select();
+      document.execCommand("copy");
+    };
+  </script>
+</body>
+</html>
