@@ -342,6 +342,21 @@ class LocaleViewTests(TestCase):
         self.assertEqual(response.data, {"language": None})
         self.assertEqual(Member.objects.count(), 0)
 
+    @patch("accounts.authentication.verify_id_token")
+    def test_invalid_token_is_treated_as_anonymous(self, mock_verify):
+        mock_verify.side_effect = InvalidFirebaseToken("expired")
+
+        response = self.client.patch(
+            LOCALE_URL, {"nationality": "KR", "language": "ko"}, format="json",
+            **self.auth_header,
+        )
+
+        # 무효/만료 토큰이어도 401이 아니라 비로그인과 동일하게 200을 받아야 한다.
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {"language": "ko"})
+        # 저장할 회원을 특정할 수 없으므로 DB에는 아무것도 남지 않아야 한다.
+        self.assertEqual(Member.objects.count(), 0)
+
 
 class MePatchIsGoneTests(TestCase):
     """PATCH /api/account/는 이제 없다. GET만 지원해야 한다.

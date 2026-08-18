@@ -16,6 +16,24 @@
 
 ---
 
+## 2026-08-18
+- tags: [phase2-2, accounts, LocaleView, 인증, 비로그인API, coding.md, test.md]
+- category: 구현 실수
+- 문제: `docs/DETAIL_SPEC.md` 6-1 #9에 "로그인 여부와 상관없이 호출 가능"이라고 정해진 `PATCH /api/account/locale/`(`LocaleView`)이, 실제로는 무효·만료된 토큰을 보낸 요청에서 막혀버렸다. `FirebaseAuthentication.authenticate()`가 무효 토큰에 대해 `AuthenticationFailed` 예외를 던지면, DRF `dispatch()`가 `patch()`를 실행하기도 전에 401로 응답을 끝내버리기 때문이다("토큰 없음"은 익명으로 통과되지만 "토큰은 있는데 무효함"은 다르게 처리된다는 차이를 coding 단계에서 놓쳤다). verify(체크리스트 검증)와 coding 모두 이 케이스를 안 짚고 지나갔고, review가 정적 코드 분석으로만 이 문제를 [BLOCKING]으로 잡아냈다. 이 구체적 버그 자체는 이번이 첫 사례지만, "비로그인 허용 API"라는 카테고리는 DETAIL_SPEC에 이미 여러 건(#8 국적 저장, #9 locale) 나왔고 앞으로도 반복해서 만들 가능성이 높은 유형이라 판단해, 처음 발견 시점에 바로 규칙을 추가했다(과거 2026-08-13 "경기 데이터 드림 출처 검증" 사례와 같은 기준 — 구조적으로 반복될 카테고리는 1회만 나와도 하네스에 반영).
+- 개선: 사용자에게 "무효 토큰을 익명으로 취급" vs "401 유지하고 문서만 정정" 중 선택을 물어(AskUserQuestion) "익명으로 취급"으로 결정. `LocaleView`에 `perform_authentication()`을 오버라이드해 이 뷰에서만 인증 예외를 삼키도록 coding에서 수정, 테스트 `test_invalid_token_is_treated_as_anonymous` 추가. 재발 방지를 위해 `.claude/agents/coding.md`의 "3. 구현하기" 절에 "로그인 여부와 상관없이 호출 가능한 API는 토큰 없음뿐 아니라 무효·만료 토큰 케이스도 처리해야 한다(필요하면 `perform_authentication()` 오버라이드)"는 규칙을 추가했고, `.claude/agents/test.md`의 체크리스트 항목에도 "무효·만료 토큰" 케이스를 명시적으로 추가했다.
+
+## 2026-08-18
+- tags: [phase2-2, review, agent툴, stall, 인프라]
+- category: 하네스 개선 (아직 규칙 추가 안 함)
+- 문제: Agent 툴로 review 에이전트를 처음 호출했을 때 "no progress for 600s (stream watchdog did not recover)"로 stall되어 실패했다. review 에이전트가 외부 명령(docker, 서버 기동 등 오래 걸리는 작업)을 시도하다 멈춘 것으로 보이며, "외부 명령 없이 정적 코드 읽기 위주로 진행하라"는 지시를 추가해 재시도하자 정상 완료됐다. 기존에 기록된 Workflow 툴의 "control characters" 오류(2026-08-13, 2026-08-17)와는 증상과 원인이 다른 별개의 인프라 문제이고, 이 구체적 증상(Agent 툴로 review 호출 시 외부 명령 때문에 stall)은 이번이 첫 사례다.
+- 개선: 1회성 사례라 아직 `review.md`에 규칙을 추가하지 않는다. 같은 증상(review가 외부 명령을 시도하다 stall)이 한 번 더 나오면, `.claude/agents/review.md`에 "정적 코드 분석을 우선하고, 서버 기동·docker 등 오래 걸리는 외부 명령은 꼭 필요한 경우가 아니면 피한다"는 규칙 추가를 검토한다.
+
+## 2026-08-18
+- tags: [phase2-2, 정상동작, 질문우선, review재검증, DRF소스코드]
+- category: 리뷰 누락 (정상 동작 사례)
+- 문제 아님 — 이번 사이클에서 하네스가 의도대로 잘 작동한 사례. (1) review가 [BLOCKING]을 찾아낸 뒤, coding이 임의로 수정 방향을 정하지 않고 AskUserQuestion으로 "무효 토큰을 익명으로 취급"과 "401 유지·문서만 정정" 두 선택지를 사용자에게 먼저 물어보고 결정을 받았다 — karpathy-guidlines.md의 "불명확하면 멈추고 물어본다" 규칙이 그대로 작동한 사례. (2) 수정 후 재검증에서 review가 DRF 소스코드(`Request._authenticate()`, `APIView.initial()`)를 직접 읽고 수정이 의도대로 동작하는지, 다른 뷰(LoginView/MeView)에 영향은 없는지까지 논리적으로 확인한 뒤에 pass로 판정했다 — 추측이 아니라 근거를 직접 확인하는 review.md 원칙이 잘 지켜졌다.
+- 개선: 규칙이 의도대로 작동했으므로 하네스를 고치지 않음. karpathy-guidlines.md의 질문 우선 규칙, review.md의 "추측만으로 문제를 만들어내지 않는다·근거를 확인한 것만 지적한다" 규칙을 그대로 유지.
+
 ## 2026-08-17
 - tags: [phase2-2, accounts, 테스트버그, mock, URL리네임, test]
 - category: 테스트 놓침
