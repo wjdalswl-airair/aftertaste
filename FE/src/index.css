@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+/*
+  여운 Design System 토큰 (Figma "Yeoun Design System" 프레임 기준)
+  값을 바꿔야 하면 Figma가 먼저 바뀌어야 한다. 여기서 임의로 값만 고치지 않는다.
+*/
+@theme {
+  --color-primary: #f47c5c;
+  --color-accent: #f8b08b;
+  --color-background: #fff5f0;
+  --color-ink: #2b2320;
+  --color-ink-secondary: #9c8ab0;
+  --color-ink-tertiary: #c9bab0;
+  --color-divider: #f0e4dc;
+
+  --radius-xs: 8px;
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
+  --radius-2xl: 28px;
+
+  --font-sans: 'Noto Sans KR', system-ui, sans-serif;
+  --font-brand: 'Gowun Batang', serif;
+}
+
+body {
+  margin: 0;
+  background: var(--color-background);
+  color: var(--color-ink);
+}
+
+#root {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100dvh;
+}
