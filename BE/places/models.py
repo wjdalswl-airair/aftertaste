@@ -1,5 +1,7 @@
 from django.db import models
 
+from accounts.models import Member
+
 
 class Place(models.Model):
     """촬영 명소 정보.
@@ -111,3 +113,18 @@ class WorkTranslation(models.Model):
 
     def __str__(self):
         return f"{self.work} ({self.language})"
+
+
+class SearchHistory(models.Model):
+    """로그인한 사람이 검색한 말을 남긴다.
+
+    Phase 2에서는 최근 검색어 표시에 쓰이고(DETAIL_SPEC 2-5), Phase 3의 검색 이력
+    기반 추천 고도화에도 쓰인다. 비로그인 사용자의 검색어는 여기 남기지 않는다.
+    """
+
+    member = models.ForeignKey(Member, on_delete=models.CASCADE, related_name="search_histories")
+    keyword = models.CharField(max_length=200)
+    searched_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.member} - {self.keyword}"

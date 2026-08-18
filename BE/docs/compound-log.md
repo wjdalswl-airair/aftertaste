@@ -17,6 +17,24 @@
 ---
 
 ## 2026-08-18
+- tags: [phase2-3, places, SearchHistory, 길이검증, CharField, coding.md, test.md]
+- category: 구현 실수
+- 문제: `SearchHistory.keyword`가 `CharField(max_length=200)`인데, 검색 기록을 저장하는 코드가 사용자가 입력한 검색어 길이를 검증하지 않고 그대로 `create()`에 넘겼다. 200자를 넘는 검색어로 로그인 사용자가 검색하면 DB가 `DataError`를 던져 요청 전체가 500으로 죽는 [BLOCKING] 버그였다. review가 정적 분석만으로 찾아냈고, coding/test 단계는 정상 길이 입력으로만 확인해서 놓쳤다. 이 구체적 버그(CharField 길이 제한과 저장 전 입력 검증 불일치)는 이번이 처음 발견된 유형이지만, 이전에 있었던 "비로그인 API에서 무효 토큰 처리 누락"(2026-08-18 기록)과 같은 구조 — "저장/처리 전에 대비 안 한 입력값 하나 때문에 정상 흐름 전체가 죽는" 카테고리다. 이 프로젝트는 명소 설명, 검색어 등 자유 텍스트를 여러 CharField/TextField에 저장하므로 앞으로도 반복될 가능성이 높다고 판단해, 첫 발견 시점에 바로 규칙을 추가한다(2026-08-13 "경기 데이터 드림" 사례와 같은 기준 — 구조적으로 반복될 카테고리는 1회만 나와도 하네스에 반영).
+- 개선: 사용자에게 "검색 자체를 200자로 제한" vs "검색은 전체로 하고 저장만 자르기" 중 선택을 물어(AskUserQuestion) 후자로 결정. `keyword[:200]`으로 잘라서 저장하도록 coding에서 수정하고 회귀 테스트를 추가함. 재발 방지를 위해 `.claude/agents/coding.md`의 "3. 구현하기" 절에 "사용자 입력을 CharField/TextField에 저장할 때는 모델의 `max_length`와 저장 전 입력 길이가 항상 일치하는 게 아니라는 것을 확인하고, 초과할 수 있는 입력이면 어떻게 처리할지(자르기/거부 등) 정하고 구현한다"는 규칙을, `.claude/agents/test.md`의 체크리스트 절에 "CharField/TextField에 저장되는 사용자 입력은 필드 `max_length`를 넘는 값으로도 테스트한다(DB 에러 없이 처리되는지 확인)"는 규칙을 추가했다.
+
+## 2026-08-18
+- tags: [phase2-3, 인프라, python인터프리터, 환경, 반복]
+- category: 하네스 개선
+- 문제: test/verify 에이전트가 이번에도 각자 "기본 `python` 명령에는 Django가 없고, Django/DRF가 설치된 인터프리터는 `C:/Users/SSAFY/AppData/Local/Programs/Python/Python311/python.exe`(Python 3.11)를 써야 한다"는 환경 함정을 스스로 찾아내는 데 시간을 썼다. Phase 2-2 때도 같은 함정을 각 에이전트가 개별적으로 발견했던 것과 동일 패턴이 이번이 2번째로 재현됐다. 지금까지 이 정보가 `CLAUDE.md` 등 하네스 문서 어디에도 적혀있지 않아서, 매 사이클 각 에이전트가 처음부터 다시 찾아내는 낭비가 반복되고 있었다.
+- 개선: `CLAUDE.md`에 "개발 환경" 절을 새로 추가해, 이 프로젝트에서 Django/DRF가 설치된 파이썬 인터프리터 경로(`C:/Users/SSAFY/AppData/Local/Programs/Python/Python311/python.exe`)를 명시했다. `manage.py` 등을 실행하는 모든 에이전트(coding/test/verify)가 매번 새로 찾지 않고 이 경로를 바로 쓰도록 함.
+
+## 2026-08-18
+- tags: [phase2-3, 정상동작, 질문우선, review재검증, test스킵보고]
+- category: 리뷰 누락 (정상 동작 사례)
+- 문제 아님 — 이번 사이클에서 하네스가 의도대로 잘 작동한 사례. (1) review가 코드를 실제로 실행하지 않고 정적 분석만으로 `SearchHistory.keyword` 길이 검증 누락 [BLOCKING]을 정확히 찾아냈다 — review.md의 "소스코드를 근거로 로직 오류를 찾는다" 원칙이 그대로 작동했다. (2) 버그를 고칠 때 coding이 수정 방향(검색 자체를 제한할지, 저장만 자를지)을 스스로 정하지 않고 AskUserQuestion으로 사용자에게 먼저 물어 결정을 받았다 — karpathy-guidlines.md의 질문 우선 규칙이 다시 정상 작동했다. (3) 재검증 단계에서 test 에이전트가 브라우저 자동화 도구가 없어 스크린샷을 못 남기고 개발 DB에 직접 쓰는 명령이 샌드박스 정책으로 막혔는데, 임의로 다른 방법을 쓰지 않고 test.md의 "캡쳐할 수 없는 항목은 건너뛰고 이유를 보고서에 남긴다" 규칙대로 자동화 테스트로 대체하고 이유를 명시해서 보고했다. 세 번째 항목은 이번에 처음 나온 구체적 상황이라 아직 반복인지 알 수 없고, 기존 test.md 규칙만으로 이미 적절히 처리됐으므로 별도 규칙 추가는 필요 없다고 판단했다.
+- 개선: 규칙이 의도대로 작동했으므로 하네스를 고치지 않음. review.md의 정적 분석 원칙, karpathy-guidlines.md의 질문 우선 규칙, test.md의 "캡쳐 불가 항목은 건너뛰고 이유를 남긴다" 규칙을 그대로 유지. 브라우저 자동화 도구 부재·DB 직접 쓰기 차단이 다음 사이클에도 반복되면, 그때는 test 에이전트의 도구 권한 설정 자체를 점검한다.
+
+## 2026-08-18
 - tags: [phase2-2, accounts, LocaleView, 인증, 비로그인API, coding.md, test.md]
 - category: 구현 실수
 - 문제: `docs/DETAIL_SPEC.md` 6-1 #9에 "로그인 여부와 상관없이 호출 가능"이라고 정해진 `PATCH /api/account/locale/`(`LocaleView`)이, 실제로는 무효·만료된 토큰을 보낸 요청에서 막혀버렸다. `FirebaseAuthentication.authenticate()`가 무효 토큰에 대해 `AuthenticationFailed` 예외를 던지면, DRF `dispatch()`가 `patch()`를 실행하기도 전에 401로 응답을 끝내버리기 때문이다("토큰 없음"은 익명으로 통과되지만 "토큰은 있는데 무효함"은 다르게 처리된다는 차이를 coding 단계에서 놓쳤다). verify(체크리스트 검증)와 coding 모두 이 케이스를 안 짚고 지나갔고, review가 정적 코드 분석으로만 이 문제를 [BLOCKING]으로 잡아냈다. 이 구체적 버그 자체는 이번이 첫 사례지만, "비로그인 허용 API"라는 카테고리는 DETAIL_SPEC에 이미 여러 건(#8 국적 저장, #9 locale) 나왔고 앞으로도 반복해서 만들 가능성이 높은 유형이라 판단해, 처음 발견 시점에 바로 규칙을 추가했다(과거 2026-08-13 "경기 데이터 드림 출처 검증" 사례와 같은 기준 — 구조적으로 반복될 카테고리는 1회만 나와도 하네스에 반영).

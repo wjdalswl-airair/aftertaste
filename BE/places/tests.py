@@ -764,3 +764,331 @@ class ImportKcisaCommandTest(TestCase):
         self.assertEqual(existing.address, "기존주소")
         self.assertEqual(existing.business_hours, "기존시간")
         self.assertIn("좌표 100m 이내 기존 명소와 병합 1건", output)
+
+
+# ---------------------------------------------------------------------------
+# Phase 2-3 (검색) checklist tests. See docs/PHASES/PHASE2.md 2-3,
+# docs/DETAIL_SPEC.md 3-2.
+# ---------------------------------------------------------------------------
+
+from rest_framework import status
+from rest_framework.test import APIClient
+
+from accounts.firebase import InvalidFirebaseToken
+from accounts.models import Member
+from places.models import SearchHistory
+
+SEARCH_URL = "/api/places/search/"
+AUTOCOMPLETE_URL = "/api/places/search/autocomplete/"
+
+
+def make_decoded_token(uid, provider="google.com"):
+    return {
+        "uid": uid,
+        "email": "test@example.com",
+        "name": "테스터",
+        "picture": "http://example.com/pic.jpg",
+        "firebase": {"sign_in_provider": provider},
+    }
+
+
+class SearchTestData(TestCase):
+    """검색 테스트에서 공통으로 쓰는 명소/작품 데이터를 만든다."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.auth_header = {"HTTP_AUTHORIZATION": "Bearer fake-token"}
+
+        self.gyeongbokgung = create_place_with_source(
+            "경복궁", "TEST_SOURCE", "SEARCH_S1", address="서울 종로구"
+        )
+        self.namsan = create_place_with_source(
+            "남산타워", "TEST_SOURCE", "SEARCH_S2", address="서울 용산구"
+        )
+
+        self.drama_work = Work.objects.create(title="사랑비", category=Work.Category.DRAMA)
+        self.movie_work = Work.objects.create(title="극한직업", category=Work.Category.MOVIE)
+
+        self.mixed_place = create_place_with_source(
+            "경복궁야경투어", "TEST_SOURCE", "SEARCH_S3", address="서울 종로구"
+        )
+        self.mixed_work = Work.objects.create(title="경복궁의 비밀", category=Work.Category.DRAMA)
+
+
+class SearchViewLoginNotRequiredTest(SearchTestData):
+    """checklist: 로그인 없이 검색된다 / 무효 만료 토큰이어도 검색은 막히지 않는다."""
+
+    def test_search_without_token_returns_200(self):
+        response = self.client.get(SEARCH_URL, {"q": "경복궁"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_search_with_invalid_token_still_returns_results(self, mock_verify):
+        mock_verify.side_effect = InvalidFirebaseToken("expired")
+
+        response = self.client.get(SEARCH_URL, {"q": "경복궁"}, **self.auth_header)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        place_names = [p["name"] for p in response.data["places"]]
+        self.assertIn("경복궁", place_names)
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_search_with_expired_token_does_not_save_history(self, mock_verify):
+        mock_verify.side_effect = InvalidFirebaseToken("expired")
+
+        self.client.get(SEARCH_URL, {"q": "경복궁"}, **self.auth_header)
+
+        self.assertEqual(SearchHistory.objects.count(), 0)
+
+
+class SearchViewSectionTest(SearchTestData):
+    """checklist: 결과가 명소 섹션과 작품 섹션으로 나뉘어 나온다."""
+
+    def test_unified_search_splits_places_and_works(self):
+        response = self.client.get(SEARCH_URL, {"q": "경복궁"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("places", response.data)
+        self.assertIn("works", response.data)
+
+        place_names = {p["name"] for p in response.data["places"]}
+        work_titles = {w["title"] for w in response.data["works"]}
+
+        self.assertIn("경복궁", place_names)
+        self.assertIn("경복궁야경투어", place_names)
+        self.assertIn("경복궁의 비밀", work_titles)
+        self.assertNotIn("남산타워", place_names)
+        self.assertNotIn("사랑비", work_titles)
+
+
+class SearchViewTypeFilterTest(SearchTestData):
+    """checklist: 드라마만, 영화만 골라 볼 수 있다."""
+
+    def test_type_work_returns_all_works_without_places(self):
+        response = self.client.get(SEARCH_URL, {"q": "사랑비", "type": "WORK"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["places"], [])
+        titles = {w["title"] for w in response.data["works"]}
+        self.assertIn("사랑비", titles)
+
+    def test_type_drama_only_returns_drama(self):
+        response = self.client.get(SEARCH_URL, {"q": "사랑비", "type": "DRAMA"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        titles = {w["title"] for w in response.data["works"]}
+        self.assertIn("사랑비", titles)
+
+    def test_type_drama_excludes_movie(self):
+        response = self.client.get(SEARCH_URL, {"q": "극한직업", "type": "DRAMA"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["works"], [])
+        self.assertEqual(response.data.get("message"), "검색결과가 존재하지 않습니다")
+
+    def test_type_movie_only_returns_movie(self):
+        response = self.client.get(SEARCH_URL, {"q": "극한직업", "type": "MOVIE"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        titles = {w["title"] for w in response.data["works"]}
+        self.assertIn("극한직업", titles)
+
+    def test_type_movie_excludes_drama(self):
+        response = self.client.get(SEARCH_URL, {"q": "사랑비", "type": "MOVIE"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["works"], [])
+
+    def test_invalid_type_value_returns_400(self):
+        response = self.client.get(SEARCH_URL, {"q": "경복궁", "type": "ARTWORK"})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class SearchViewTypoTest(SearchTestData):
+    """checklist: 오타를 내도 찾아진다. 완전히 다른 검색어로는 노이즈가 없어야 한다."""
+
+    def test_typo_finds_correct_place(self):
+        response = self.client.get(SEARCH_URL, {"q": "경보궁"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        place_names = {p["name"] for p in response.data["places"]}
+        self.assertIn("경복궁", place_names)
+
+    def test_missing_last_character_still_finds_place(self):
+        response = self.client.get(SEARCH_URL, {"q": "남산타"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        place_names = {p["name"] for p in response.data["places"]}
+        self.assertIn("남산타워", place_names)
+
+    def test_completely_unrelated_keyword_returns_no_noise(self):
+        response = self.client.get(SEARCH_URL, {"q": "쥐라기공원우주정거장"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["places"], [])
+        self.assertEqual(response.data["works"], [])
+        self.assertEqual(response.data.get("message"), "검색결과가 존재하지 않습니다")
+
+
+class SearchViewNoResultTest(SearchTestData):
+    """checklist: 결과가 없으면 검색결과가 존재하지 않습니다가 나온다."""
+
+    def test_no_result_includes_message(self):
+        response = self.client.get(SEARCH_URL, {"q": "존재하지않는검색어123"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["message"], "검색결과가 존재하지 않습니다")
+
+    def test_result_found_has_no_message_key(self):
+        response = self.client.get(SEARCH_URL, {"q": "경복궁"})
+
+        self.assertNotIn("message", response.data)
+
+
+class SearchViewEmptyKeywordTest(SearchTestData):
+    """예외 상황: 검색어가 비어 있으면 검색하지 않는다."""
+
+    def test_missing_q_param_returns_400(self):
+        response = self.client.get(SEARCH_URL)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_empty_q_param_returns_400(self):
+        response = self.client.get(SEARCH_URL, {"q": ""})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_whitespace_only_q_param_returns_400(self):
+        response = self.client.get(SEARCH_URL, {"q": "   "})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class SearchViewTranslationTest(SearchTestData):
+    """checklist: 저장된 번역 이름까지 같이 뒤진다."""
+
+    def setUp(self):
+        super().setUp()
+        PlaceTranslation.objects.create(
+            place=self.gyeongbokgung, language="en", name="Gyeongbokgung Palace"
+        )
+        WorkTranslation.objects.create(
+            work=self.drama_work, language="en", title="Rain of Love"
+        )
+
+    def test_place_translation_name_is_searchable(self):
+        response = self.client.get(SEARCH_URL, {"q": "Gyeongbokgung"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        place_names = {p["name"] for p in response.data["places"]}
+        self.assertIn("경복궁", place_names)
+
+    def test_work_translation_title_is_searchable(self):
+        response = self.client.get(SEARCH_URL, {"q": "Rain of Love"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        work_titles = {w["title"] for w in response.data["works"]}
+        self.assertIn("사랑비", work_titles)
+
+
+class SearchAutocompleteTest(SearchTestData):
+    """checklist: 글자를 치는 도중 후보가 나온다."""
+
+    def test_autocomplete_returns_candidates_while_typing(self):
+        response = self.client.get(AUTOCOMPLETE_URL, {"q": "경복"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("경복궁", response.data["suggestions"])
+        self.assertIn("경복궁야경투어", response.data["suggestions"])
+        self.assertIn("경복궁의 비밀", response.data["suggestions"])
+
+    def test_autocomplete_empty_query_returns_empty_list_not_400(self):
+        response = self.client.get(AUTOCOMPLETE_URL, {"q": ""})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["suggestions"], [])
+
+    def test_autocomplete_missing_query_returns_empty_list_not_400(self):
+        response = self.client.get(AUTOCOMPLETE_URL)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["suggestions"], [])
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_autocomplete_with_invalid_token_still_returns_candidates(self, mock_verify):
+        mock_verify.side_effect = InvalidFirebaseToken("expired")
+
+        response = self.client.get(AUTOCOMPLETE_URL, {"q": "경복"}, **self.auth_header)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("경복궁", response.data["suggestions"])
+
+    def test_autocomplete_limits_to_ten_candidates(self):
+        for i in range(15):
+            create_place_with_source("자동완성명소" + str(i), "TEST_SOURCE", "AC_" + str(i))
+
+        response = self.client.get(AUTOCOMPLETE_URL, {"q": "자동완성명소"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertLessEqual(len(response.data["suggestions"]), 10)
+
+
+class SearchHistoryTest(SearchTestData):
+    """checklist: 로그인한 사람의 검색어가 서버에 쌓인다 / 비로그인은 남기지 않는다."""
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_logged_in_user_search_is_saved_to_history(self, mock_verify):
+        member = Member.objects.create(
+            firebase_uid="search-uid-1",
+            provider=Member.Provider.GOOGLE,
+            agreed_terms_at="2026-01-01T00:00:00Z",
+        )
+        mock_verify.return_value = make_decoded_token("search-uid-1")
+
+        response = self.client.get(SEARCH_URL, {"q": "경복궁"}, **self.auth_header)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(SearchHistory.objects.filter(member=member).count(), 1)
+        self.assertEqual(SearchHistory.objects.get(member=member).keyword, "경복궁")
+
+    def test_anonymous_user_search_is_not_saved(self):
+        response = self.client.get(SEARCH_URL, {"q": "경복궁"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(SearchHistory.objects.count(), 0)
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_each_search_by_logged_in_user_creates_a_new_history_row(self, mock_verify):
+        member = Member.objects.create(
+            firebase_uid="search-uid-2",
+            provider=Member.Provider.GOOGLE,
+            agreed_terms_at="2026-01-01T00:00:00Z",
+        )
+        mock_verify.return_value = make_decoded_token("search-uid-2")
+
+        self.client.get(SEARCH_URL, {"q": "경복궁"}, **self.auth_header)
+        self.client.get(SEARCH_URL, {"q": "남산타워"}, **self.auth_header)
+
+        self.assertEqual(SearchHistory.objects.filter(member=member).count(), 2)
+        keywords = set(SearchHistory.objects.filter(member=member).values_list("keyword", flat=True))
+        self.assertEqual(keywords, {"경복궁", "남산타워"})
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_long_keyword_search_succeeds_and_history_is_truncated_to_200_chars(self, mock_verify):
+        """검색어가 200자를 넘어도 검색은 전체 검색어로 되고, 이력에는 200자까지만 저장된다."""
+        member = Member.objects.create(
+            firebase_uid="search-uid-3",
+            provider=Member.Provider.GOOGLE,
+            agreed_terms_at="2026-01-01T00:00:00Z",
+        )
+        mock_verify.return_value = make_decoded_token("search-uid-3")
+
+        long_keyword = "경복궁" + "가" * 300  # 200자를 훌쩍 넘는 검색어
+
+        response = self.client.get(SEARCH_URL, {"q": long_keyword}, **self.auth_header)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        place_names = {p["name"] for p in response.data["places"]}
+        self.assertIn("경복궁", place_names)  # 검색 자체는 전체 문자열로 정상 수행됨
+
+        saved_keyword = SearchHistory.objects.get(member=member).keyword
+        self.assertEqual(len(saved_keyword), 200)
+        self.assertEqual(saved_keyword, long_keyword[:200])

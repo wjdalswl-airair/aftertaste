@@ -1,6 +1,14 @@
 from django.contrib import admin
 
-from places.models import Place, PlaceSource, PlaceTranslation, PlaceWork, Work, WorkTranslation
+from places.models import (
+    Place,
+    PlaceSource,
+    PlaceTranslation,
+    PlaceWork,
+    SearchHistory,
+    Work,
+    WorkTranslation,
+)
 
 
 class PlaceWorkInline(admin.TabularInline):
@@ -45,3 +53,9 @@ class PlaceTranslationAdmin(admin.ModelAdmin):
 @admin.register(WorkTranslation)
 class WorkTranslationAdmin(admin.ModelAdmin):
     list_display = ("work", "language", "title")
+
+
+@admin.register(SearchHistory)
+class SearchHistoryAdmin(admin.ModelAdmin):
+    list_display = ("member", "keyword", "searched_at")
+    search_fields = ("keyword", "member__nickname")

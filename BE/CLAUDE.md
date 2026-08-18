@@ -42,6 +42,10 @@
 3. 코드 주석은 비전공자/신입 팀원도 이해할 수 있도록 쉬운 단어로 간결하게 작성한다.
 4. 사용자에게 코드나 결정사항을 설명할 때도 쉬운 단어로 단순명료하게 설명한다.
 
+# 개발 환경
+
+- 기본 `python` 명령어에는 Django가 설치되어 있지 않다. Django/DRF가 설치된 인터프리터는 `C:/Users/SSAFY/AppData/Local/Programs/Python/Python311/python.exe` (Python 3.11)이다. `manage.py test`, `manage.py runserver` 등을 실행할 때는 이 경로를 사용한다. (Phase 2-2, Phase 2-3에서 각 에이전트가 반복해서 새로 발견했던 함정이라 여기에 명시해둔다.)
+
 # 알려진 도구 이슈
 
 - `Workflow` 툴로 phase-harness(coding→test→verify→review→compound)를 자동 실행하면 권한 처리기 오류("script contains control characters that would be hidden in the approval dialog")로 실패할 수 있다 (2026-08-13, 2026-08-17 재현됨). 하네스 문서로 고칠 수 있는 문제가 아니라 도구 자체의 버그다. 재발하면 `Agent` 툴로 coding→test→verify→review→compound를 순서대로 수동 호출해 동일한 흐름을 대체 수행한다.

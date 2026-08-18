@@ -43,6 +43,8 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    # 유사 검색(trigram_similar, TrigramSimilarity)에 필요 — PostgreSQL 전용 조회 기능
+    "django.contrib.postgres",
     "rest_framework",
     "drf_spectacular",
     "corsheaders",
