@@ -46,6 +46,7 @@
 - [ ] 로그인한 뒤 새로고침해도 로그인 상태가 유지된다 (Firebase `onAuthStateChanged` 기준)
 - [ ] 토큰을 `localStorage` 등에 직접 저장하는 코드가 없다 (Firebase SDK가 자체 관리)
 - [ ] 로그인이 필요한 라우트에 비로그인 상태로 접근하면 "로그인이 필요한 기능입니다" 안내 후 `/login`으로 이동한다
+- [ ] 관련 유닛 테스트(인증 API 함수 성공/실패, `useAuthStore`, `RequireAuth` 가드) 통과 (Vitest)
 - [ ] `npm run lint`, `npm run build` 통과
 
 ## 넘어가기 전 확인
