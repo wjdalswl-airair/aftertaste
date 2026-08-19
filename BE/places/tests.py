@@ -1092,3 +1092,425 @@ class SearchHistoryTest(SearchTestData):
         saved_keyword = SearchHistory.objects.get(member=member).keyword
         self.assertEqual(len(saved_keyword), 200)
         self.assertEqual(saved_keyword, long_keyword[:200])
+
+
+# ---------------------------------------------------------------------------
+# Phase 2-4 (위치기반 추천 — 비로그인 분기만) checklist tests. See docs/PHASES/PHASE2.md 2-4.
+# ---------------------------------------------------------------------------
+
+RECOMMEND_URL = "/api/places/recommend/"
+
+# 테스트 기준점: 서울시청 근처. 각 명소를 이 점에서 거리가 다르게 배치해 거리순 정렬을 검증한다.
+BASE_LAT = 37.5665
+BASE_LNG = 126.9780
+
+
+class RecommendTestData(TestCase):
+    """추천 테스트에서 공통으로 쓰는 클라이언트/헤더 준비."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.auth_header = {"HTTP_AUTHORIZATION": "Bearer fake-token"}
+
+
+class RecommendationViewLoginNotRequiredTest(RecommendTestData):
+    """checklist 1: 로그인 없이 추천이 나온다. 무효/만료 토큰이어도 막히지 않는다."""
+
+    def setUp(self):
+        super().setUp()
+        create_place_with_source("명소1", "TEST_SOURCE", "REC_A1")
+        create_place_with_source("명소2", "TEST_SOURCE", "REC_A2")
+
+    def test_recommend_without_token_returns_200(self):
+        response = self.client.get(RECOMMEND_URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_recommend_response_has_places_key(self):
+        response = self.client.get(RECOMMEND_URL)
+        self.assertIn("places", response.data)
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_recommend_with_invalid_token_still_returns_200_not_401(self, mock_verify):
+        mock_verify.side_effect = InvalidFirebaseToken("expired")
+
+        response = self.client.get(RECOMMEND_URL, **self.auth_header)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_recommend_with_expired_token_still_returns_places(self, mock_verify):
+        mock_verify.side_effect = InvalidFirebaseToken("expired")
+
+        response = self.client.get(RECOMMEND_URL, **self.auth_header)
+
+        self.assertGreater(len(response.data["places"]), 0)
+
+
+class RecommendationViewNearestTest(RecommendTestData):
+    """checklist 2: 위치 권한을 허용하면(lat/lng 유효) 주변 명소 3곳이 거리순으로 나온다."""
+
+    def setUp(self):
+        super().setUp()
+        # 기준점에서 거리가 다른 4개 명소를 만든다. 가까운 순서: near < mid < far < farthest.
+        self.near = create_place_with_source(
+            "가까운명소", "TEST_SOURCE", "REC_NEAR", latitude=Decimal("37.5665"), longitude=Decimal("126.9780")
+        )
+        self.mid = create_place_with_source(
+            "중간명소", "TEST_SOURCE", "REC_MID", latitude=Decimal("37.6000"), longitude=Decimal("126.9780")
+        )
+        self.far = create_place_with_source(
+            "먼명소", "TEST_SOURCE", "REC_FAR", latitude=Decimal("37.7000"), longitude=Decimal("126.9780")
+        )
+        self.farthest = create_place_with_source(
+            "가장먼명소", "TEST_SOURCE", "REC_FARTHEST", latitude=Decimal("38.0000"), longitude=Decimal("126.9780")
+        )
+        # 좌표 없는 명소는 거리 기준 추천 대상에서 빠져야 한다.
+        self.no_coord = create_place_with_source("좌표없는명소", "TEST_SOURCE", "REC_NOCOORD")
+
+    def test_nearest_places_returns_three_closest_in_distance_order(self):
+        response = self.client.get(RECOMMEND_URL, {"lat": str(BASE_LAT), "lng": str(BASE_LNG)})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = [p["name"] for p in response.data["places"]]
+        self.assertEqual(names, ["가까운명소", "중간명소", "먼명소"])
+
+    def test_nearest_places_excludes_farthest_place(self):
+        response = self.client.get(RECOMMEND_URL, {"lat": str(BASE_LAT), "lng": str(BASE_LNG)})
+
+        names = [p["name"] for p in response.data["places"]]
+        self.assertNotIn("가장먼명소", names)
+
+    def test_nearest_places_excludes_place_without_coordinates(self):
+        response = self.client.get(RECOMMEND_URL, {"lat": str(BASE_LAT), "lng": str(BASE_LNG)})
+
+        names = [p["name"] for p in response.data["places"]]
+        self.assertNotIn("좌표없는명소", names)
+
+    def test_nearest_places_returns_exactly_three(self):
+        response = self.client.get(RECOMMEND_URL, {"lat": str(BASE_LAT), "lng": str(BASE_LNG)})
+
+        self.assertEqual(len(response.data["places"]), 3)
+
+
+class RecommendationViewRandomFallbackTest(RecommendTestData):
+    """checklist 3, 4, 7: 위치 정보가 없거나/숫자가 아니거나/일부만 있으면 무작위 3곳으로 대체된다."""
+
+    def setUp(self):
+        super().setUp()
+        for i in range(5):
+            create_place_with_source(f"무작위명소{i}", "TEST_SOURCE", f"REC_RAND_{i}")
+
+    def test_no_lat_lng_returns_three_places_without_error(self):
+        response = self.client.get(RECOMMEND_URL)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["places"]), 3)
+
+    def test_non_numeric_lat_lng_falls_back_to_random_without_error(self):
+        response = self.client.get(RECOMMEND_URL, {"lat": "정보없음", "lng": "정보없음"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["places"]), 3)
+
+    def test_only_lat_without_lng_falls_back_to_random(self):
+        response = self.client.get(RECOMMEND_URL, {"lat": str(BASE_LAT)})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["places"]), 3)
+
+    def test_only_lng_without_lat_falls_back_to_random(self):
+        response = self.client.get(RECOMMEND_URL, {"lng": str(BASE_LNG)})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["places"]), 3)
+
+    def test_empty_string_lat_lng_falls_back_to_random(self):
+        response = self.client.get(RECOMMEND_URL, {"lat": "", "lng": ""})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["places"]), 3)
+
+    def test_response_place_fields_match_serializer(self):
+        response = self.client.get(RECOMMEND_URL)
+
+        place = response.data["places"][0]
+        self.assertEqual(set(place.keys()), {"id", "name", "address", "photo_url"})
+
+
+class RecommendationViewFewerThanThreeTest(RecommendTestData):
+    """checklist 5: 명소가 3개보다 적어도 에러 없이 있는 만큼만 반환한다."""
+
+    def test_random_branch_with_one_place_returns_one_without_error(self):
+        create_place_with_source("유일한명소", "TEST_SOURCE", "REC_ONLY1")
+
+        response = self.client.get(RECOMMEND_URL)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["places"]), 1)
+        self.assertEqual(response.data["places"][0]["name"], "유일한명소")
+
+    def test_nearest_branch_with_one_place_returns_one_without_error(self):
+        create_place_with_source(
+            "유일한명소", "TEST_SOURCE", "REC_ONLY2", latitude=Decimal("37.5665"), longitude=Decimal("126.9780")
+        )
+
+        response = self.client.get(RECOMMEND_URL, {"lat": str(BASE_LAT), "lng": str(BASE_LNG)})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["places"]), 1)
+
+    def test_no_places_at_all_returns_empty_list_without_error(self):
+        response = self.client.get(RECOMMEND_URL)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["places"], [])
+
+
+# ---------------------------------------------------------------------------
+# Phase 2-5 (명소 상세 + 카카오맵) checklist tests. See docs/PHASES/PHASE2.md 2-5.
+# ---------------------------------------------------------------------------
+
+DETAIL_URL_TEMPLATE = "/api/places/{}/"
+
+
+def _fake_kakao_result(name, address, lat, lng, category="음식점", kakao_id="1"):
+    return {
+        "id": kakao_id,
+        "place_name": name,
+        "address_name": address,
+        "road_address_name": address,
+        "latitude": lat,
+        "longitude": lng,
+        "category_name": category,
+    }
+
+
+class PlaceDetailTestData(TestCase):
+    """명소 상세 테스트에서 공통으로 쓰는 명소/작품 데이터를 만든다."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.auth_header = {"HTTP_AUTHORIZATION": "Bearer fake-token"}
+
+        self.place = create_place_with_source(
+            "경복궁",
+            "TEST_SOURCE",
+            "DETAIL_S1",
+            address="서울 종로구 사직로 161",
+            photo_url="https://example.com/gyeongbokgung.jpg",
+            business_hours="09:00~18:00",
+            description="조선시대 정궁",
+            latitude=Decimal("37.579617"),
+            longitude=Decimal("126.977041"),
+        )
+
+
+class PlaceDetailViewLoginNotRequiredTest(PlaceDetailTestData):
+    """checklist: 로그인 없이 열린다 / 무효 만료 토큰이어도 401이 아니라 200이 온다."""
+
+    def test_detail_without_token_returns_200(self):
+        response = self.client.get(DETAIL_URL_TEMPLATE.format(self.place.id))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_detail_with_invalid_token_still_returns_200(self, mock_verify):
+        mock_verify.side_effect = InvalidFirebaseToken("expired")
+
+        response = self.client.get(DETAIL_URL_TEMPLATE.format(self.place.id), **self.auth_header)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["name"], "경복궁")
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_detail_with_expired_token_still_returns_200(self, mock_verify):
+        mock_verify.side_effect = InvalidFirebaseToken("expired")
+
+        response = self.client.get(DETAIL_URL_TEMPLATE.format(self.place.id), **self.auth_header)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
+class PlaceDetailViewBasicFieldsTest(PlaceDetailTestData):
+    """checklist: 명소 기본 정보(이름 주소 사진 영업시간 설명 위경도)가 함께 나온다."""
+
+    def test_detail_includes_basic_fields(self):
+        response = self.client.get(DETAIL_URL_TEMPLATE.format(self.place.id))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["name"], "경복궁")
+        self.assertEqual(response.data["address"], "서울 종로구 사직로 161")
+        self.assertEqual(response.data["photo_url"], "https://example.com/gyeongbokgung.jpg")
+        self.assertEqual(response.data["business_hours"], "09:00~18:00")
+        self.assertEqual(response.data["description"], "조선시대 정궁")
+        self.assertAlmostEqual(float(response.data["latitude"]), 37.579617, places=5)
+        self.assertAlmostEqual(float(response.data["longitude"]), 126.977041, places=5)
+
+
+class PlaceDetailViewWorksTest(PlaceDetailTestData):
+    """checklist: 명소를 열면 등장 작품과 작품별 장면 설명이 같이 나온다."""
+
+    def setUp(self):
+        super().setUp()
+        self.work1 = Work.objects.create(
+            title="사랑비",
+            category=Work.Category.DRAMA,
+            release_date="2022-01-01",
+            main_cast="배우A",
+            director="감독A",
+        )
+        self.work2 = Work.objects.create(
+            title="극한직업",
+            category=Work.Category.MOVIE,
+            release_date="2019-01-01",
+            main_cast="배우B",
+            director="감독B",
+        )
+        PlaceWork.objects.create(place=self.place, work=self.work1, scene_description="1화 왕궁 장면")
+        PlaceWork.objects.create(place=self.place, work=self.work2, scene_description="추격 장면")
+
+    def test_detail_includes_all_linked_works(self):
+        response = self.client.get(DETAIL_URL_TEMPLATE.format(self.place.id))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        titles = {w["work"]["title"] for w in response.data["works"]}
+        self.assertEqual(titles, {"사랑비", "극한직업"})
+
+    def test_scene_description_matches_correct_work(self):
+        response = self.client.get(DETAIL_URL_TEMPLATE.format(self.place.id))
+
+        by_title = {w["work"]["title"]: w["scene_description"] for w in response.data["works"]}
+        self.assertEqual(by_title["사랑비"], "1화 왕궁 장면")
+        self.assertEqual(by_title["극한직업"], "추격 장면")
+
+    def test_work_detail_fields_are_included(self):
+        response = self.client.get(DETAIL_URL_TEMPLATE.format(self.place.id))
+
+        work_entry = next(w for w in response.data["works"] if w["work"]["title"] == "사랑비")
+        self.assertEqual(work_entry["work"]["category"], "DRAMA")
+        self.assertEqual(work_entry["work"]["main_cast"], "배우A")
+        self.assertEqual(work_entry["work"]["director"], "감독A")
+
+    def test_place_without_works_returns_empty_list(self):
+        lonely_place = create_place_with_source("혼자인명소", "TEST_SOURCE", "DETAIL_LONELY")
+
+        response = self.client.get(DETAIL_URL_TEMPLATE.format(lonely_place.id))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["works"], [])
+
+
+class PlaceDetailViewNotFoundTest(PlaceDetailTestData):
+    """checklist: 없는 명소를 열려고 하면 존재하지 않습니다가 나온다."""
+
+    def test_missing_place_returns_404_with_message(self):
+        response = self.client.get(DETAIL_URL_TEMPLATE.format(999999))
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.data["detail"], "존재하지 않습니다")
+
+
+class PlaceDetailViewNearbyPlacesTest(PlaceDetailTestData):
+    """checklist: 주변 상권이 보인다. 카카오 API는 mock으로 처리해 실제 네트워크 호출을 하지 않는다."""
+
+    @patch("places.views.kakao_geocoding.search_by_category")
+    def test_nearby_places_are_included_from_mocked_kakao_api(self, mock_search):
+        mock_search.side_effect = [
+            [_fake_kakao_result("맛집1", "서울 종로구 1", 37.58, 126.98, "음식점", kakao_id="F1")],
+            [_fake_kakao_result("카페1", "서울 종로구 2", 37.581, 126.981, "카페", kakao_id="C1")],
+            [_fake_kakao_result("관광지1", "서울 종로구 3", 37.582, 126.982, "관광명소", kakao_id="A1")],
+        ]
+
+        response = self.client.get(DETAIL_URL_TEMPLATE.format(self.place.id))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = {p["place_name"] for p in response.data["nearby_places"]}
+        self.assertEqual(names, {"맛집1", "카페1", "관광지1"})
+        self.assertEqual(mock_search.call_count, 3)
+
+    @patch("places.views.kakao_geocoding.search_by_category")
+    def test_nearby_places_search_uses_place_coordinates_and_configured_radius(self, mock_search):
+        mock_search.return_value = []
+
+        self.client.get(DETAIL_URL_TEMPLATE.format(self.place.id))
+
+        called_codes = [call.args[0] for call in mock_search.call_args_list]
+        self.assertEqual(called_codes, ["FD6", "CE7", "AT4"])
+        for call in mock_search.call_args_list:
+            self.assertAlmostEqual(call.kwargs["x"], 126.977041, places=5)
+            self.assertAlmostEqual(call.kwargs["y"], 37.579617, places=5)
+            self.assertEqual(call.kwargs["radius"], 1000)
+
+    @patch("places.views.kakao_geocoding.search_by_category")
+    def test_one_category_failing_does_not_break_response(self, mock_search):
+        def side_effect(category_code, **kwargs):
+            if category_code == "CE7":
+                raise Exception("카카오 카페 검색 실패")
+            if category_code == "FD6":
+                return [_fake_kakao_result("맛집1", "서울 종로구 1", 37.58, 126.98, "음식점", kakao_id="F1")]
+            return [_fake_kakao_result("관광지1", "서울 종로구 3", 37.582, 126.982, "관광명소", kakao_id="A1")]
+
+        mock_search.side_effect = side_effect
+
+        response = self.client.get(DETAIL_URL_TEMPLATE.format(self.place.id))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = {p["place_name"] for p in response.data["nearby_places"]}
+        self.assertEqual(names, {"맛집1", "관광지1"})
+
+    @patch("places.views.kakao_geocoding.search_by_category")
+    def test_all_categories_failing_returns_200_with_empty_nearby_places(self, mock_search):
+        mock_search.side_effect = Exception("카카오 API 전체 실패")
+
+        response = self.client.get(DETAIL_URL_TEMPLATE.format(self.place.id))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["nearby_places"], [])
+
+    @patch("places.views.kakao_geocoding.search_by_category")
+    def test_place_without_coordinates_skips_kakao_call_and_returns_empty_list(self, mock_search):
+        no_coord_place = create_place_with_source("좌표없는명소", "TEST_SOURCE", "DETAIL_NOCOORD")
+
+        response = self.client.get(DETAIL_URL_TEMPLATE.format(no_coord_place.id))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["nearby_places"], [])
+        mock_search.assert_not_called()
+
+    @patch("places.views.kakao_geocoding.search_by_category")
+    def test_duplicate_result_across_categories_is_deduplicated_by_kakao_id(self, mock_search):
+        duplicate_place = _fake_kakao_result("복합공간", "서울 종로구 4", 37.583, 126.983, "복합", kakao_id="DUP1")
+        mock_search.side_effect = [
+            [duplicate_place],
+            [duplicate_place],
+            [],
+        ]
+
+        response = self.client.get(DETAIL_URL_TEMPLATE.format(self.place.id))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["nearby_places"]), 1)
+        self.assertEqual(response.data["nearby_places"][0]["place_name"], "복합공간")
+
+    @patch("places.views.kakao_geocoding.search_by_category")
+    def test_nearby_places_are_capped_at_fifteen(self, mock_search):
+        # 카테고리마다 서로 다른 id를 써야 한다. 같은 id를 쓰면 중복 제거만으로도
+        # 15개 이하로 줄어들어서, 정작 자르는(cap) 코드가 없어도 테스트가 통과해버린다.
+        food_results = [
+            _fake_kakao_result(f"식당{i}", f"서울 종로구 {i}", 37.58, 126.98, "음식점", kakao_id=f"F{i}")
+            for i in range(20)
+        ]
+        cafe_results = [
+            _fake_kakao_result(f"카페{i}", f"서울 종로구 {i}", 37.58, 126.98, "카페", kakao_id=f"C{i}")
+            for i in range(20)
+        ]
+        tourist_results = [
+            _fake_kakao_result(f"명소{i}", f"서울 종로구 {i}", 37.58, 126.98, "관광명소", kakao_id=f"A{i}")
+            for i in range(20)
+        ]
+        mock_search.side_effect = [food_results, cafe_results, tourist_results]
+
+        response = self.client.get(DETAIL_URL_TEMPLATE.format(self.place.id))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # 서로 겹치지 않는 60개(20+20+20) 중 15개로 정확히 잘려야 한다.
+        self.assertEqual(len(response.data["nearby_places"]), 15)
