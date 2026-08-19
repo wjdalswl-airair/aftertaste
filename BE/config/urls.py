@@ -33,6 +33,8 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/health/", health_check, name="health-check"),
     path("api/account/", include("accounts.urls")),
+    path("api/banners/", include("main.urls")),
+    path("api/places/", include("places.urls")),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path(
         "api/docs/",

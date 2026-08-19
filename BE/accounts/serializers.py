@@ -19,6 +19,26 @@ class MemberSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class MemberUpdateSerializer(serializers.ModelSerializer):
+    """국적·언어 값을 검증할 때 쓰는 serializer (PATCH /account/locale/).
+
+    로그인한 사용자면 이 serializer로 Member를 실제로 저장하고, 로그인하지
+    않은 사용자면 값 검증에만 쓰인다(저장할 회원이 없음).
+
+    국적→언어 자동 매핑은 하지 않는다. 프론트엔드가 보내주는 값을 그대로 저장한다.
+    """
+
+    class Meta:
+        model = Member
+        fields = ["nationality", "language"]
+
+
+class LocaleResponseSerializer(serializers.Serializer):
+    """PATCH /account/locale/ 응답 형식."""
+
+    language = serializers.CharField(allow_null=True, required=False)
+
+
 class LoginRequestSerializer(serializers.Serializer):
     """로그인 요청 body. 처음 오는 사람일 때만 agree_terms가 확인된다."""
 
