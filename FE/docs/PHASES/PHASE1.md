@@ -36,18 +36,50 @@
 - 비로그인 상태로 접근하면 "로그인이 필요한 기능입니다"를 보여준 뒤 `/login`으로 보낸다.
 - 다른 화면(즐겨찾기, 리뷰 등)이 아직 없으므로, 이 장치는 만들어만 두고 실제로 어디에 씌울지는 다음 Phase에서 정한다.
 
+## 진행 상황 (2026-08-19)
+
+**구현 완료.** 아래 파일에 나눠서 만듦.
+
+| 파일 | 역할 |
+|---|---|
+| `src/lib/firebase.ts` | Firebase 초기화, Google/Apple 프로바이더 |
+| `src/api/auth.ts` | `POST /api/account/login/`, `GET /api/account/` 호출 |
+| `src/store/useAuthStore.ts` | 로그인한 회원 정보(Zustand) |
+| `src/hooks/useInitAuth.ts` | 앱 시작 시 Firebase 로그인 상태 감지 → 서버 회원 정보 동기화 |
+| `src/components/RequireAuth.tsx` | 로그인 가드 |
+| `src/pages/LoginPage.tsx` | Google/Apple 로그인 버튼 |
+| `src/App.tsx`, `src/main.tsx` | 라우터 연결 (`/`, `/login`, 가드로 감싼 임시 `/mypage`) |
+| `src/vite-env.d.ts` | `.env` 변수 타입 |
+
+**Commands**
+- `npm run lint`: passed
+- `npm run build`: passed
+- `npm run dev`로 실제 띄워서 모든 모듈이 에러 없이 로드되고 `.env` 값이 앱에 주입되는 것까지 확인함
+
+**아직 확인 안 됨 (브라우저에서 직접 클릭해야 함)**
+- Google/Apple 로그인 버튼을 눌러 실제로 팝업 로그인이 되는지
+- 새로고침해도 로그인 상태가 유지되는지
+- 비로그인 상태로 `/mypage` 접근 시 실제로 안내 후 `/login`으로 이동하는지
+
+**결정 보류 중**
+- 약관 동의를 "로그인 버튼 = 동의"로 암묵 처리(항상 `agree_terms: true` 전송)할지, 별도 체크박스로 명시적 동의를 받을지 — 사용자 확인 대기 중
+
+**남은 일**
+- Vitest 설치 후 인증 API 함수 / `useAuthStore` / `RequireAuth` 테스트 작성
+- 위 "아직 확인 안 됨" 항목 브라우저에서 직접 확인
+
 ## 완료 기준 체크리스트
 
-- [ ] Google 계정으로 로그인하면 서버에 회원이 생성되거나 조회된다
-- [ ] Apple 계정으로 로그인하면 서버에 회원이 생성되거나 조회된다
-- [ ] 처음 로그인하는 사용자는 약관 동의 화면을 거치고, 동의해야만 가입이 완료된다
-- [ ] 약관 동의 없이 진행하면 가입이 완료되지 않는다 (400 응답을 화면에서 처리한다)
-- [ ] Kakao 로그인 버튼은 화면에 없다
-- [ ] 로그인한 뒤 새로고침해도 로그인 상태가 유지된다 (Firebase `onAuthStateChanged` 기준)
-- [ ] 토큰을 `localStorage` 등에 직접 저장하는 코드가 없다 (Firebase SDK가 자체 관리)
-- [ ] 로그인이 필요한 라우트에 비로그인 상태로 접근하면 "로그인이 필요한 기능입니다" 안내 후 `/login`으로 이동한다
-- [ ] 관련 유닛 테스트(인증 API 함수 성공/실패, `useAuthStore`, `RequireAuth` 가드) 통과 (Vitest)
-- [ ] `npm run lint`, `npm run build` 통과
+- [ ] Google 계정으로 로그인하면 서버에 회원이 생성되거나 조회된다 (브라우저 확인 필요)
+- [ ] Apple 계정으로 로그인하면 서버에 회원이 생성되거나 조회된다 (브라우저 확인 필요)
+- [ ] 처음 로그인하는 사용자는 약관 동의 화면을 거치고, 동의해야만 가입이 완료된다 (구현 방식 결정 보류 중)
+- [ ] 약관 동의 없이 진행하면 가입이 완료되지 않는다 (400 응답을 화면에서 처리한다) (위와 동일 사유로 보류)
+- [x] Kakao 로그인 버튼은 화면에 없다
+- [ ] 로그인한 뒤 새로고침해도 로그인 상태가 유지된다 (Firebase `onAuthStateChanged` 기준) (브라우저 확인 필요)
+- [x] 토큰을 `localStorage` 등에 직접 저장하는 코드가 없다 (Firebase SDK가 자체 관리)
+- [ ] 로그인이 필요한 라우트에 비로그인 상태로 접근하면 "로그인이 필요한 기능입니다" 안내 후 `/login`으로 이동한다 (브라우저 확인 필요)
+- [ ] 관련 유닛 테스트(인증 API 함수 성공/실패, `useAuthStore`, `RequireAuth` 가드) 통과 (Vitest) (Vitest 미설치)
+- [x] `npm run lint`, `npm run build` 통과
 
 ## 넘어가기 전 확인
 
