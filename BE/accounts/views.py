@@ -1,3 +1,5 @@
+import uuid
+
 from django.utils import timezone
 from drf_spectacular.extensions import OpenApiAuthenticationExtension
 from drf_spectacular.utils import OpenApiExample, OpenApiResponse, extend_schema
@@ -13,6 +15,7 @@ from accounts.serializers import (
     ErrorDetailSerializer,
     LocaleResponseSerializer,
     LoginRequestSerializer,
+    MemberProfileUpdateSerializer,
     MemberSerializer,
     MemberUpdateSerializer,
 )
@@ -125,7 +128,7 @@ class LoginView(APIView):
 
 
 class MeView(APIView):
-    """로그인한 사람만 자기 정보를 볼 수 있다."""
+    """로그인한 사람만 자기 정보를 보고, 고치고, 탈퇴할 수 있다."""
 
     permission_classes = [IsAuthenticated]
 
@@ -150,6 +153,51 @@ class MeView(APIView):
     )
     def get(self, request):
         return Response(MemberSerializer(request.user).data)
+
+    @extend_schema(
+        summary="프로필(닉네임) 수정",
+        description="로그인한 회원 본인의 닉네임을 바꾼다.",
+        request=MemberProfileUpdateSerializer,
+        responses={
+            200: None,
+            400: OpenApiResponse(response=ErrorDetailSerializer, description="닉네임 형식 오류"),
+            401: OpenApiResponse(response=ErrorDetailSerializer, description="로그인 필요"),
+        },
+    )
+    def patch(self, request):
+        serializer = MemberProfileUpdateSerializer(request.user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(status=200)
+
+    @extend_schema(
+        summary="회원 탈퇴",
+        description=(
+            "회원 row는 지우지 않는다(리뷰·즐겨찾기가 주인을 잃지 않도록). 대신 닉네임·이메일·"
+            "프로필사진 같은 개인정보만 비우고 `is_withdrawn=True`로 표시한다. 탈퇴 후에는 "
+            "같은 소셜 계정으로 다시 로그인해도 이 회원이 아니라 새 회원으로 시작된다."
+        ),
+        request=None,
+        responses={
+            204: None,
+            401: OpenApiResponse(response=ErrorDetailSerializer, description="로그인 필요"),
+        },
+    )
+    def delete(self, request):
+        member = request.user
+        member.nickname = None
+        member.email = None
+        member.profile_image_url = None
+        # firebase_uid를 다른 값으로 바꿔서(익명화) 더 이상 로그인에 쓸 수 없게 한다.
+        # firebase_uid는 unique라서 원래 값 그대로 두면, 같은 사람이 다시 로그인할 때
+        # LoginView가 이 탈퇴 회원을 그대로 찾아버려서 "새 회원으로 시작"이 안 된다.
+        # 값을 바꿔두면 다음 로그인 때 원래 firebase_uid로는 아무도 안 찾아지므로
+        # 자동으로 새 Member가 만들어진다.
+        member.firebase_uid = f"withdrawn:{uuid.uuid4()}"
+        member.is_withdrawn = True
+        member.withdrawn_at = timezone.now()
+        member.save()
+        return Response(status=204)
 
 
 class LocaleView(APIView):

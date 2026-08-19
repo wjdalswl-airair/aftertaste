@@ -1,6 +1,9 @@
+from django.db.models import Avg
 from rest_framework import serializers
 
+from favorites.models import Favorite
 from places.models import Place, PlaceWork, Work
+from reviews.serializers import ReviewSerializer
 
 
 class PlaceSearchSerializer(serializers.ModelSerializer):
@@ -73,11 +76,14 @@ class NearbyPlaceSerializer(serializers.Serializer):
 
 
 class PlaceDetailSerializer(serializers.ModelSerializer):
-    """GET /api/places/<id>/ 응답. 명소 기본 정보 + 등장 작품 + 주변 상권을 한 화면 분량으로 담는다."""
+    """GET /api/places/<id>/ 응답. 명소 기본 정보 + 등장 작품 + 주변 상권 + 리뷰를 한 화면 분량으로 담는다."""
 
     works = PlaceWorkSerializer(source="place_works", many=True, read_only=True)
     # nearby_places는 모델 필드가 아니라, 뷰에서 카카오 API 결과를 place 객체에 임시로 붙여준 값이다.
     nearby_places = NearbyPlaceSerializer(many=True, read_only=True)
+    is_favorited = serializers.SerializerMethodField()
+    reviews = serializers.SerializerMethodField()
+    review_average_rating = serializers.SerializerMethodField()
 
     class Meta:
         model = Place
@@ -92,5 +98,23 @@ class PlaceDetailSerializer(serializers.ModelSerializer):
             "longitude",
             "works",
             "nearby_places",
+            "is_favorited",
+            "reviews",
+            "review_average_rating",
         ]
         read_only_fields = fields
+
+    def get_is_favorited(self, obj):
+        # 로그인한 사람이면 내가 이미 즐겨찾기 했는지 표시한다 (DETAIL_SPEC 3-4).
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        return Favorite.objects.filter(member=request.user, place=obj).exists()
+
+    def get_reviews(self, obj):
+        reviews = obj.reviews.filter(is_hidden=False).order_by("-created_at")
+        return ReviewSerializer(reviews, many=True, context=self.context).data
+
+    def get_review_average_rating(self, obj):
+        average = obj.reviews.filter(is_hidden=False).aggregate(Avg("rating"))["rating__avg"]
+        return round(average, 1) if average is not None else None
