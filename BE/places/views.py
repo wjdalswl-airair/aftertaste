@@ -1,13 +1,15 @@
 import logging
 
 from django.contrib.postgres.search import TrigramSimilarity
-from django.db.models import Q
+from django.db.models import Count, Q
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from places.models import Place, SearchHistory, Work
+from favorites.models import Favorite
+from places.models import Place, PlaceWork, SearchHistory, Work
+from reviews.models import Review
 from places.serializers import (
     AutocompleteResponseSerializer,
     PlaceDetailSerializer,
@@ -26,6 +28,21 @@ AUTOCOMPLETE_LIMIT = 10
 
 # 추천 개수. PRD F-04, PHASES/PHASE2.md 2-4에서 3으로 정해짐.
 RECOMMEND_COUNT = 3
+
+# 로그인한 사용자의 개인화 추천에서 가산점을 계산할 후보 풀 크기. 문서에 정해진 값이
+# 없어 임의로 정했다 - "거리 우선 + 인기도 보너스" 방식이라 후보를 넉넉히 뽑아야
+# 거리는 가깝지만 가산점이 높은 곳이 상위 3곳 안에 들어올 여지가 생긴다
+# (PHASE3.md 3번, 2026-08-19 사용자 확인).
+RECOMMEND_CANDIDATE_POOL = 10
+
+# 개인화 추천 가산점 가중치. 정확한 공식은 문서에 없어 임의로 정했다(자기신고, 2026-08-19).
+# - 검색이력 키워드가 명소 이름/등장 작품 제목에 걸리면 키워드 하나당 5점을 준다.
+#   "검색해서 관심을 보인 것"이 즐겨찾기·리뷰 한 건보다 더 강한 선호 신호라고 보고
+#   즐겨찾기·리뷰 가중치보다 크게 잡았다.
+# - 즐겨찾기 수·리뷰 수는 1건당 1점씩 그대로 더한다(인기도 보너스).
+KEYWORD_MATCH_SCORE = 5
+FAVORITE_SCORE_WEIGHT = 1
+REVIEW_SCORE_WEIGHT = 1
 
 NO_RESULT_MESSAGE = "검색결과가 존재하지 않습니다"
 NOT_FOUND_MESSAGE = "존재하지 않습니다"
@@ -189,14 +206,84 @@ def _random_places(count):
     return list(Place.objects.order_by("?")[:count])
 
 
+def _personalized_places(member, latitude, longitude, count):
+    """로그인한 사용자를 위한 "거리 우선 + 인기도 보너스" 추천 (PHASE3.md 3번, 2026-08-19 확정).
+
+    1. 현재 위치에서 가까운 명소 후보를 넉넉히(RECOMMEND_CANDIDATE_POOL개) 뽑는다.
+    2. 후보 안에서, 회원의 검색이력 키워드와 연관된 명소(이름 또는 등장 작품 제목에
+       키워드가 포함) + 즐겨찾기 수 + 리뷰 수(감춰지지 않은 것만)에 가산점을 준다.
+    3. 가산점 합계로 정렬해 상위 count개를 돌려준다.
+
+    동점 처리(결정론 보장): 가산점이 같으면 거리가 가까운 쪽을, 거리도 같으면 id가
+    작은 쪽을 앞에 둔다. 후보 풀 자체가 거리 기준으로 뽑히므로 "가깝지만 안 맞는 곳"이
+    완전히 배제되지는 않는다.
+    """
+    candidates = _nearest_places(latitude, longitude, RECOMMEND_CANDIDATE_POOL)
+    if not candidates:
+        return candidates
+
+    candidate_ids = [place.id for place in candidates]
+
+    keywords = list(
+        SearchHistory.objects.filter(member=member).values_list("keyword", flat=True).distinct()
+    )
+    keywords_lower = [kw.lower() for kw in keywords if kw]
+
+    favorite_counts = dict(
+        Favorite.objects.filter(place_id__in=candidate_ids)
+        .values("place_id")
+        .annotate(count=Count("id"))
+        .values_list("place_id", "count")
+    )
+    review_counts = dict(
+        Review.objects.filter(place_id__in=candidate_ids, is_hidden=False)
+        .values("place_id")
+        .annotate(count=Count("id"))
+        .values_list("place_id", "count")
+    )
+
+    # 명소마다 연결된 작품 제목을 미리 모아둔다 (후보별로 매번 쿼리하지 않기 위해).
+    work_titles_by_place = {}
+    for place_work in PlaceWork.objects.filter(place_id__in=candidate_ids).select_related("work"):
+        work_titles_by_place.setdefault(place_work.place_id, []).append(place_work.work.title)
+
+    def keyword_match_count(place):
+        if not keywords_lower:
+            return 0
+        name_lower = place.name.lower()
+        work_titles_lower = [title.lower() for title in work_titles_by_place.get(place.id, [])]
+        matches = 0
+        for kw in keywords_lower:
+            if kw in name_lower or any(kw in title for title in work_titles_lower):
+                matches += 1
+        return matches
+
+    distances = {
+        place.id: haversine_distance_meters(latitude, longitude, place.latitude, place.longitude)
+        for place in candidates
+    }
+
+    def score(place):
+        return (
+            keyword_match_count(place) * KEYWORD_MATCH_SCORE
+            + favorite_counts.get(place.id, 0) * FAVORITE_SCORE_WEIGHT
+            + review_counts.get(place.id, 0) * REVIEW_SCORE_WEIGHT
+        )
+
+    ranked = sorted(candidates, key=lambda place: (-score(place), distances[place.id], place.id))
+    return ranked[:count]
+
+
 class RecommendationView(APIView):
     """위치기반 명소 추천. 로그인 여부와 상관없이 호출할 수 있다 (PRD F-04).
 
-    - lat, lng를 둘 다 보내면(위치 권한 허용) 그 위치에서 가장 가까운 명소 3곳을 추천한다.
-    - lat, lng를 안 보내거나 숫자가 아니면(위치 권한 거부) 명소 3곳을 무작위로 추천한다.
-      즐겨찾기 기준으로 하고 싶었지만 즐겨찾기 모델이 Phase 3에 생기므로, Phase 2에서는
-      무작위로 추천한다 (PHASES/PHASE2.md 2-4, 2026-08-19 결정).
-    - 로그인 + 검색이력 반영 개인화는 Phase 3 범위라 여기서 다루지 않는다.
+    - lat, lng를 둘 다 보내면(위치 권한 허용):
+        - 로그인한 사용자는 "거리 우선 + 인기도 보너스" 개인화 추천을 받는다
+          (검색이력·즐겨찾기·리뷰 개수 반영, _personalized_places 참고. PHASE3.md 3번).
+        - 비로그인 사용자는 Phase 2와 동일하게 그 위치에서 가장 가까운 명소 3곳을 추천받는다.
+    - lat, lng를 안 보내거나 숫자가 아니면(위치 권한 거부) 로그인 여부와 상관없이 명소
+      3곳을 무작위로 추천한다. "위치 권한을 거부했을 경우 비로그인 상태의 추천과
+      동일하다"(PRD F-04)는 규칙을 그대로 따른다.
 
     SearchView와 같은 이유로 perform_authentication을 오버라이드한다: 이 API는
     로그인이 필요 없으므로, 토큰이 무효/만료돼도 추천 자체는 막지 않는다.
@@ -225,7 +312,10 @@ class RecommendationView(APIView):
         longitude, lng_ok = to_decimal(request.query_params.get("lng"))
 
         if lat_ok and lng_ok and latitude is not None and longitude is not None:
-            places = _nearest_places(latitude, longitude, RECOMMEND_COUNT)
+            if request.user.is_authenticated:
+                places = _personalized_places(request.user, latitude, longitude, RECOMMEND_COUNT)
+            else:
+                places = _nearest_places(latitude, longitude, RECOMMEND_COUNT)
         else:
             places = _random_places(RECOMMEND_COUNT)
 
@@ -275,9 +365,10 @@ def _fetch_nearby_places(place):
 class PlaceDetailView(APIView):
     """명소 상세. 로그인 여부와 상관없이 호출할 수 있다 (PRD F-05).
 
-    한 화면에 명소 기본 정보 + 등장 작품(장면 설명 포함) + 주변 상권을 함께 내려준다.
-    주변 상권은 저장해두지 않고, 이 요청을 받을 때마다 카카오 장소 검색 API를 대신
-    호출해서(프록시) 받아온 결과를 그대로 붙여준다 (DETAIL_SPEC 2-2, PHASES/PHASE2.md 2-5).
+    한 화면에 명소 기본 정보 + 등장 작품(장면 설명 포함) + 주변 상권 + 리뷰 목록·별점 평균을
+    함께 내려준다. 주변 상권은 저장해두지 않고, 이 요청을 받을 때마다 카카오 장소 검색 API를
+    대신 호출해서(프록시) 받아온 결과를 그대로 붙여준다 (DETAIL_SPEC 2-2, PHASES/PHASE2.md 2-5).
+    로그인한 사람이면 내가 이미 즐겨찾기 했는지(is_favorited)도 함께 보여준다 (PHASE3 1번).
 
     SearchView와 같은 이유로 perform_authentication을 오버라이드한다: 토큰이 무효/만료돼도
     상세 조회 자체는 막지 않는다.
@@ -310,4 +401,4 @@ class PlaceDetailView(APIView):
         # 임시로 붙여주는 값이다 (PlaceDetailSerializer 참고).
         place.nearby_places = _fetch_nearby_places(place)
 
-        return Response(PlaceDetailSerializer(place).data)
+        return Response(PlaceDetailSerializer(place, context={"request": request}).data)

@@ -1514,3 +1514,343 @@ class PlaceDetailViewNearbyPlacesTest(PlaceDetailTestData):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         # 서로 겹치지 않는 60개(20+20+20) 중 15개로 정확히 잘려야 한다.
         self.assertEqual(len(response.data["nearby_places"]), 15)
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 사이클 B (검색이력 기반 추천 고도화) checklist tests. See docs/PHASES/PHASE3.md 3번,
+# places/views.py _personalized_places 참고.
+#
+# 확정된 알고리즘 (coding이 구현, 2026-08-19 정해짐): 로그인 + 위치 있음이면 가장 가까운
+# 후보 10곳(RECOMMEND_CANDIDATE_POOL)을 뽑고, 각 후보에 가산점을 매긴다 - 검색이력
+# 키워드가 명소 이름/등장 작품 제목에 포함되면 키워드당 +5점, 즐겨찾기 1건당 +1점,
+# 감춰지지 않은 리뷰 1건당 +1점. 점수 내림차순, 동점이면 거리 가까운 순 -> id 작은 순으로
+# 정렬해 상위 3곳을 돌려준다. 로그인이어도 위치가 없으면(또는 비로그인) Phase 2와 동일하게
+# 거리순/무작위로 동작한다.
+# ---------------------------------------------------------------------------
+
+from favorites.models import Favorite
+from reviews.models import Review
+
+
+def create_member(uid, nickname="테스터"):
+    return Member.objects.create(
+        firebase_uid=uid,
+        provider=Member.Provider.GOOGLE,
+        nickname=nickname,
+        agreed_terms_at="2026-01-01T00:00:00Z",
+    )
+
+
+class PersonalizedRecommendTestData(TestCase):
+    """개인화 추천 테스트에서 공통으로 쓰는 로그인 회원 준비."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.auth_header = {"HTTP_AUTHORIZATION": "Bearer fake-token"}
+        self.member = create_member("personal-uid-1")
+
+
+class PersonalizedRecommendationKeywordTest(PersonalizedRecommendTestData):
+    """checklist: 로그인 + 위치 있음 + 검색이력 있음 -> 검색이력과 연관된 명소가 우선 추천된다."""
+
+    def setUp(self):
+        super().setUp()
+        self.near1 = create_place_with_source(
+            "일반명소1", "TEST_SOURCE", "PERS_N1",
+            latitude=Decimal(str(BASE_LAT)), longitude=Decimal(str(BASE_LNG)),
+        )
+        self.near2 = create_place_with_source(
+            "일반명소2", "TEST_SOURCE", "PERS_N2",
+            latitude=Decimal("37.5700"), longitude=Decimal(str(BASE_LNG)),
+        )
+        self.near3 = create_place_with_source(
+            "일반명소3", "TEST_SOURCE", "PERS_N3",
+            latitude=Decimal("37.5750"), longitude=Decimal(str(BASE_LNG)),
+        )
+        self.near4 = create_place_with_source(
+            "일반명소4", "TEST_SOURCE", "PERS_N4",
+            latitude=Decimal("37.5800"), longitude=Decimal(str(BASE_LNG)),
+        )
+        self.far_matching = create_place_with_source(
+            "특별한장소E5", "TEST_SOURCE", "PERS_FAR",
+            latitude=Decimal("37.6000"), longitude=Decimal(str(BASE_LNG)),
+        )
+        SearchHistory.objects.create(member=self.member, keyword="특별한장소")
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_keyword_matched_place_is_ranked_first_despite_being_farthest(self, mock_verify):
+        mock_verify.return_value = make_decoded_token("personal-uid-1")
+
+        response = self.client.get(
+            RECOMMEND_URL, {"lat": str(BASE_LAT), "lng": str(BASE_LNG)}, **self.auth_header
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = [p["name"] for p in response.data["places"]]
+        self.assertEqual(names[0], "특별한장소E5")
+        self.assertEqual(names[1:], ["일반명소1", "일반명소2"])
+
+
+class PersonalizedRecommendationWorkTitleMatchTest(PersonalizedRecommendTestData):
+    """checklist: 검색이력 키워드가 명소 이름이 아니라 연결된 작품 제목에 있어도 가산점을 받는다."""
+
+    def setUp(self):
+        super().setUp()
+        self.work_matched_place = create_place_with_source(
+            "이름은평범한명소", "TEST_SOURCE", "PERS_WORK_MATCH",
+            latitude=Decimal("37.6500"), longitude=Decimal(str(BASE_LNG)),
+        )
+        matched_work = Work.objects.create(title="사랑비특별판", category=Work.Category.DRAMA)
+        PlaceWork.objects.create(place=self.work_matched_place, work=matched_work, scene_description="장면")
+
+        self.unmatched_close_place = create_place_with_source(
+            "가까운무관계명소", "TEST_SOURCE", "PERS_WORK_UNMATCHED",
+            latitude=Decimal(str(BASE_LAT)), longitude=Decimal(str(BASE_LNG)),
+        )
+        SearchHistory.objects.create(member=self.member, keyword="사랑비특별판")
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_place_ranked_up_by_matching_linked_work_title(self, mock_verify):
+        mock_verify.return_value = make_decoded_token("personal-uid-1")
+
+        response = self.client.get(
+            RECOMMEND_URL, {"lat": str(BASE_LAT), "lng": str(BASE_LNG)}, **self.auth_header
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = [p["name"] for p in response.data["places"]]
+        self.assertEqual(names[0], "이름은평범한명소")
+
+
+class PersonalizedRecommendationPopularityTest(PersonalizedRecommendTestData):
+    """checklist: 즐겨찾기/리뷰 개수 차이가 있으면 많은 쪽이 우선 추천된다."""
+
+    def setUp(self):
+        super().setUp()
+        self.close_no_popularity = create_place_with_source(
+            "인기없는가까운명소", "TEST_SOURCE", "PERS_POP_LOW",
+            latitude=Decimal(str(BASE_LAT)), longitude=Decimal(str(BASE_LNG)),
+        )
+        self.far_popular = create_place_with_source(
+            "인기많은먼명소", "TEST_SOURCE", "PERS_POP_HIGH",
+            latitude=Decimal("37.6500"), longitude=Decimal(str(BASE_LNG)),
+        )
+        for i in range(3):
+            fav_member = create_member(f"fav-uid-{i}")
+            Favorite.objects.create(member=fav_member, place=self.far_popular)
+        for i in range(2):
+            review_member = create_member(f"review-uid-{i}")
+            Review.objects.create(
+                member=review_member, place=self.far_popular, rating=5, content="좋아요", language="ko"
+            )
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_place_with_more_favorites_and_reviews_is_ranked_first(self, mock_verify):
+        mock_verify.return_value = make_decoded_token("personal-uid-1")
+
+        response = self.client.get(
+            RECOMMEND_URL, {"lat": str(BASE_LAT), "lng": str(BASE_LNG)}, **self.auth_header
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = [p["name"] for p in response.data["places"]]
+        self.assertEqual(names[0], "인기많은먼명소")
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_hidden_reviews_do_not_count_toward_score(self, mock_verify):
+        mock_verify.return_value = make_decoded_token("personal-uid-1")
+        for i in range(5):
+            hidden_member = create_member(f"hidden-review-uid-{i}")
+            Review.objects.create(
+                member=hidden_member,
+                place=self.close_no_popularity,
+                rating=1,
+                content="스팸",
+                language="ko",
+                is_hidden=True,
+            )
+
+        response = self.client.get(
+            RECOMMEND_URL, {"lat": str(BASE_LAT), "lng": str(BASE_LNG)}, **self.auth_header
+        )
+
+        names = [p["name"] for p in response.data["places"]]
+        self.assertEqual(names[0], "인기많은먼명소")
+
+
+class PersonalizedRecommendationNewMemberTest(PersonalizedRecommendTestData):
+    """checklist: 검색이력/즐겨찾기/리뷰가 전혀 없는 새 회원은 거리순 추천과 동일하다."""
+
+    def setUp(self):
+        super().setUp()
+        self.near = create_place_with_source(
+            "가까운명소", "TEST_SOURCE", "PERS_NEW_NEAR",
+            latitude=Decimal(str(BASE_LAT)), longitude=Decimal(str(BASE_LNG)),
+        )
+        self.mid = create_place_with_source(
+            "중간명소", "TEST_SOURCE", "PERS_NEW_MID",
+            latitude=Decimal("37.6000"), longitude=Decimal(str(BASE_LNG)),
+        )
+        self.far = create_place_with_source(
+            "먼명소", "TEST_SOURCE", "PERS_NEW_FAR",
+            latitude=Decimal("37.7000"), longitude=Decimal(str(BASE_LNG)),
+        )
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_new_member_without_history_gets_distance_order(self, mock_verify):
+        mock_verify.return_value = make_decoded_token("personal-uid-1")
+
+        response = self.client.get(
+            RECOMMEND_URL, {"lat": str(BASE_LAT), "lng": str(BASE_LNG)}, **self.auth_header
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = [p["name"] for p in response.data["places"]]
+        self.assertEqual(names, ["가까운명소", "중간명소", "먼명소"])
+
+
+class PersonalizedRecommendationTieBreakTest(PersonalizedRecommendTestData):
+    """checklist: 동점(가산점도 거리도 같음)이면 id가 작은 순으로 결정론적으로 정렬된다."""
+
+    def setUp(self):
+        super().setUp()
+        self.tie_low_id = create_place_with_source(
+            "동점명소A", "TEST_SOURCE", "PERS_TIE_A",
+            latitude=Decimal(str(BASE_LAT)), longitude=Decimal(str(BASE_LNG)),
+        )
+        self.tie_high_id = create_place_with_source(
+            "동점명소B", "TEST_SOURCE", "PERS_TIE_B",
+            latitude=Decimal(str(BASE_LAT)), longitude=Decimal(str(BASE_LNG)),
+        )
+        self.third = create_place_with_source(
+            "세번째명소", "TEST_SOURCE", "PERS_TIE_C",
+            latitude=Decimal("37.6500"), longitude=Decimal(str(BASE_LNG)),
+        )
+        self.assertLess(self.tie_low_id.id, self.tie_high_id.id)
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_tie_break_order_is_by_id_and_deterministic_across_calls(self, mock_verify):
+        mock_verify.return_value = make_decoded_token("personal-uid-1")
+
+        response1 = self.client.get(
+            RECOMMEND_URL, {"lat": str(BASE_LAT), "lng": str(BASE_LNG)}, **self.auth_header
+        )
+        response2 = self.client.get(
+            RECOMMEND_URL, {"lat": str(BASE_LAT), "lng": str(BASE_LNG)}, **self.auth_header
+        )
+
+        expected = ["동점명소A", "동점명소B", "세번째명소"]
+        self.assertEqual([p["name"] for p in response1.data["places"]], expected)
+        self.assertEqual([p["name"] for p in response2.data["places"]], expected)
+
+
+class PersonalizedRecommendationNoLocationTest(PersonalizedRecommendTestData):
+    """checklist: 위치 없이 로그인만 한 경우 개인화가 적용되지 않고 Phase 2 방식(무작위)이 유지된다."""
+
+    def setUp(self):
+        super().setUp()
+        for i in range(5):
+            create_place_with_source(f"무작위대상{i}", "TEST_SOURCE", f"PERS_RAND_{i}")
+
+    @patch("places.views._personalized_places")
+    @patch("accounts.authentication.verify_id_token")
+    def test_personalized_places_is_not_called_without_location(self, mock_verify, mock_personalized):
+        mock_verify.return_value = make_decoded_token("personal-uid-1")
+
+        response = self.client.get(RECOMMEND_URL, **self.auth_header)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["places"]), 3)
+        mock_personalized.assert_not_called()
+
+    @patch("places.views._personalized_places")
+    @patch("accounts.authentication.verify_id_token")
+    def test_personalized_places_is_called_when_logged_in_with_location(self, mock_verify, mock_personalized):
+        mock_verify.return_value = make_decoded_token("personal-uid-1")
+        mock_personalized.return_value = []
+
+        self.client.get(RECOMMEND_URL, {"lat": str(BASE_LAT), "lng": str(BASE_LNG)}, **self.auth_header)
+
+        mock_personalized.assert_called_once()
+
+
+class PersonalizedRecommendationInvalidTokenTest(PersonalizedRecommendTestData):
+    """checklist: 위치가 있는 분기에서도 무효 토큰으로 호출하면 401이 아니라 200이 온다."""
+
+    def setUp(self):
+        super().setUp()
+        create_place_with_source(
+            "명소", "TEST_SOURCE", "PERS_INVALID_TOKEN",
+            latitude=Decimal(str(BASE_LAT)), longitude=Decimal(str(BASE_LNG)),
+        )
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_invalid_token_with_location_returns_200_not_401(self, mock_verify):
+        mock_verify.side_effect = InvalidFirebaseToken("expired")
+
+        response = self.client.get(
+            RECOMMEND_URL, {"lat": str(BASE_LAT), "lng": str(BASE_LNG)}, **self.auth_header
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
+class PersonalizedRecommendationFewerThanPoolTest(PersonalizedRecommendTestData):
+    """checklist: 전체 명소가 후보 풀(10곳)보다 적어도 에러 없이 동작한다."""
+
+    def setUp(self):
+        super().setUp()
+        for i in range(5):
+            create_place_with_source(
+                f"소규모명소{i}", "TEST_SOURCE", f"PERS_FEW_{i}",
+                latitude=Decimal(str(BASE_LAT)), longitude=Decimal(str(BASE_LNG)),
+            )
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_personalized_branch_with_fewer_places_than_pool_size_does_not_error(self, mock_verify):
+        mock_verify.return_value = make_decoded_token("personal-uid-1")
+
+        response = self.client.get(
+            RECOMMEND_URL, {"lat": str(BASE_LAT), "lng": str(BASE_LNG)}, **self.auth_header
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["places"]), 3)
+
+
+class PersonalizedRecommendationKeywordAccumulationTest(PersonalizedRecommendTestData):
+    """checklist: 같은 명소가 검색이력 키워드 여러 개와 매칭되면 가산점이 매칭 개수만큼 정확히 쌓인다.
+
+    키워드 2개가 모두 매칭되는 명소(10점)가, 즐겨찾기 9건(9점)에 더 가까운 다른 명소보다
+    앞서야 한다. 키워드 매칭 개수를 누적하지 않고 있는지 없는지로만 보는 버그가 있다면
+    5점 < 9점이 되어 이 테스트가 실패하며 버그를 잡아낸다.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.multi_match = create_place_with_source(
+            "제주감귤촬영지백", "TEST_SOURCE", "PERS_MULTI",
+            latitude=Decimal("37.6500"), longitude=Decimal(str(BASE_LNG)),
+        )
+        self.many_favorites = create_place_with_source(
+            "즐겨찾기아홉개장소", "TEST_SOURCE", "PERS_FAVS9",
+            latitude=Decimal(str(BASE_LAT)), longitude=Decimal(str(BASE_LNG)),
+        )
+        for i in range(9):
+            fav_member = create_member(f"multi-fav-uid-{i}")
+            Favorite.objects.create(member=fav_member, place=self.many_favorites)
+
+        SearchHistory.objects.create(member=self.member, keyword="제주감귤")
+        SearchHistory.objects.create(member=self.member, keyword="촬영지백")
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_multiple_keyword_matches_accumulate_score_and_outrank_higher_favorite_count(self, mock_verify):
+        mock_verify.return_value = make_decoded_token("personal-uid-1")
+
+        response = self.client.get(
+            RECOMMEND_URL, {"lat": str(BASE_LAT), "lng": str(BASE_LNG)}, **self.auth_header
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = [p["name"] for p in response.data["places"]]
+        self.assertEqual(names[0], "제주감귤촬영지백")
