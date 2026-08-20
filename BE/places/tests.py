@@ -1030,6 +1030,24 @@ class SearchAutocompleteTest(SearchTestData):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertLessEqual(len(response.data["suggestions"]), 10)
 
+    def test_autocomplete_shows_english_name_when_lang_and_approved(self):
+        PlaceTranslation.objects.create(
+            place=self.gyeongbokgung, language="en", name="Gyeongbokgung", is_approved=True
+        )
+
+        response = self.client.get(AUTOCOMPLETE_URL, {"q": "경복", "lang": "en"})
+
+        self.assertIn("Gyeongbokgung", response.data["suggestions"])
+
+    def test_autocomplete_shows_korean_name_without_lang(self):
+        PlaceTranslation.objects.create(
+            place=self.gyeongbokgung, language="en", name="Gyeongbokgung", is_approved=True
+        )
+
+        response = self.client.get(AUTOCOMPLETE_URL, {"q": "경복"})
+
+        self.assertIn("경복궁", response.data["suggestions"])
+
 
 class SearchHistoryTest(SearchTestData):
     """checklist: 로그인한 사람의 검색어가 서버에 쌓인다 / 비로그인은 남기지 않는다."""
@@ -1854,3 +1872,598 @@ class PersonalizedRecommendationKeywordAccumulationTest(PersonalizedRecommendTes
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         names = [p["name"] for p in response.data["places"]]
         self.assertEqual(names[0], "제주감귤촬영지백")
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 (다국어 번역 — 명소·작품만) checklist tests. See docs/PHASES/PHASE4.md 4-3.
+# ---------------------------------------------------------------------------
+
+import requests as requests_module
+from django.contrib.admin.sites import AdminSite
+from django.contrib.messages.storage.cookie import CookieStorage
+from django.test import RequestFactory, override_settings
+
+from places.admin import PlaceTranslationAdmin, WorkTranslationAdmin, retranslate_places, retranslate_works
+from places.models import TranslationStatus
+from places.sources import google_translate
+from places.translation import pick_translated_text, translate_place, translate_work
+
+
+class GoogleTranslateModuleTest(TestCase):
+    """저수준 API 호출 모듈. requests를 mock해서 실제 네트워크를 타지 않는다."""
+
+    @patch("places.sources.google_translate.requests.post")
+    def test_translate_text_returns_translated_string(self, mock_post):
+        mock_post.return_value.json.return_value = {
+            "data": {"translations": [{"translatedText": "Gyeongbokgung"}]}
+        }
+        mock_post.return_value.raise_for_status.return_value = None
+
+        with override_settings(GOOGLE_TRANSLATE_API_KEY="fake-key"):
+            result = google_translate.translate_text("경복궁", "en")
+
+        self.assertEqual(result, "Gyeongbokgung")
+
+    def test_translate_text_without_api_key_raises(self):
+        with override_settings(GOOGLE_TRANSLATE_API_KEY=""):
+            with self.assertRaises(RuntimeError):
+                google_translate.translate_text("경복궁", "en")
+
+    @patch("places.sources.google_translate.requests.post")
+    def test_translate_text_propagates_http_error(self, mock_post):
+        mock_post.return_value.raise_for_status.side_effect = requests_module.HTTPError("500")
+
+        with override_settings(GOOGLE_TRANSLATE_API_KEY="fake-key"):
+            with self.assertRaises(requests_module.HTTPError):
+                google_translate.translate_text("경복궁", "en")
+
+
+class TranslatePlaceServiceTest(TestCase):
+    """checklist: 실패 판정 규칙(빈 값/원문과 동일/길이/시간초과·오류), 짧은 이름은 길이 검사를 건너뛴다."""
+
+    @patch("places.translation.google_translate.translate_text")
+    def test_success_sets_status_success_and_fields(self, mock_translate):
+        place = create_place_with_source("경복궁", "TEST_SOURCE", "TR1", description="조선시대 정궁")
+        mock_translate.side_effect = ["Gyeongbokgung", "Royal palace of the Joseon dynasty"]
+
+        translation = translate_place(place, "en")
+
+        self.assertEqual(translation.status, TranslationStatus.SUCCESS)
+        self.assertEqual(translation.name, "Gyeongbokgung")
+        self.assertEqual(translation.description, "Royal palace of the Joseon dynasty")
+        self.assertIsNotNone(translation.translated_at)
+        self.assertFalse(translation.is_approved)
+
+    @patch("places.translation.google_translate.translate_text")
+    def test_blank_description_is_not_translated_and_does_not_fail(self, mock_translate):
+        place = create_place_with_source("경복궁", "TEST_SOURCE", "TR2")
+        mock_translate.return_value = "Gyeongbokgung"
+
+        translation = translate_place(place, "en")
+
+        self.assertEqual(translation.status, TranslationStatus.SUCCESS)
+        self.assertEqual(translation.description, "")
+        self.assertEqual(mock_translate.call_count, 1)  # description은 빈 값이라 아예 호출 안 됨
+
+    @patch("places.translation.google_translate.translate_text")
+    def test_exception_from_api_marks_failed(self, mock_translate):
+        place = create_place_with_source("경복궁", "TEST_SOURCE", "TR3")
+        mock_translate.side_effect = TimeoutError("시간 초과")
+
+        translation = translate_place(place, "en")
+
+        self.assertEqual(translation.status, TranslationStatus.FAILED)
+        self.assertIsNone(translation.translated_at)
+
+    @patch("places.translation.google_translate.translate_text")
+    def test_empty_result_marks_failed(self, mock_translate):
+        place = create_place_with_source("경복궁", "TEST_SOURCE", "TR4")
+        mock_translate.return_value = ""
+
+        translation = translate_place(place, "en")
+
+        self.assertEqual(translation.status, TranslationStatus.FAILED)
+
+    @patch("places.translation.google_translate.translate_text")
+    def test_result_same_as_original_marks_failed(self, mock_translate):
+        place = create_place_with_source("경복궁", "TEST_SOURCE", "TR5")
+        mock_translate.return_value = "경복궁"  # 번역이 안 되고 그대로 돌아옴
+
+        translation = translate_place(place, "en")
+
+        self.assertEqual(translation.status, TranslationStatus.FAILED)
+
+    @patch("places.translation.google_translate.translate_text")
+    def test_long_description_with_bad_length_ratio_marks_failed(self, mock_translate):
+        # 원문이 20자를 넘으므로 길이 검사가 적용된다. 번역문이 원문의 1/5보다 훨씬 짧다.
+        description = "이 설명은 스무 글자를 확실히 넘기기 위한 아주 긴 문장입니다"  # 20자 초과
+        place = create_place_with_source("경복궁", "TEST_SOURCE", "TR6", description=description)
+        mock_translate.side_effect = ["Gyeongbokgung", "Hi"]  # 이름은 성공, 설명은 너무 짧음
+
+        translation = translate_place(place, "en")
+
+        self.assertEqual(translation.status, TranslationStatus.FAILED)
+        # 성공한 필드(name)는 그대로 반영된다.
+        self.assertEqual(translation.name, "Gyeongbokgung")
+
+    @patch("places.translation.google_translate.translate_text")
+    def test_short_name_skips_length_check(self, mock_translate):
+        """checklist: 짧은 명소 이름이 길이 검사 때문에 실패로 처리되지 않는다.
+
+        `청계천`(3자) → `Cheonggyecheon`(14자)은 4.7배라 5배 기준에 걸릴 뻔하지만,
+        원문이 20자 이하이므로 애초에 길이 검사를 받지 않아야 한다 (DETAIL_SPEC 4-3).
+        """
+        place = create_place_with_source("청계천", "TEST_SOURCE", "TR7")
+        mock_translate.return_value = "Cheonggyecheon"
+
+        translation = translate_place(place, "en")
+
+        self.assertEqual(translation.status, TranslationStatus.SUCCESS)
+        self.assertEqual(translation.name, "Cheonggyecheon")
+
+    @patch("places.translation.google_translate.translate_text")
+    def test_partial_failure_keeps_previous_successful_field_value(self, mock_translate):
+        place = create_place_with_source("경복궁", "TEST_SOURCE", "TR8", description="조선시대 정궁")
+        PlaceTranslation.objects.create(
+            place=place,
+            language="en",
+            name="OldName",
+            description="Old description",
+            status=TranslationStatus.SUCCESS,
+            is_approved=True,
+        )
+        mock_translate.side_effect = ["Gyeongbokgung", "조선시대 정궁"]  # 이름은 성공, 설명은 원문 그대로(실패)
+
+        translation = translate_place(place, "en")
+
+        self.assertEqual(translation.status, TranslationStatus.FAILED)
+        self.assertEqual(translation.name, "Gyeongbokgung")  # 성공한 값으로 갱신됨
+        self.assertEqual(translation.description, "Old description")  # 실패한 필드는 이전 값 유지
+        # 내용이 바뀌었으니 재승인이 필요하다 — 예전에 승인됐어도 초기화한다.
+        self.assertFalse(translation.is_approved)
+
+    @patch("places.translation.google_translate.translate_text")
+    def test_complete_failure_keeps_existing_approval(self, mock_translate):
+        """회귀 테스트: 이미 승인되어 노출 중인 번역이, 재번역이 완전히 실패했을 때도 그대로 유지돼야 한다.
+
+        내용이 하나도 안 바뀌었는데 is_approved가 False로 리셋되면, 정상 노출 중이던 번역이
+        일시적인 API 실패 한 번 때문에 사용자 화면에서 사라져 버린다 (버그 리포트 재현 시나리오).
+        """
+        place = create_place_with_source("경복궁", "TEST_SOURCE", "TR9", description="조선시대 정궁")
+        PlaceTranslation.objects.create(
+            place=place,
+            language="en",
+            name="Gyeongbokgung",
+            description="Royal palace of the Joseon dynasty",
+            status=TranslationStatus.SUCCESS,
+            is_approved=True,
+        )
+        mock_translate.side_effect = Exception("네트워크 타임아웃")  # 완전 실패
+
+        translation = translate_place(place, "en")
+
+        self.assertEqual(translation.status, TranslationStatus.FAILED)
+        # 내용은 전혀 안 바뀌었다.
+        self.assertEqual(translation.name, "Gyeongbokgung")
+        self.assertEqual(translation.description, "Royal palace of the Joseon dynasty")
+        # 그러니 기존 승인 상태도 그대로 유지돼야 한다.
+        self.assertTrue(translation.is_approved)
+
+
+class TranslationLengthRatioBoundaryTest(TestCase):
+    """DETAIL_SPEC 4-3: 길이 비율 1/5~5배 경계값을 정확히 확인한다.
+    원문이 20자를 넘을 때만 검사가 적용되므로, 25자 원문을 기준으로 잡는다.
+    """
+
+    def setUp(self):
+        # 정확히 25자인 한국어 문자열 (설명 필드에 씀)
+        self.long_description = "가" * 25
+        self.place = create_place_with_source("테스트명소", "TEST_SOURCE", "LEN_BOUND")
+
+    @patch("places.translation.google_translate.translate_text")
+    def test_ratio_exactly_one_fifth_is_success(self, mock_translate):
+        # 25자 / 5 = 5자 => ratio = 0.2 = 1/5 (경계값, 실패 아님)
+        mock_translate.side_effect = ["ok-name", "a" * 5]
+        self.place.description = self.long_description
+        self.place.save()
+
+        translation = translate_place(self.place, "en")
+
+        self.assertEqual(translation.status, TranslationStatus.SUCCESS)
+
+    @patch("places.translation.google_translate.translate_text")
+    def test_ratio_just_below_one_fifth_fails(self, mock_translate):
+        # 25자 / 4 = 4자 => ratio = 0.16 < 1/5 (실패)
+        mock_translate.side_effect = ["ok-name", "a" * 4]
+        self.place.description = self.long_description
+        self.place.save()
+
+        translation = translate_place(self.place, "en")
+
+        self.assertEqual(translation.status, TranslationStatus.FAILED)
+
+    @patch("places.translation.google_translate.translate_text")
+    def test_ratio_exactly_five_is_success(self, mock_translate):
+        # 25자 * 5 = 125자 => ratio = 5.0 (경계값, 실패 아님)
+        mock_translate.side_effect = ["ok-name", "a" * 125]
+        self.place.description = self.long_description
+        self.place.save()
+
+        translation = translate_place(self.place, "en")
+
+        self.assertEqual(translation.status, TranslationStatus.SUCCESS)
+
+    @patch("places.translation.google_translate.translate_text")
+    def test_ratio_just_above_five_fails(self, mock_translate):
+        # 25자 * 5 + 1 = 126자 => ratio = 5.04 > 5 (실패)
+        mock_translate.side_effect = ["ok-name", "a" * 126]
+        self.place.description = self.long_description
+        self.place.save()
+
+        translation = translate_place(self.place, "en")
+
+        self.assertEqual(translation.status, TranslationStatus.FAILED)
+
+    @patch("places.translation.google_translate.translate_text")
+    def test_source_length_exactly_20_skips_length_check(self, mock_translate):
+        # 정확히 20자인 원문은 길이검사 대상이 아니어야 한다 ("20자가 넘는 글에만 적용")
+        description_20 = "가" * 20
+        mock_translate.side_effect = ["ok-name", "a"]  # 극단적으로 짧은 번역
+        self.place.description = description_20
+        self.place.save()
+
+        translation = translate_place(self.place, "en")
+
+        self.assertEqual(translation.status, TranslationStatus.SUCCESS)
+
+    @patch("places.translation.google_translate.translate_text")
+    def test_source_length_21_applies_length_check(self, mock_translate):
+        # 21자부터는 길이검사가 걸려야 한다
+        description_21 = "가" * 21
+        mock_translate.side_effect = ["ok-name", "a"]  # 극단적으로 짧은 번역 -> 실패해야 함
+        self.place.description = description_21
+        self.place.save()
+
+        translation = translate_place(self.place, "en")
+
+        self.assertEqual(translation.status, TranslationStatus.FAILED)
+
+
+class TranslationMaxLengthTest(TestCase):
+    """PlaceTranslation.name은 CharField(max_length=200). 번역 결과가 200자를 넘으면 잘라서 저장하는지 확인한다.
+
+    (버그 수정 확인용) name/title에 해당하는 필드를 저장 전에 자르지 않으면 Postgres가
+    DataError를 던져서 명소 등록 시 자동 번역(on_commit)이나 admin "다시 번역" 액션이 죽는다.
+    """
+
+    def setUp(self):
+        self.place = create_place_with_source("경복궁", "TEST_SOURCE", "MAXLEN1")
+
+    @patch("places.translation.google_translate.translate_text")
+    def test_translated_name_over_200_chars_is_truncated_and_saved(self, mock_translate):
+        # 원문(경복궁, 3자)은 20자 이하라 길이검사를 안 받으므로, 번역기가 극단적으로 긴 결과를
+        # 줘도(예: 250자) 길이 비율만으로는 실패 처리되지 않는다. 잘려서 저장돼야 한다.
+        long_name = "a" * 250
+        mock_translate.side_effect = [long_name, ""]
+
+        translation = translate_place(self.place, "en")
+
+        self.assertEqual(translation.status, TranslationStatus.SUCCESS)
+        self.assertEqual(len(translation.name), 200)
+        self.assertEqual(translation.name, long_name[:200])
+
+
+class TranslateWorkServiceTest(TestCase):
+    """TranslatePlaceServiceTest와 같은 규칙이 작품(Work)에도 적용되는지 확인."""
+
+    @patch("places.translation.google_translate.translate_text")
+    def test_success_sets_status_success_and_fields(self, mock_translate):
+        work = Work.objects.create(title="사랑비", category=Work.Category.DRAMA, description="로맨스 드라마")
+        mock_translate.side_effect = ["Rain of Love", "A romance drama"]
+
+        translation = translate_work(work, "en")
+
+        self.assertEqual(translation.status, TranslationStatus.SUCCESS)
+        self.assertEqual(translation.title, "Rain of Love")
+        self.assertEqual(translation.description, "A romance drama")
+        self.assertFalse(translation.is_approved)
+
+    @patch("places.translation.google_translate.translate_text")
+    def test_exception_marks_failed_but_row_is_kept(self, mock_translate):
+        work = Work.objects.create(title="사랑비", category=Work.Category.DRAMA)
+        mock_translate.side_effect = Exception("번역 서비스 오류")
+
+        translation = translate_work(work, "en")
+
+        self.assertEqual(translation.status, TranslationStatus.FAILED)
+        self.assertTrue(WorkTranslation.objects.filter(pk=translation.pk).exists())
+
+    @patch("places.translation.google_translate.translate_text")
+    def test_complete_failure_keeps_existing_approval(self, mock_translate):
+        """회귀 테스트(Work판): 완전 실패 시 내용이 안 바뀌었으면 기존 승인 상태를 유지한다."""
+        work = Work.objects.create(title="사랑비", category=Work.Category.DRAMA, description="로맨스 드라마")
+        WorkTranslation.objects.create(
+            work=work,
+            language="en",
+            title="Rain of Love",
+            description="A romance drama",
+            status=TranslationStatus.SUCCESS,
+            is_approved=True,
+        )
+        mock_translate.side_effect = Exception("번역 서비스 오류")
+
+        translation = translate_work(work, "en")
+
+        self.assertEqual(translation.status, TranslationStatus.FAILED)
+        self.assertEqual(translation.title, "Rain of Love")
+        self.assertEqual(translation.description, "A romance drama")
+        self.assertTrue(translation.is_approved)
+
+
+class PickTranslatedTextTest(TestCase):
+    """checklist: 승인 전에는 번역문이 안 보이고, 승인하면 보인다 / 번역이 없으면 원문이 나온다."""
+
+    def setUp(self):
+        self.place = create_place_with_source("경복궁", "TEST_SOURCE", "PICK1", description="조선시대 정궁")
+
+    def test_no_translation_returns_original(self):
+        self.assertEqual(pick_translated_text(self.place, "name", "en"), "경복궁")
+
+    def test_language_none_returns_original_even_if_translation_exists(self):
+        PlaceTranslation.objects.create(
+            place=self.place, language="en", name="Gyeongbokgung", is_approved=True
+        )
+        self.assertEqual(pick_translated_text(self.place, "name", None), "경복궁")
+
+    def test_unapproved_translation_returns_original(self):
+        PlaceTranslation.objects.create(
+            place=self.place, language="en", name="Gyeongbokgung", is_approved=False
+        )
+        self.assertEqual(pick_translated_text(self.place, "name", "en"), "경복궁")
+
+    def test_approved_translation_returns_translated_value(self):
+        PlaceTranslation.objects.create(
+            place=self.place, language="en", name="Gyeongbokgung", is_approved=True
+        )
+        self.assertEqual(pick_translated_text(self.place, "name", "en"), "Gyeongbokgung")
+
+
+class PlaceTranslationSignalTest(TestCase):
+    """checklist: 관리자가 명소·작품을 등록하면(신규 생성) 번역문이 자동으로 만들어진다.
+
+    google_translate.translate_text를 mock해서 실제 네트워크를 타지 않는다. 번역은
+    transaction.on_commit으로 미뤄지므로, TestCase의 captureOnCommitCallbacks로 직접 실행해줘야 한다.
+    """
+
+    @patch("places.translation.google_translate.translate_text")
+    def test_creating_place_triggers_translation(self, mock_translate):
+        mock_translate.return_value = "Gyeongbokgung"
+
+        with self.captureOnCommitCallbacks(execute=True):
+            place = Place.objects.create(name="경복궁")
+
+        translation = PlaceTranslation.objects.get(place=place, language="en")
+        self.assertEqual(translation.status, TranslationStatus.SUCCESS)
+        self.assertEqual(translation.name, "Gyeongbokgung")
+        self.assertFalse(translation.is_approved)
+
+    @patch("places.translation.google_translate.translate_text")
+    def test_updating_place_does_not_retranslate_automatically(self, mock_translate):
+        """등록 시점에만 자동 번역하고, 그 뒤 내용 수정은 관리자가 admin의 "다시 번역"으로 직접 걸어야 한다."""
+        mock_translate.return_value = "Gyeongbokgung"
+
+        with self.captureOnCommitCallbacks(execute=True):
+            place = Place.objects.create(name="경복궁")
+        self.assertEqual(mock_translate.call_count, 1)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            place.business_hours = "09:00~18:00"
+            place.save()
+
+        self.assertEqual(mock_translate.call_count, 1)
+
+    @patch("places.translation.google_translate.translate_text")
+    def test_creating_work_triggers_translation(self, mock_translate):
+        mock_translate.return_value = "Rain of Love"
+
+        with self.captureOnCommitCallbacks(execute=True):
+            work = Work.objects.create(title="사랑비", category=Work.Category.DRAMA)
+
+        translation = WorkTranslation.objects.get(work=work, language="en")
+        self.assertEqual(translation.status, TranslationStatus.SUCCESS)
+        self.assertEqual(translation.title, "Rain of Love")
+
+
+class TranslationAdminConfigTest(TestCase):
+    """checklist: 실패한 명소가 관리자 화면의 실패 목록에 남는다 (status로 필터링 가능해야 한다)."""
+
+    def test_place_translation_admin_exposes_status_filter_and_approval_editing(self):
+        self.assertIn("status", PlaceTranslationAdmin.list_filter)
+        self.assertIn("is_approved", PlaceTranslationAdmin.list_editable)
+
+    def test_work_translation_admin_exposes_status_filter_and_approval_editing(self):
+        self.assertIn("status", WorkTranslationAdmin.list_filter)
+        self.assertIn("is_approved", WorkTranslationAdmin.list_editable)
+
+    def test_failed_translation_can_be_found_by_status_filter(self):
+        place = create_place_with_source("경복궁", "TEST_SOURCE", "ADMIN_FAIL1")
+        PlaceTranslation.objects.create(place=place, language="en", status=TranslationStatus.FAILED)
+
+        failed = PlaceTranslation.objects.filter(status=TranslationStatus.FAILED)
+        self.assertEqual(failed.count(), 1)
+
+
+class TranslationAdminRetranslateActionTest(TestCase):
+    """관리자가 "다시 번역" 액션을 실행하면 실제 번역 서비스가 호출되는지 확인."""
+
+    def setUp(self):
+        self.place_admin = PlaceTranslationAdmin(PlaceTranslation, AdminSite())
+        self.work_admin = WorkTranslationAdmin(WorkTranslation, AdminSite())
+
+    def _make_request(self):
+        # message_user()가 쓸 메시지 저장소가 필요하다. CookieStorage는 세션 미들웨어 없이도 동작한다.
+        request = RequestFactory().get("/admin/places/placetranslation/")
+        request._messages = CookieStorage(request)
+        return request
+
+    @patch("places.admin.translate_place")
+    def test_retranslate_places_action_calls_translate_place(self, mock_translate):
+        place = create_place_with_source("경복궁", "TEST_SOURCE", "ADMIN_ACT1")
+        translation = PlaceTranslation.objects.create(
+            place=place, language="en", status=TranslationStatus.FAILED
+        )
+
+        retranslate_places(
+            self.place_admin, self._make_request(), PlaceTranslation.objects.filter(pk=translation.pk)
+        )
+
+        mock_translate.assert_called_once_with(place, "en")
+
+    @patch("places.admin.translate_work")
+    def test_retranslate_works_action_calls_translate_work(self, mock_translate):
+        work = Work.objects.create(title="사랑비", category=Work.Category.DRAMA)
+        translation = WorkTranslation.objects.create(
+            work=work, language="en", status=TranslationStatus.FAILED
+        )
+
+        retranslate_works(
+            self.work_admin, self._make_request(), WorkTranslation.objects.filter(pk=translation.pk)
+        )
+
+        mock_translate.assert_called_once_with(work, "en")
+
+
+class TranslationApiIntegrationTest(TestCase):
+    """checklist: 승인 전/후 노출, 언어 결정 순서(lang → 로그인 회원 언어 → 한국어),
+    번역 실패해도 화면이 안 깨짐, 영어로 검색하면 한국어 명소가 찾아짐.
+    """
+
+    def setUp(self):
+        self.client = APIClient()
+        self.place = create_place_with_source(
+            "경복궁", "TEST_SOURCE", "TRANS_INTEG_1", address="서울 종로구", description="조선시대 정궁"
+        )
+        self.translation = PlaceTranslation.objects.create(
+            place=self.place,
+            language="en",
+            name="Gyeongbokgung",
+            description="Royal palace of the Joseon dynasty",
+            status=TranslationStatus.SUCCESS,
+        )
+
+    def test_unapproved_translation_not_shown_even_with_lang_param(self):
+        response = self.client.get(DETAIL_URL_TEMPLATE.format(self.place.id), {"lang": "en"})
+        self.assertEqual(response.data["name"], "경복궁")
+
+    def test_approved_translation_shown_with_lang_param(self):
+        self.translation.is_approved = True
+        self.translation.save()
+
+        response = self.client.get(DETAIL_URL_TEMPLATE.format(self.place.id), {"lang": "en"})
+
+        self.assertEqual(response.data["name"], "Gyeongbokgung")
+        self.assertEqual(response.data["description"], "Royal palace of the Joseon dynasty")
+
+    def test_non_translatable_fields_stay_korean(self):
+        self.translation.is_approved = True
+        self.translation.save()
+
+        response = self.client.get(DETAIL_URL_TEMPLATE.format(self.place.id), {"lang": "en"})
+
+        self.assertEqual(response.data["address"], "서울 종로구")
+
+    def test_failed_translation_falls_back_to_korean_without_breaking_response(self):
+        self.translation.status = TranslationStatus.FAILED
+        self.translation.is_approved = False
+        self.translation.save()
+
+        response = self.client.get(DETAIL_URL_TEMPLATE.format(self.place.id), {"lang": "en"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["name"], "경복궁")
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_logged_in_member_language_used_without_lang_param(self, mock_verify):
+        self.translation.is_approved = True
+        self.translation.save()
+        Member.objects.create(
+            firebase_uid="lang-uid-1",
+            provider=Member.Provider.GOOGLE,
+            agreed_terms_at="2026-01-01T00:00:00Z",
+            language="en",
+        )
+        mock_verify.return_value = make_decoded_token("lang-uid-1")
+
+        response = self.client.get(
+            DETAIL_URL_TEMPLATE.format(self.place.id), **{"HTTP_AUTHORIZATION": "Bearer fake-token"}
+        )
+
+        self.assertEqual(response.data["name"], "Gyeongbokgung")
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_lang_param_overrides_member_language(self, mock_verify):
+        """member.language가 en이 아니어도, lang 파라미터가 있으면 그게 우선한다."""
+        self.translation.is_approved = True
+        self.translation.save()
+        Member.objects.create(
+            firebase_uid="lang-uid-2",
+            provider=Member.Provider.GOOGLE,
+            agreed_terms_at="2026-01-01T00:00:00Z",
+            language="ja",  # 지원하지 않는 언어라 매칭 안 됨 → lang 파라미터가 우선해야만 영어가 나옴
+        )
+        mock_verify.return_value = make_decoded_token("lang-uid-2")
+
+        response = self.client.get(
+            DETAIL_URL_TEMPLATE.format(self.place.id),
+            {"lang": "en"},
+            **{"HTTP_AUTHORIZATION": "Bearer fake-token"},
+        )
+
+        self.assertEqual(response.data["name"], "Gyeongbokgung")
+
+    def test_search_result_name_shown_in_english_when_approved_and_lang_requested(self):
+        self.translation.is_approved = True
+        self.translation.save()
+
+        response = self.client.get(SEARCH_URL, {"q": "경복궁", "lang": "en"})
+
+        names = {p["name"] for p in response.data["places"]}
+        self.assertIn("Gyeongbokgung", names)
+
+    def test_english_keyword_search_finds_korean_place(self):
+        """checklist: 영어로 Gyeongbokgung을 검색하면 경복궁이 찾아진다."""
+        response = self.client.get(SEARCH_URL, {"q": "Gyeongbokgung"})
+
+        names = {p["name"] for p in response.data["places"]}  # lang을 안 줬으니 기본은 한국어로 나온다
+        self.assertIn("경복궁", names)
+
+
+class WorkTranslationInPlaceDetailTest(TestCase):
+    """checklist: 명소 상세에 중첩된 작품 정보(WorkDetailSerializer)도 번역된 값을 보여준다."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.place = create_place_with_source("경복궁", "TEST_SOURCE", "WORK_TRANS_1")
+        self.work = Work.objects.create(title="사랑비", category=Work.Category.DRAMA, description="로맨스 드라마")
+        PlaceWork.objects.create(place=self.place, work=self.work, scene_description="1화 장면")
+        WorkTranslation.objects.create(
+            work=self.work,
+            language="en",
+            title="Rain of Love",
+            description="A romance drama",
+            status=TranslationStatus.SUCCESS,
+            is_approved=True,
+        )
+
+    def test_nested_work_title_and_description_are_translated(self):
+        response = self.client.get(DETAIL_URL_TEMPLATE.format(self.place.id), {"lang": "en"})
+
+        work_entry = response.data["works"][0]["work"]
+        self.assertEqual(work_entry["title"], "Rain of Love")
+        self.assertEqual(work_entry["description"], "A romance drama")
+
+    def test_nested_work_stays_korean_without_lang(self):
+        response = self.client.get(DETAIL_URL_TEMPLATE.format(self.place.id))
+
+        work_entry = response.data["works"][0]["work"]
+        self.assertEqual(work_entry["title"], "사랑비")

@@ -1,5 +1,6 @@
 from django.urls import path
 
+from courses.views import PlaceCourseListCreateView
 from favorites.views import PlaceFavoriteView
 from places.views import PlaceDetailView, RecommendationView, SearchAutocompleteView, SearchView
 from reviews.views import PlaceReviewListCreateView
@@ -11,4 +12,5 @@ urlpatterns = [
     path("<int:place_id>/", PlaceDetailView.as_view(), name="place-detail"),
     path("<int:place_id>/reviews/", PlaceReviewListCreateView.as_view(), name="place-reviews"),
     path("<int:place_id>/favorite/", PlaceFavoriteView.as_view(), name="place-favorite"),
+    path("<int:place_id>/courses/", PlaceCourseListCreateView.as_view(), name="place-courses"),
 ]

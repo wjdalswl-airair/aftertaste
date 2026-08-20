@@ -3,25 +3,40 @@ from rest_framework import serializers
 
 from favorites.models import Favorite
 from places.models import Place, PlaceWork, Work
+from places.translation import pick_translated_text
 from reviews.serializers import ReviewSerializer
 
 
 class PlaceSearchSerializer(serializers.ModelSerializer):
-    """검색 결과의 명소 섹션에 쓰는 최소 정보. 상세 정보는 명소 상세 API(Phase 2-5) 몫이다."""
+    """검색 결과의 명소 섹션에 쓰는 최소 정보. 상세 정보는 명소 상세 API(Phase 2-5) 몫이다.
+
+    name은 context의 language에 승인된 번역이 있으면 그 값을, 없으면 한국어 원문을 돌려준다
+    (뷰가 context={"language": ...}를 넣어줘야 한다. 안 넣으면 항상 한국어 원문).
+    """
+
+    name = serializers.SerializerMethodField()
 
     class Meta:
         model = Place
         fields = ["id", "name", "address", "photo_url"]
         read_only_fields = fields
 
+    def get_name(self, obj):
+        return pick_translated_text(obj, "name", self.context.get("language"))
+
 
 class WorkSearchSerializer(serializers.ModelSerializer):
-    """검색 결과의 작품 섹션에 쓰는 최소 정보."""
+    """검색 결과의 작품 섹션에 쓰는 최소 정보. title 번역 규칙은 PlaceSearchSerializer.name과 같다."""
+
+    title = serializers.SerializerMethodField()
 
     class Meta:
         model = Work
         fields = ["id", "title", "category", "poster_url"]
         read_only_fields = fields
+
+    def get_title(self, obj):
+        return pick_translated_text(obj, "title", self.context.get("language"))
 
 
 class SearchResponseSerializer(serializers.Serializer):
@@ -45,12 +60,24 @@ class RecommendResponseSerializer(serializers.Serializer):
 
 
 class WorkDetailSerializer(serializers.ModelSerializer):
-    """명소 상세에 보여줄 작품 정보 (PRD F-05: 제목, 방영 시기, 주연배우, 감독)."""
+    """명소 상세에 보여줄 작품 정보 (PRD F-05: 제목, 방영 시기, 주연배우, 감독).
+
+    title/description은 PlaceSearchSerializer.name과 같은 규칙으로 번역문을 고른다.
+    """
+
+    title = serializers.SerializerMethodField()
+    description = serializers.SerializerMethodField()
 
     class Meta:
         model = Work
-        fields = ["id", "title", "category", "release_date", "main_cast", "director", "poster_url"]
+        fields = ["id", "title", "description", "category", "release_date", "main_cast", "director", "poster_url"]
         read_only_fields = fields
+
+    def get_title(self, obj):
+        return pick_translated_text(obj, "title", self.context.get("language"))
+
+    def get_description(self, obj):
+        return pick_translated_text(obj, "description", self.context.get("language"))
 
 
 class PlaceWorkSerializer(serializers.ModelSerializer):
@@ -76,8 +103,14 @@ class NearbyPlaceSerializer(serializers.Serializer):
 
 
 class PlaceDetailSerializer(serializers.ModelSerializer):
-    """GET /api/places/<id>/ 응답. 명소 기본 정보 + 등장 작품 + 주변 상권 + 리뷰를 한 화면 분량으로 담는다."""
+    """GET /api/places/<id>/ 응답. 명소 기본 정보 + 등장 작품 + 주변 상권 + 리뷰를 한 화면 분량으로 담는다.
 
+    name/description은 PlaceSearchSerializer.name과 같은 규칙으로 번역문을 고른다.
+    address/business_hours는 번역 대상이 아니라 항상 한국어 그대로 나간다.
+    """
+
+    name = serializers.SerializerMethodField()
+    description = serializers.SerializerMethodField()
     works = PlaceWorkSerializer(source="place_works", many=True, read_only=True)
     # nearby_places는 모델 필드가 아니라, 뷰에서 카카오 API 결과를 place 객체에 임시로 붙여준 값이다.
     nearby_places = NearbyPlaceSerializer(many=True, read_only=True)
@@ -103,6 +136,12 @@ class PlaceDetailSerializer(serializers.ModelSerializer):
             "review_average_rating",
         ]
         read_only_fields = fields
+
+    def get_name(self, obj):
+        return pick_translated_text(obj, "name", self.context.get("language"))
+
+    def get_description(self, obj):
+        return pick_translated_text(obj, "description", self.context.get("language"))
 
     def get_is_favorited(self, obj):
         # 로그인한 사람이면 내가 이미 즐겨찾기 했는지 표시한다 (DETAIL_SPEC 3-4).

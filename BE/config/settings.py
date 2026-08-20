@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "main",
     "reviews",
     "favorites",
+    "courses",
 ]
 
 MIDDLEWARE = [
@@ -158,6 +159,9 @@ KCISA_API_KEY = os.environ.get("KCISA_API_KEY", "")
 # 카카오맵 지오코딩용 REST API 키. 좌표가 없는 출처(경기 데이터 드림)의 장소명을
 # 좌표로 바꿔서, 좌표가 있는 다른 출처(한국문화정보원)와 같은 명소인지 비교하는 데 쓴다.
 KAKAO_API_KEY = os.environ.get("KAKAO_API_KEY", "")
+
+# Google Cloud Translation API (v2) 키. 명소·작품 번역에 쓴다 (docs/DETAIL_SPEC.md 6-1 #13).
+GOOGLE_TRANSLATE_API_KEY = os.environ.get("GOOGLE_TRANSLATE_API_KEY", "")
 
 
 # Firebase Authentication
