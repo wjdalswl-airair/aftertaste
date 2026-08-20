@@ -46,6 +46,12 @@
 
 - 기본 `python` 명령어에는 Django가 설치되어 있지 않다. Django/DRF가 설치된 인터프리터는 `C:/Users/SSAFY/AppData/Local/Programs/Python/Python311/python.exe` (Python 3.11)이다. `manage.py test`, `manage.py runserver` 등을 실행할 때는 이 경로를 사용한다. (Phase 2-2, Phase 2-3에서 각 에이전트가 반복해서 새로 발견했던 함정이라 여기에 명시해둔다.)
 
+# 브랜치 병합
+
+- 이 프로젝트는 여러 기능 브랜치(`place-description`/`personalization`/`multi-language`/`course` 등)를 병행해서 개발하고 나중에 하나로 합친다.
+- 브랜치를 병합해 충돌을 해결할 때는 어느 한쪽만 취하지 않고, 두 기능을 모두 보존하는 방향으로 병합한다.
+- 병합 직후에는 반드시 전체 테스트를 실행해 두 기능이 서로 깨지지 않았는지 확인한 뒤에 커밋한다.
+
 # 알려진 도구 이슈
 
 - `Workflow` 툴로 phase-harness(coding→test→verify→review→compound)를 자동 실행하면 권한 처리기 오류("script contains control characters that would be hidden in the approval dialog")로 실패할 수 있다 (2026-08-13, 2026-08-17 재현됨). 하네스 문서로 고칠 수 있는 문제가 아니라 도구 자체의 버그다. 재발하면 `Agent` 툴로 coding→test→verify→review→compound를 순서대로 수동 호출해 동일한 흐름을 대체 수행한다.

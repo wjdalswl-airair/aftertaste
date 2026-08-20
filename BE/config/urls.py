@@ -22,6 +22,7 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
+from courses.views import MyCourseListView
 from favorites.views import MyFavoriteListView
 from main.views import HallOfFameView, TopPlacesView
 from reviews.views import MyReviewListView
@@ -42,6 +43,8 @@ urlpatterns = [
     # 알 필요는 없어서(방 분리), accounts.urls에 넣지 않고 여기서 바로 라우팅한다.
     path("api/account/reviews/", MyReviewListView.as_view(), name="my-reviews"),
     path("api/account/favorites/", MyFavoriteListView.as_view(), name="my-favorites"),
+    # 내가 만든 코스 목록(마이페이지용). 위와 같은 이유로 courses.urls에 안 넣고 여기서 바로 라우팅한다.
+    path("api/account/courses/", MyCourseListView.as_view(), name="my-courses"),
     path("api/banners/", include("main.urls")),
     # 명예의 전당·Top10은 배너와 달리 "메인 화면"에 속하는 별개 구성요소라
     # /api/banners/ 프리픽스를 쓰면 이름이 안 맞는다. main 앱 자체의 url 프리픽스가
@@ -51,6 +54,7 @@ urlpatterns = [
     path("api/main/top-places/", TopPlacesView.as_view(), name="top-places"),
     path("api/places/", include("places.urls")),
     path("api/reviews/", include("reviews.urls")),
+    path("api/courses/", include("courses.urls")),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path(
         "api/docs/",

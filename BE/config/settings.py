@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "main",
     "reviews",
     "favorites",
+    "courses",
 ]
 
 MIDDLEWARE = [
