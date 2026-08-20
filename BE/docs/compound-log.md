@@ -16,6 +16,24 @@
 
 ---
 
+## 2026-08-20
+- tags: [phase4, places, translation, is_approved, 재번역, review, BLOCKING]
+- category: 구현 실수
+- 문제: `places/translation.py`의 `_apply_translation`이, 재번역이 **완전히 실패**해서 내용이 하나도 안 바뀌었을 때도 `is_approved`를 무조건 `False`로 리셋하고 있었다. 그러면 이미 관리자가 승인해서 손님에게 정상적으로 보이던 번역이, 관리자가 "다시 번역"을 눌렀는데 API가 일시적으로 실패한 것 한 번만으로 화면에서 사라져버린다. review가 정적 분석으로 [BLOCKING]으로 찾아냈고, coding이 "실제로 값이 갱신된 필드가 있을 때만 is_approved를 리셋"하도록 고치고 회귀 테스트(`test_complete_failure_keeps_existing_approval`)를 추가해 187개 테스트 통과를 확인했다. "재시도/재작업이 실패했을 때 이미 정상이던 상태값까지 덩달아 리셋해버리는" 이 구체적 유형은 이번이 첫 발견이라 아직 반복 패턴으로 보기는 이르다. review는 이 외에도 NIT 3건(200자 트렁케이션이 SUCCESS로 표시돼 관리자가 잘림을 못 알아챔 / 대량 import 시 `transaction.on_commit` 동기 호출로 인한 지연·예외 전파 가능성 / `lang`·`Member.language` 값 정규화 부재)을 남겼는데 전부 이번이 첫 발견이라 이번 사이클에서는 고치지 않았다.
+- 개선: BLOCKING은 이번 사이클에서 바로 수정해 반영했다. 첫 발견이라 하네스 규칙은 아직 추가하지 않는다. 다음에 "재시도·재작업 실패 시 정상이던 상태값을 덩달아 리셋하는" 유형이 한 번 더 나오면 `.claude/agents/coding.md`에 관련 규칙 추가를 검토한다. 남겨둔 NIT 3건도 각각 다시 나오면(트렁케이션 표시 부정확, 대량 처리 동기 호출, 외부 입력 값 정규화 누락) 관련 규칙 추가를 검토한다.
+
+## 2026-08-20
+- tags: [phase4, places, PlaceTranslation, WorkTranslation, CharField, max_length, 외부API번역, coding.md, test.md]
+- category: 구현 실수 (반복, 2번째)
+- 문제: `PlaceTranslation.name`/`WorkTranslation.title`이 `CharField(max_length=200)`인데, Google Translate가 돌려준 번역문이 이 길이를 넘으면 저장 시 `DataError`가 나는 버그를 test 단계에서 DETAIL_SPEC 4-3의 예외 케이스(길이비율 경계값 등)를 직접 재검증하다가 찾아냈다. 2026-08-18에 기록한 `SearchHistory.keyword` 초과 버그와 근본 원인 유형은 같다(모델 `max_length`와 저장 전 값 길이가 항상 일치하지 않음)지만, 이번엔 사용자가 직접 입력한 값이 아니라 **외부 API(번역 서비스) 응답값**이 원인이었다. 당시 추가한 `.claude/agents/coding.md` 규칙 문구가 "사용자 입력을 CharField/TextField에 저장할 때는..."으로 한정돼 있어서, 외부 API 응답값을 저장하는 이번 케이스는 문구상 명시적으로 커버되지 않았고 실제로 coding 단계에서 놓쳤다(test 단계에서 뒤늦게 발견). "저장 전 검증 없이 CharField/TextField에 값을 쓰는" 문제가 원인 소스를 바꿔가며 2번째로 재현된 것으로, 이 프로젝트가 외부 API(공공데이터, 번역 등)를 계속 연동할 예정이라 앞으로도 반복될 가능성이 있다.
+- 개선: 사용자에게 확인(AskUserQuestion)해서 기존 SearchHistory 사례와 동일하게 "200자로 잘라서 저장"으로 처리하고 회귀 테스트(`test_translated_name_over_200_chars_is_truncated_and_saved`)를 추가했다. 재발 방지를 위해 `.claude/agents/coding.md`와 `.claude/agents/test.md`의 기존 CharField/TextField 규칙 문구를 "사용자 입력"에서 "사용자 입력이든 외부 API 응답값이든"으로 일반화해서, 같은 유형이 세 번째 다른 소스(예: 다른 외부 API)에서 나와도 문구상 이미 커버되도록 고쳤다.
+
+## 2026-08-20
+- tags: [phase4, multi-language, 브랜치범위, place, work, coding전확인, 질문우선, coding.md]
+- category: 문서·코드 불일치
+- 문제: `docs/PHASES/PHASE4.md`가 "이전 Phase에서 만든 것을 이어받는다"고 전제하는데, 실제 작업 브랜치(`feature/be/multi-language`)는 Phase 3(`feature/be/personalization`)이 아니라 Phase 2(`feature/be/place-description`) 기준으로 만들어져 있어서 `reviews` 앱 자체가 브랜치에 없었다. 그래서 Phase 4 다국어 번역(N-01) 중 리뷰 번역을 지금 브랜치에서 그대로 구현하려 했다면 존재하지 않는 모델을 참조하는 코드를 만들 뻔했다. coding이 착수 전 "기준 문서 확인" 단계에서 문서와 실제 코드 상태를 대조해보다가 발견했고, 임의로 건너뛰거나 흉내 내지 않고 사용자에게 확인해서 "명소·작품 번역만 먼저, 리뷰 번역은 브랜치가 합쳐진 뒤 별도 진행"으로 범위를 좁혔다. 이 구체적 유형("Phase 문서가 가정하는 이전 Phase 코드가 지금 브랜치엔 없음")은 이번이 첫 발견이지만, 이 프로젝트는 여러 기능 브랜치(`place-description`/`personalization`/`multi-language`/`login` 등)를 병행해서 만들고 나중에 합치는 구조라, 브랜치 병합 순서에 따라 앞으로도 같은 유형이 반복될 가능성이 구조적으로 크다고 판단했다(과거 "구조적으로 반복될 카테고리는 1회만 나와도 하네스에 반영" 기준과 동일).
+- 개선: 반복 가능성이 구조적이라 첫 발견 시점에 바로 규칙을 추가한다. `.claude/agents/coding.md`의 "3. 구현하기" 절에 "Phase 문서가 이전 Phase 코드를 이어받는다고 전제하는 기능을 만들기 전에는 실제 작업 브랜치에 그 앱·모델이 있는지 직접 확인하고, 없으면 범위를 어떻게 좁힐지 사용자에게 먼저 확인한다"는 규칙을 추가했다. 또한 이 사이클에서 번역 방식·지원 언어(문서 미결 항목)와 응답 언어 결정 순서(문서에 없던 부분)를 코드 작성 전에 AskUserQuestion으로 먼저 확인한 것도 기존 "질문 우선" 패턴이 다시 잘 작동한 사례라 별도 규칙 추가는 하지 않았다.
+
 ## 2026-08-19 (Phase 3 사이클 B)
 - tags: [phase3, recommendation, _nearest_places, 성능, 재확인, coding.md]
 - category: 하네스 개선
@@ -45,6 +63,8 @@
 - category: 구현 실수 (경미, NIT)
 - 문제: review가 favorites/reviews 구현에서 BLOCKING 없이 NIT 3건을 찾았다: (1) `PlaceReviewListCreateView`에서 `perform_authentication` 오버라이드가 GET/POST 모두에 적용돼, 로그인이 필요한 POST를 무효 토큰으로 시도하면 다른 앱(즐겨찾기/좋아요)과 다른 에러 메시지가 나옴 — 로그인 요건 자체는 안 깨지지만, 로그인 필요/불필요 메서드가 한 뷰에 섞여 있을 때 오버라이드를 메서드 구분 없이 적용하면 생기는 새로운 유형의 부작용 (2) `Review.content`의 `TextField(max_length=1000)`이 DRF 시리얼라이저 레벨에서만 강제되고 DB/모델 레벨에는 없어, admin이나 시리얼라이저를 안 거치는 경로에서는 1000자 제한이 안 걸림 (3) `ReviewReportView.post`가 중복 신고여도 항상 201을 반환해 즐겨찾기/좋아요의 200/201 구분 관례와 다름. 셋 다 이번이 첫 발견이고 당장 오동작을 일으키는 BLOCKING은 아니라 이번 사이클에서는 고치지 않고 넘어갔다.
 - 개선: 셋 다 첫 사례라 하네스 규칙은 아직 추가하지 않음. (1)은 "로그인 필요 메서드와 불필요 메서드가 한 뷰에 섞인 경우"라는 좀 더 구체적인 조건에서 재발하는지 지켜본다. (2)는 2026-08-18 "CharField/TextField max_length와 저장 전 검증 불일치"와 방향은 다르지만(그때는 초과 입력이 DB 에러를 냈던 문제, 이번은 시리얼라이저만 강제하고 DB/모델 레벨엔 없는 문제) 같은 카테고리로 볼 수 있어, 다음에 TextField/CharField 길이 제한을 시리얼라이저에만 두는 사례가 한 번 더 review에서 지적되면 `.claude/agents/coding.md`에 "글자수 제한은 시리얼라이저뿐 아니라 모델 `validators`로도 이중으로 건다" 같은 규칙 추가를 검토한다. (3)은 응답 코드 관례 문제로, 앱마다 다른 관례가 한 번 더 지적되면 API 응답 관례를 문서(DETAIL_SPEC 등)에 명문화하는 것을 검토한다.
+
+---
 
 ## 2026-08-19
 - tags: [phase2-5, places, kakao, 외부API, 순차호출, reviewNIT, 코스추천예고]

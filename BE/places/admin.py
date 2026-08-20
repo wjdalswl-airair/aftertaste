@@ -9,6 +9,7 @@ from places.models import (
     Work,
     WorkTranslation,
 )
+from places.translation import translate_place, translate_work
 
 
 class PlaceWorkInline(admin.TabularInline):
@@ -45,14 +46,40 @@ class WorkAdmin(admin.ModelAdmin):
     inlines = [PlaceWorkInline]
 
 
+@admin.action(description="선택한 번역 다시 번역하기")
+def retranslate_places(modeladmin, request, queryset):
+    for translation in queryset:
+        translate_place(translation.place, translation.language)
+    modeladmin.message_user(request, f"{queryset.count()}건 다시 번역했습니다.")
+
+
+@admin.action(description="선택한 번역 다시 번역하기")
+def retranslate_works(modeladmin, request, queryset):
+    for translation in queryset:
+        translate_work(translation.work, translation.language)
+    modeladmin.message_user(request, f"{queryset.count()}건 다시 번역했습니다.")
+
+
 @admin.register(PlaceTranslation)
 class PlaceTranslationAdmin(admin.ModelAdmin):
-    list_display = ("place", "language", "name")
+    # is_approved를 목록에서 바로 체크할 수 있게 한다. status로 필터링하면 FAILED만 골라
+    # "실패 목록"으로 볼 수 있다 (PHASES/PHASE4.md 4-3 완료 기준).
+    list_display = ("place", "language", "name", "status", "is_approved")
+    list_display_links = ("place",)
+    list_editable = ("is_approved",)
+    list_filter = ("status", "language", "is_approved")
+    search_fields = ("place__name", "name")
+    actions = [retranslate_places]
 
 
 @admin.register(WorkTranslation)
 class WorkTranslationAdmin(admin.ModelAdmin):
-    list_display = ("work", "language", "title")
+    list_display = ("work", "language", "title", "status", "is_approved")
+    list_display_links = ("work",)
+    list_editable = ("is_approved",)
+    list_filter = ("status", "language", "is_approved")
+    search_fields = ("work__title", "title")
+    actions = [retranslate_works]
 
 
 @admin.register(SearchHistory)
