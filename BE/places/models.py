@@ -85,13 +85,31 @@ class PlaceWork(models.Model):
         return f"{self.place} - {self.work}"
 
 
+class TranslationStatus(models.TextChoices):
+    """번역 처리 상태. PlaceTranslation/WorkTranslation이 공통으로 쓴다 (DETAIL_SPEC 4-3·4-4)."""
+
+    PENDING = "PENDING", "대기"
+    SUCCESS = "SUCCESS", "성공"
+    FAILED = "FAILED", "실패"
+
+
 class PlaceTranslation(models.Model):
-    """명소 이름·설명의 언어별 번역문 자리. 실제 번역은 Phase 4에서 채운다."""
+    """명소 이름·설명의 언어별 번역문.
+
+    is_approved가 True인 것만 손님에게 보여준다 — 자동 번역이 뜻으로 옮겨버릴 수 있어서
+    (예: 경복궁 → Scenery Palace) 관리자가 눈으로 확인해야 한다 (DETAIL_SPEC 4-3 (2)).
+    status/translated_at은 번역 시도 결과를 남겨서, 실패한 것을 관리자 화면에서 찾아
+    "다시 번역"할 수 있게 한다.
+    """
 
     place = models.ForeignKey(Place, on_delete=models.CASCADE, related_name="translations")
     language = models.CharField(max_length=10)
     name = models.CharField(max_length=200, blank=True)
     description = models.TextField(blank=True)
+
+    is_approved = models.BooleanField(default=False)
+    status = models.CharField(max_length=10, choices=TranslationStatus.choices, default=TranslationStatus.PENDING)
+    translated_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         unique_together = ("place", "language")
@@ -101,12 +119,16 @@ class PlaceTranslation(models.Model):
 
 
 class WorkTranslation(models.Model):
-    """작품 제목·설명의 언어별 번역문 자리. 실제 번역은 Phase 4에서 채운다."""
+    """작품 제목·설명의 언어별 번역문. 규칙은 PlaceTranslation과 같다."""
 
     work = models.ForeignKey(Work, on_delete=models.CASCADE, related_name="translations")
     language = models.CharField(max_length=10)
     title = models.CharField(max_length=200, blank=True)
     description = models.TextField(blank=True)
+
+    is_approved = models.BooleanField(default=False)
+    status = models.CharField(max_length=10, choices=TranslationStatus.choices, default=TranslationStatus.PENDING)
+    translated_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         unique_together = ("work", "language")

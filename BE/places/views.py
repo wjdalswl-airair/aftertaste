@@ -18,6 +18,7 @@ from places.serializers import (
 )
 from places.services import haversine_distance_meters, to_decimal
 from places.sources import kakao_geocoding
+from places.translation import pick_translated_text, resolve_language
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,17 @@ VALID_SEARCH_TYPES = {"", "WORK", "DRAMA", "MOVIE"}
 
 
 def _search_places(keyword):
-    """명소 이름(원문 + 번역문)에서 비슷한 것까지 찾는다."""
+    """명소 이름(원문 + 번역문)에서 비슷한 것까지 찾는다.
+
+    is_approved가 안 된 번역까지 검색 대상에 포함한다 — 여기서 뒤지는 건 "찾을 수 있는지"이지
+    "무엇을 보여줄지"가 아니다. 결과에 실제로 노출되는 이름은 PlaceSearchSerializer가
+    pick_translated_text로 승인된 번역만 고르므로, 미승인 텍스트가 사용자에게 그대로
+    보이는 일은 없다. 승인 여부까지 걸러버리면 "번역은 됐는데 아직 승인 전"인 명소가
+    번역명으로는 검색이 안 되는 빈틈이 생긴다.
+
+    translations를 prefetch해서, 검색 결과를 직렬화할 때(pick_translated_text) 명소마다
+    추가 쿼리가 나가지 않게 한다.
+    """
 
     return (
         Place.objects.filter(
@@ -53,11 +64,15 @@ def _search_places(keyword):
         .annotate(similarity=TrigramSimilarity("name", keyword))
         .distinct()
         .order_by("-similarity", "name")
+        .prefetch_related("translations")
     )
 
 
 def _search_works(keyword, category=None):
-    """작품 제목(원문 + 번역문)에서 비슷한 것까지 찾는다. category를 주면 그 구분만 본다."""
+    """작품 제목(원문 + 번역문)에서 비슷한 것까지 찾는다. category를 주면 그 구분만 본다.
+
+    미승인 번역까지 검색 대상에 포함하는 이유는 _search_places와 같다.
+    """
 
     qs = Work.objects.filter(
         Q(title__icontains=keyword)
@@ -67,7 +82,12 @@ def _search_works(keyword, category=None):
     )
     if category:
         qs = qs.filter(category=category)
-    return qs.annotate(similarity=TrigramSimilarity("title", keyword)).distinct().order_by("-similarity", "title")
+    return (
+        qs.annotate(similarity=TrigramSimilarity("title", keyword))
+        .distinct()
+        .order_by("-similarity", "title")
+        .prefetch_related("translations")
+    )
 
 
 class SearchView(APIView):
@@ -99,6 +119,7 @@ class SearchView(APIView):
         parameters=[
             OpenApiParameter("q", str, description="검색어"),
             OpenApiParameter("type", str, description="WORK / DRAMA / MOVIE (선택)"),
+            OpenApiParameter("lang", str, description="응답 언어 (예: en). 안 주면 로그인 회원의 언어 → 한국어 순"),
         ],
         responses={
             200: SearchResponseSerializer,
@@ -124,9 +145,11 @@ class SearchView(APIView):
             places_qs = Place.objects.none()
             works_qs = _search_works(keyword, category=search_type)
 
+        language = resolve_language(request)
+        context = {"language": language}
         data = {
-            "places": PlaceSearchSerializer(places_qs, many=True).data,
-            "works": WorkSearchSerializer(works_qs, many=True).data,
+            "places": PlaceSearchSerializer(places_qs, many=True, context=context).data,
+            "works": WorkSearchSerializer(works_qs, many=True, context=context).data,
         }
         if not data["places"] and not data["works"]:
             data["message"] = NO_RESULT_MESSAGE
@@ -150,7 +173,10 @@ class SearchAutocompleteView(APIView):
     @extend_schema(
         summary="검색 자동완성",
         description="입력 중인 글자로 시작/포함하는 명소·작품 이름 후보를 보여준다.",
-        parameters=[OpenApiParameter("q", str, description="입력 중인 검색어")],
+        parameters=[
+            OpenApiParameter("q", str, description="입력 중인 검색어"),
+            OpenApiParameter("lang", str, description="응답 언어 (예: en). 안 주면 로그인 회원의 언어 → 한국어 순"),
+        ],
         responses={200: AutocompleteResponseSerializer},
     )
     def get(self, request):
@@ -158,18 +184,23 @@ class SearchAutocompleteView(APIView):
         if not keyword:
             return Response({"suggestions": []})
 
-        place_names = (
+        language = resolve_language(request)
+
+        places = (
             Place.objects.filter(Q(name__icontains=keyword) | Q(translations__name__icontains=keyword))
-            .values_list("name", flat=True)
             .distinct()
+            .prefetch_related("translations")
         )
-        work_titles = (
+        works = (
             Work.objects.filter(Q(title__icontains=keyword) | Q(translations__title__icontains=keyword))
-            .values_list("title", flat=True)
             .distinct()
+            .prefetch_related("translations")
         )
 
-        suggestions = list(dict.fromkeys(list(place_names) + list(work_titles)))[:AUTOCOMPLETE_LIMIT]
+        place_names = [pick_translated_text(place, "name", language) for place in places]
+        work_titles = [pick_translated_text(work, "title", language) for work in works]
+
+        suggestions = list(dict.fromkeys(place_names + work_titles))[:AUTOCOMPLETE_LIMIT]
         return Response({"suggestions": suggestions})
 
 
@@ -295,6 +326,9 @@ class PlaceDetailView(APIView):
             "명소 기본 정보, 등장 작품 목록(작품별 장면 설명 포함), 주변 상권을 한 번에 반환한다.\n\n"
             "주변 상권은 명소 좌표를 기준으로 카카오 장소 검색 API를 그때그때 호출해서 가져온다."
         ),
+        parameters=[
+            OpenApiParameter("lang", str, description="응답 언어 (예: en). 안 주면 로그인 회원의 언어 → 한국어 순"),
+        ],
         responses={
             200: PlaceDetailSerializer,
             404: OpenApiResponse(description="해당 명소가 존재하지 않음"),
@@ -302,7 +336,9 @@ class PlaceDetailView(APIView):
     )
     def get(self, request, place_id):
         try:
-            place = Place.objects.prefetch_related("place_works__work").get(pk=place_id)
+            place = Place.objects.prefetch_related(
+                "translations", "place_works__work__translations"
+            ).get(pk=place_id)
         except Place.DoesNotExist:
             return Response({"detail": NOT_FOUND_MESSAGE}, status=404)
 
@@ -310,4 +346,5 @@ class PlaceDetailView(APIView):
         # 임시로 붙여주는 값이다 (PlaceDetailSerializer 참고).
         place.nearby_places = _fetch_nearby_places(place)
 
-        return Response(PlaceDetailSerializer(place).data)
+        language = resolve_language(request)
+        return Response(PlaceDetailSerializer(place, context={"language": language}).data)

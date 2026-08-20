@@ -157,6 +157,9 @@ KCISA_API_KEY = os.environ.get("KCISA_API_KEY", "")
 # 좌표로 바꿔서, 좌표가 있는 다른 출처(한국문화정보원)와 같은 명소인지 비교하는 데 쓴다.
 KAKAO_API_KEY = os.environ.get("KAKAO_API_KEY", "")
 
+# Google Cloud Translation API (v2) 키. 명소·작품 번역에 쓴다 (docs/DETAIL_SPEC.md 6-1 #13).
+GOOGLE_TRANSLATE_API_KEY = os.environ.get("GOOGLE_TRANSLATE_API_KEY", "")
+
 
 # Firebase Authentication
 # 서비스 계정 키 파일 경로. 아직 준비되지 않았다면 파일이 없어도 서버는 정상 부팅되고,
