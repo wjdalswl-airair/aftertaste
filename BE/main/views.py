@@ -51,6 +51,10 @@ class HallOfFameView(APIView):
     (오류로 처리하지 않음). 화면에 나가는 대표 이미지는 리뷰 사진 중 첫 번째 장이다
     (ReviewSerializer의 photos 배열 순서가 곧 제출 순서, DETAIL_SPEC 2-3).
 
+    응답에는 리뷰 객체만 담는다(place는 id만). 목업 카드에 필요한 명소 이름·작품 제목은
+    프론트엔드가 review.place id로 GET /api/places/<id>/를 한 번 더 불러서 채운다
+    (DETAIL_SPEC 6-1 #20-1, 2026-08-28).
+
     배너·추천처럼 메인 화면 구성요소는 지금까지 전부 로그인이 필요 없었던 패턴을 따라
     로그인 여부와 상관없이 호출할 수 있게 만들었다. SearchView와 같은 이유로
     perform_authentication을 오버라이드한다: 토큰이 무효/만료돼도 조회 자체는 막지 않는다.
