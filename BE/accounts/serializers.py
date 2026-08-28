@@ -1,9 +1,19 @@
 from rest_framework import serializers
 
 from accounts.models import Member
+from courses.models import Course
+from reviews.models import Review
 
 
 class MemberSerializer(serializers.ModelSerializer):
+    # 마이페이지 프로필 상단 활동 요약 (docs/DETAIL_SPEC.md 3-1, 6-1 #22).
+    # - reviewed_places_count: 내가 리뷰를 쓴 서로 다른 명소 수 ("방문 인증한 촬영지").
+    #   실제 방문 인증 기능이 아니라 리뷰 수를 명소 단위로 센 것뿐이다. 관리자가 감춘
+    #   리뷰는 뺀다. (삭제한 리뷰는 물리적으로 지워져 자연히 빠진다.)
+    # - created_courses_count: 내가 만든 코스 수 ("제안한 코스").
+    reviewed_places_count = serializers.SerializerMethodField()
+    created_courses_count = serializers.SerializerMethodField()
+
     class Meta:
         model = Member
         fields = [
@@ -15,8 +25,21 @@ class MemberSerializer(serializers.ModelSerializer):
             "nationality",
             "language",
             "created_at",
+            "reviewed_places_count",
+            "created_courses_count",
         ]
         read_only_fields = fields
+
+    def get_reviewed_places_count(self, obj):
+        return (
+            Review.objects.filter(member=obj, is_hidden=False)
+            .values("place")
+            .distinct()
+            .count()
+        )
+
+    def get_created_courses_count(self, obj):
+        return Course.objects.filter(creator=obj).count()
 
 
 class MemberUpdateSerializer(serializers.ModelSerializer):

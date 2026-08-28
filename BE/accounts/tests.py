@@ -200,6 +200,79 @@ class MeViewTests(TestCase):
         self.assertEqual(response.data["email"], "member@example.com")
 
 
+class MeProfileSummaryTests(TestCase):
+    """GET /api/account/ 프로필 응답의 활동 요약 (DETAIL_SPEC 3-1, 6-1 #22).
+
+    - reviewed_places_count: 내가 리뷰를 쓴 서로 다른 명소 수 (감춰진 리뷰 제외)
+    - created_courses_count: 내가 만든 코스 수
+    """
+
+    def setUp(self):
+        self.client = APIClient()
+        self.auth_header = {"HTTP_AUTHORIZATION": "Bearer fake-token"}
+        self.member = Member.objects.create(
+            firebase_uid="summary-uid",
+            provider=Member.Provider.GOOGLE,
+            agreed_terms_at="2026-01-01T00:00:00Z",
+        )
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_counts_are_zero_for_new_member(self, mock_verify):
+        mock_verify.return_value = make_decoded_token("summary-uid")
+
+        response = self.client.get(ME_URL, **self.auth_header)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["reviewed_places_count"], 0)
+        self.assertEqual(response.data["created_courses_count"], 0)
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_reviewed_places_count_dedupes_by_place_and_excludes_hidden(self, mock_verify):
+        from courses.models import Course
+        from places.models import Place
+        from reviews.models import Review
+
+        mock_verify.return_value = make_decoded_token("summary-uid")
+        place_a = Place.objects.create(name="경복궁")
+        place_b = Place.objects.create(name="남산타워")
+
+        # 같은 명소에 리뷰 2개 → 1로 센다
+        Review.objects.create(member=self.member, place=place_a, rating=5, content="1", language="ko")
+        Review.objects.create(member=self.member, place=place_a, rating=4, content="2", language="ko")
+        Review.objects.create(member=self.member, place=place_b, rating=3, content="3", language="ko")
+        # 감춰진 리뷰만 있는 명소는 안 센다
+        place_c = Place.objects.create(name="숨겨진명소")
+        Review.objects.create(
+            member=self.member, place=place_c, rating=1, content="4", language="ko", is_hidden=True
+        )
+        Course.objects.create(place=place_a, creator=self.member, title="내 코스 1")
+        Course.objects.create(place=place_b, creator=self.member, title="내 코스 2")
+
+        response = self.client.get(ME_URL, **self.auth_header)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["reviewed_places_count"], 2)
+        self.assertEqual(response.data["created_courses_count"], 2)
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_other_members_activity_does_not_count(self, mock_verify):
+        from places.models import Place
+        from reviews.models import Review
+
+        mock_verify.return_value = make_decoded_token("summary-uid")
+        other = Member.objects.create(
+            firebase_uid="other-summary-uid",
+            provider=Member.Provider.GOOGLE,
+            agreed_terms_at="2026-01-01T00:00:00Z",
+        )
+        place = Place.objects.create(name="경복궁")
+        Review.objects.create(member=other, place=place, rating=5, content="남의 리뷰", language="ko")
+
+        response = self.client.get(ME_URL, **self.auth_header)
+
+        self.assertEqual(response.data["reviewed_places_count"], 0)
+
+
 class MemberModelTests(TestCase):
     """회원 정보 보관 항목이 준비되어 있는지 확인한다."""
 
