@@ -4,9 +4,10 @@ from django.db import models
 from accounts.models import Member
 from places.models import Place
 
-# 리뷰 글자 수·사진 장수 제한 (docs/DETAIL_SPEC.md 6-1 #14, 2026-08-19 결정)
-REVIEW_CONTENT_MAX_LENGTH = 1000
-REVIEW_MAX_PHOTOS = 3
+# 리뷰 글자 수·사진 장수 제한 (docs/DETAIL_SPEC.md 6-1 #14).
+# 2026-08-28 정정: 목업의 리뷰 작성 화면("14 / 500", "사진 첨부 0 / 5")에 맞춰 500자·5장으로 변경.
+REVIEW_CONTENT_MAX_LENGTH = 500
+REVIEW_MAX_PHOTOS = 5
 
 
 class Review(models.Model):
@@ -33,7 +34,11 @@ class Review(models.Model):
 
 
 class ReviewPhoto(models.Model):
-    """리뷰 사진. 최대 3장까지 붙을 수 있다 (개수 검증은 시리얼라이저에서 한다).
+    """리뷰 사진. 최대 5장까지 붙을 수 있다 (개수 검증은 시리얼라이저에서 한다).
+
+    사진이 여러 장이면 제출 순서상 첫 번째 장이 대표 이미지다 (명예의 전당 등에서 사용,
+    docs/DETAIL_SPEC.md 2-3). 별도 순서 필드는 두지 않고 제출 순서대로 만들어 pk 오름차순이
+    곧 제출 순서가 되게 한다 (ReviewWriteSerializer가 bulk_create를 순서대로 호출).
 
     Firebase Storage에 올린 파일의 URL만 저장한다 (docs/DETAIL_SPEC.md 6-1 #2, Place.photo_url과 같은 방식).
     """

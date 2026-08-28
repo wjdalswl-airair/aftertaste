@@ -56,7 +56,7 @@ class ReviewSerializer(serializers.ModelSerializer):
 class ReviewWriteSerializer(serializers.ModelSerializer):
     """리뷰 쓰기·고치기에 쓰는 시리얼라이저. photo_urls로 사진 URL 목록을 받는다.
 
-    글자 수 제한(1000자)은 Review.content의 max_length를 통해 자동으로 검증된다
+    글자 수 제한(500자)은 Review.content의 max_length를 통해 자동으로 검증된다
     (모델 max_length와 저장 전 검증이 어긋나지 않도록, DB에 넣기 전 여기서 막는다).
     """
 

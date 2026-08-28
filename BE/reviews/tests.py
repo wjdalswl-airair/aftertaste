@@ -231,7 +231,7 @@ class ReviewWriteTests(TestCase):
     # 글자 수 제한 (경계값 포함)
 
     @patch("accounts.authentication.verify_id_token")
-    def test_content_exactly_1000_chars_is_accepted(self, mock_verify):
+    def test_content_at_max_length_is_accepted(self, mock_verify):
         mock_verify.return_value = make_decoded_token("review-writer-uid")
 
         response = self.client.post(
@@ -244,7 +244,7 @@ class ReviewWriteTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     @patch("accounts.authentication.verify_id_token")
-    def test_content_1001_chars_is_rejected_not_db_error(self, mock_verify):
+    def test_content_over_max_length_is_rejected_not_db_error(self, mock_verify):
         mock_verify.return_value = make_decoded_token("review-writer-uid")
 
         response = self.client.post(
@@ -260,20 +260,17 @@ class ReviewWriteTests(TestCase):
     # 사진 장수 제한 (경계값 포함)
 
     @patch("accounts.authentication.verify_id_token")
-    def test_exactly_3_photos_is_accepted(self, mock_verify):
+    def test_photos_at_max_count_is_accepted(self, mock_verify):
         mock_verify.return_value = make_decoded_token("review-writer-uid")
+        photo_urls = [f"http://example.com/{i}.jpg" for i in range(REVIEW_MAX_PHOTOS)]
 
         response = self.client.post(
             reviews_url(self.place.id),
             {
                 "rating": 5,
-                "content": "사진 3장",
+                "content": "사진 최대 장수",
                 "language": "ko",
-                "photo_urls": [
-                    "http://example.com/1.jpg",
-                    "http://example.com/2.jpg",
-                    "http://example.com/3.jpg",
-                ],
+                "photo_urls": photo_urls,
             },
             format="json",
             **self.auth_header,
@@ -281,24 +278,20 @@ class ReviewWriteTests(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         review = Review.objects.get(pk=response.data["reviewId"])
-        self.assertEqual(review.photos.count(), 3)
+        self.assertEqual(review.photos.count(), REVIEW_MAX_PHOTOS)
 
     @patch("accounts.authentication.verify_id_token")
-    def test_4_photos_is_rejected(self, mock_verify):
+    def test_photos_over_max_count_is_rejected(self, mock_verify):
         mock_verify.return_value = make_decoded_token("review-writer-uid")
+        photo_urls = [f"http://example.com/{i}.jpg" for i in range(REVIEW_MAX_PHOTOS + 1)]
 
         response = self.client.post(
             reviews_url(self.place.id),
             {
                 "rating": 5,
-                "content": "사진 4장",
+                "content": "사진 초과",
                 "language": "ko",
-                "photo_urls": [
-                    "http://example.com/1.jpg",
-                    "http://example.com/2.jpg",
-                    "http://example.com/3.jpg",
-                    "http://example.com/4.jpg",
-                ],
+                "photo_urls": photo_urls,
             },
             format="json",
             **self.auth_header,
