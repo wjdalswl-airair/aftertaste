@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 
 from accounts.authentication import FirebaseAuthentication, _extract_bearer_token
 from accounts.firebase import InvalidFirebaseToken, verify_id_token
-from accounts.models import Member
+from accounts.models import NICKNAME_MAX_LENGTH, Member
 from accounts.serializers import (
     ErrorDetailSerializer,
     LocaleResponseSerializer,
@@ -116,11 +116,16 @@ class LoginView(APIView):
         if provider is None:
             return Response({"detail": "지원하지 않는 로그인 방식입니다"}, status=400)
 
+        # 소셜에서 받은 이름이 닉네임 최대 길이(20자)를 넘으면 잘라서 저장한다.
+        # 그대로 넣으면 DB varchar 길이를 초과해 가입이 실패한다.
+        social_name = decoded_token.get("name")
+        nickname = social_name[:NICKNAME_MAX_LENGTH] if social_name else social_name
+
         member = Member.objects.create(
             firebase_uid=firebase_uid,
             provider=provider,
             email=decoded_token.get("email"),
-            nickname=decoded_token.get("name"),
+            nickname=nickname,
             profile_image_url=decoded_token.get("picture"),
             agreed_terms_at=timezone.now(),
         )

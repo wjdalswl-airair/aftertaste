@@ -37,8 +37,9 @@ class MemberProfileUpdateSerializer(serializers.ModelSerializer):
     """프로필(닉네임) 수정에 쓰는 serializer (PATCH /account/).
 
     로그인한 본인만 호출할 수 있다(뷰에서 IsAuthenticated로 막음). 닉네임 길이
-    제한(100자)은 ModelSerializer가 Member.nickname의 max_length를 그대로
-    가져와 자동으로 검증해준다 - 넘는 값을 보내면 저장 전에 400으로 막힌다.
+    제한(20자, docs/DETAIL_SPEC.md 6-1 #21)은 ModelSerializer가 Member.nickname의
+    max_length를 그대로 가져와 자동으로 검증해준다 - 넘는 값을 보내면 저장 전에
+    400으로 막힌다.
     """
 
     class Meta:
