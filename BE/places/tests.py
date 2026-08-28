@@ -1112,6 +1112,90 @@ class SearchHistoryTest(SearchTestData):
         self.assertEqual(saved_keyword, long_keyword[:200])
 
 
+POPULAR_URL = "/api/search/popular/"
+
+
+class PopularKeywordsTest(TestCase):
+    """추천(인기) 검색어: 최근 30일 검색 기록 집계 상위 5개 (DETAIL_SPEC 2-5, 6-1 #23)."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.member = Member.objects.create(
+            firebase_uid="popular-uid",
+            provider=Member.Provider.GOOGLE,
+            agreed_terms_at="2026-01-01T00:00:00Z",
+        )
+
+    def _add_history(self, keyword, times, days_ago=0):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        for _ in range(times):
+            row = SearchHistory.objects.create(member=self.member, keyword=keyword)
+            if days_ago:
+                SearchHistory.objects.filter(pk=row.pk).update(
+                    searched_at=timezone.now() - timedelta(days=days_ago)
+                )
+
+    def test_keywords_ordered_by_search_count_desc(self):
+        self._add_history("도깨비", 3)
+        self._add_history("경복궁", 1)
+        self._add_history("사랑나무", 2)
+
+        response = self.client.get(POPULAR_URL)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["keywords"], ["도깨비", "사랑나무", "경복궁"])
+
+    def test_single_search_keyword_is_included(self):
+        self._add_history("한번만검색", 1)
+
+        response = self.client.get(POPULAR_URL)
+
+        self.assertIn("한번만검색", response.data["keywords"])
+
+    def test_limited_to_five(self):
+        for i in range(8):
+            self._add_history(f"검색어{i}", i + 1)
+
+        response = self.client.get(POPULAR_URL)
+
+        self.assertEqual(len(response.data["keywords"]), 5)
+        # 많이 검색된 순 → 검색어7(8회) ~ 검색어3(4회)
+        self.assertEqual(response.data["keywords"][0], "검색어7")
+
+    def test_searches_older_than_30_days_are_excluded(self):
+        self._add_history("오래된검색어", 10, days_ago=40)
+        self._add_history("최근검색어", 1)
+
+        response = self.client.get(POPULAR_URL)
+
+        self.assertEqual(response.data["keywords"], ["최근검색어"])
+
+    def test_no_history_returns_empty_list_not_error(self):
+        response = self.client.get(POPULAR_URL)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["keywords"], [])
+
+    def test_login_not_required(self):
+        self._add_history("도깨비", 1)
+
+        response = self.client.get(POPULAR_URL)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_invalid_token_does_not_return_401(self, mock_verify):
+        mock_verify.side_effect = InvalidFirebaseToken("expired")
+        self._add_history("도깨비", 1)
+
+        response = self.client.get(POPULAR_URL, HTTP_AUTHORIZATION="Bearer fake-token")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
 # ---------------------------------------------------------------------------
 # Phase 2-4 (위치기반 추천 — 비로그인 분기만) checklist tests. See docs/PHASES/PHASE2.md 2-4.
 # ---------------------------------------------------------------------------

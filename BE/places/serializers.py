@@ -53,6 +53,12 @@ class AutocompleteResponseSerializer(serializers.Serializer):
     suggestions = serializers.ListField(child=serializers.CharField())
 
 
+class PopularKeywordsResponseSerializer(serializers.Serializer):
+    """GET /api/places/search/popular/ 응답 형태. 인기 검색어를 많이 검색된 순으로 담는다."""
+
+    keywords = serializers.ListField(child=serializers.CharField())
+
+
 class RecommendResponseSerializer(serializers.Serializer):
     """GET /api/places/recommend/ 응답 형태."""
 

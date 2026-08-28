@@ -1,7 +1,9 @@
 import logging
+from datetime import timedelta
 
 from django.contrib.postgres.search import TrigramSimilarity
 from django.db.models import Count, Q
+from django.utils import timezone
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.response import Response
@@ -14,6 +16,7 @@ from places.serializers import (
     AutocompleteResponseSerializer,
     PlaceDetailSerializer,
     PlaceSearchSerializer,
+    PopularKeywordsResponseSerializer,
     RecommendResponseSerializer,
     SearchResponseSerializer,
     WorkSearchSerializer,
@@ -26,6 +29,11 @@ logger = logging.getLogger(__name__)
 
 # 자동완성 후보 개수 제한. 문서에 정해진 값이 없어 임의로 정한 값이라 확정이 필요하다.
 AUTOCOMPLETE_LIMIT = 10
+
+# 추천(인기) 검색어 설정 (docs/DETAIL_SPEC.md 2-5, 6-1 #23, 2026-08-28 확정).
+# 최근 30일 검색 기록을 집계해 상위 5개를 보여준다. 1회만 검색된 말도 후보에 넣는다.
+POPULAR_KEYWORDS_DAYS = 30
+POPULAR_KEYWORDS_LIMIT = 5
 
 # 추천 개수. PRD F-04, PHASES/PHASE2.md 2-4에서 3으로 정해짐.
 RECOMMEND_COUNT = 3
@@ -219,6 +227,40 @@ class SearchAutocompleteView(APIView):
 
         suggestions = list(dict.fromkeys(place_names + work_titles))[:AUTOCOMPLETE_LIMIT]
         return Response({"suggestions": suggestions})
+
+
+class PopularKeywordsView(APIView):
+    """추천(인기) 검색어. 로그인 여부와 상관없이 호출할 수 있다 (DETAIL_SPEC 2-5, 6-1 #23).
+
+    관리자가 손으로 고르지 않고, 최근 30일 검색 기록(SearchHistory)을 집계해
+    많이 검색된 순서로 상위 5개를 돌려준다. 검색 기록은 로그인한 사용자 것만 쌓이므로
+    (비로그인 검색어는 저장하지 않음, SearchView 참고) 집계 대상도 그 범위다.
+    검색 기록이 아직 없으면 빈 목록을 준다(오류 아님).
+
+    SearchView와 같은 이유로 perform_authentication을 오버라이드한다: 이 API는
+    로그인이 필요 없으므로, 토큰이 무효/만료돼도 조회 자체는 막지 않는다.
+    """
+
+    def perform_authentication(self, request):
+        try:
+            request.user
+        except AuthenticationFailed:
+            pass
+
+    @extend_schema(
+        summary="추천(인기) 검색어",
+        description="최근 30일 검색 기록을 집계해 많이 검색된 순으로 상위 5개를 반환한다.",
+        responses={200: PopularKeywordsResponseSerializer},
+    )
+    def get(self, request):
+        since = timezone.now() - timedelta(days=POPULAR_KEYWORDS_DAYS)
+        rows = (
+            SearchHistory.objects.filter(searched_at__gte=since)
+            .values("keyword")
+            .annotate(search_count=Count("id"))
+            .order_by("-search_count", "keyword")[:POPULAR_KEYWORDS_LIMIT]
+        )
+        return Response({"keywords": [row["keyword"] for row in rows]})
 
 
 def _nearest_places(latitude, longitude, count):
