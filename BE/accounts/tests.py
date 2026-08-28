@@ -565,6 +565,83 @@ class MeNicknamePatchTests(TestCase):
         self.assertEqual(member.nationality, "KR")
         self.assertEqual(member.language, "ko")
 
+    @patch("accounts.authentication.verify_id_token")
+    def test_logged_in_member_can_change_profile_image_url(self, mock_verify):
+        member = Member.objects.create(
+            firebase_uid="profile-img-uid",
+            provider=Member.Provider.GOOGLE,
+            profile_image_url="https://old.example.com/a.jpg",
+            agreed_terms_at="2026-01-01T00:00:00Z",
+        )
+        mock_verify.return_value = make_decoded_token("profile-img-uid")
+
+        response = self.client.patch(
+            ME_URL,
+            {"profile_image_url": "https://storage.example.com/new.jpg"},
+            format="json",
+            **self.auth_header,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        member.refresh_from_db()
+        self.assertEqual(member.profile_image_url, "https://storage.example.com/new.jpg")
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_blank_profile_image_url_clears_it(self, mock_verify):
+        member = Member.objects.create(
+            firebase_uid="profile-img-clear-uid",
+            provider=Member.Provider.APPLE,
+            profile_image_url="https://old.example.com/a.jpg",
+            agreed_terms_at="2026-01-01T00:00:00Z",
+        )
+        mock_verify.return_value = make_decoded_token("profile-img-clear-uid")
+
+        response = self.client.patch(
+            ME_URL, {"profile_image_url": ""}, format="json", **self.auth_header,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        member.refresh_from_db()
+        self.assertIsNone(member.profile_image_url)
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_invalid_profile_image_url_is_rejected_with_400(self, mock_verify):
+        member = Member.objects.create(
+            firebase_uid="profile-img-bad-uid",
+            provider=Member.Provider.GOOGLE,
+            profile_image_url="https://old.example.com/a.jpg",
+            agreed_terms_at="2026-01-01T00:00:00Z",
+        )
+        mock_verify.return_value = make_decoded_token("profile-img-bad-uid")
+
+        response = self.client.patch(
+            ME_URL, {"profile_image_url": "그냥 텍스트"}, format="json", **self.auth_header,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        member.refresh_from_db()
+        self.assertEqual(member.profile_image_url, "https://old.example.com/a.jpg")
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_patch_only_nickname_leaves_profile_image_untouched(self, mock_verify):
+        member = Member.objects.create(
+            firebase_uid="profile-img-partial-uid",
+            provider=Member.Provider.GOOGLE,
+            nickname="원래이름",
+            profile_image_url="https://keep.example.com/a.jpg",
+            agreed_terms_at="2026-01-01T00:00:00Z",
+        )
+        mock_verify.return_value = make_decoded_token("profile-img-partial-uid")
+
+        response = self.client.patch(
+            ME_URL, {"nickname": "새이름"}, format="json", **self.auth_header,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        member.refresh_from_db()
+        self.assertEqual(member.nickname, "새이름")
+        self.assertEqual(member.profile_image_url, "https://keep.example.com/a.jpg")
+
 
 class MeGetRegressionTests(TestCase):
     """GET /api/account/, /api/account/favorites/, /api/account/reviews/, LocaleView가

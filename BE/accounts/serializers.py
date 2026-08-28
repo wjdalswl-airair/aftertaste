@@ -57,17 +57,27 @@ class MemberUpdateSerializer(serializers.ModelSerializer):
 
 
 class MemberProfileUpdateSerializer(serializers.ModelSerializer):
-    """프로필(닉네임) 수정에 쓰는 serializer (PATCH /account/).
+    """프로필(닉네임·프로필 사진) 수정에 쓰는 serializer (PATCH /account/).
 
     로그인한 본인만 호출할 수 있다(뷰에서 IsAuthenticated로 막음). 닉네임 길이
     제한(20자, docs/DETAIL_SPEC.md 6-1 #21)은 ModelSerializer가 Member.nickname의
     max_length를 그대로 가져와 자동으로 검증해준다 - 넘는 값을 보내면 저장 전에
     400으로 막힌다.
+
+    프로필 사진은 서버가 파일을 받지 않는다. 리뷰 사진과 똑같이 프론트엔드가
+    Firebase Storage에 올린 뒤 그 URL만 보내준다 (docs/DETAIL_SPEC.md 6-1 #2·#25).
+    빈 문자열이나 null을 보내면 사진을 지운다(Apple 로그인처럼 원래 사진이 없을 수도 있다).
     """
+
+    profile_image_url = serializers.URLField(required=False, allow_null=True, allow_blank=True)
 
     class Meta:
         model = Member
-        fields = ["nickname"]
+        fields = ["nickname", "profile_image_url"]
+
+    def validate_profile_image_url(self, value):
+        # 빈 값은 "사진 없음"으로 통일해서 저장한다.
+        return value or None
 
 
 class LocaleResponseSerializer(serializers.Serializer):
