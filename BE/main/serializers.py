@@ -23,8 +23,8 @@ class BannerListResponseSerializer(serializers.Serializer):
 class HallOfFameResponseSerializer(serializers.Serializer):
     """GET /api/main/hall-of-fame/ 응답 형태 (PHASES/PHASE3.md 6번).
 
-    이번 달 좋아요가 가장 많은, 사진이 있는 리뷰 하나를 review에 담아 돌려준다.
-    후보가 하나도 없으면(그 달 좋아요 데이터가 없음) review는 null이다 —
+    이번 주 좋아요가 가장 많은, 사진이 있는 리뷰 하나를 review에 담아 돌려준다.
+    후보가 하나도 없으면(이번 주 좋아요 데이터가 없음) review는 null이다 —
     화면이 깨지면 안 되므로 오류로 처리하지 않는다.
     """
 

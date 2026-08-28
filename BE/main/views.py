@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.db.models import Count
 from django.utils import timezone
 from drf_spectacular.utils import OpenApiResponse, extend_schema
@@ -39,13 +41,15 @@ class BannerListView(ListAPIView):
 
 
 class HallOfFameView(APIView):
-    """명예의 전당. 이번 달에 좋아요가 가장 많은, 사진이 있는 리뷰 하나를 보여준다
-    (PRD F-02, PHASES/PHASE3.md 6번).
+    """명예의 전당. 이번 주에 좋아요가 가장 많은, 사진이 있는 리뷰 하나를 보여준다
+    (PRD F-02, PHASES/PHASE3.md 6번. 2026-08-28: 월→주로 변경, 목업 "금주의 명예의 전당").
 
-    "그 달"은 리뷰 작성일(created_at) 기준 이번 달로 판단한다. ReviewLike에는 좋아요를
-    누른 시점 정보가 없어서 "좋아요를 누른 시점 기준"으로는 애초에 계산할 수 없다.
-    사진이 없는 리뷰(사진을 보여주는 기능이므로)와 감춰진(is_hidden) 리뷰는 후보에서 뺀다.
-    그 달 좋아요 데이터가 하나도 없으면 review를 null로 돌려준다(오류로 처리하지 않음).
+    "그 주"는 리뷰 작성일(created_at) 기준 이번 주(월요일 0시부터)로 판단한다.
+    ReviewLike에는 좋아요를 누른 시점 정보가 없어서 "좋아요를 누른 시점 기준"으로는
+    애초에 계산할 수 없다. 사진이 없는 리뷰(사진을 보여주는 기능이므로)와 감춰진(is_hidden)
+    리뷰는 후보에서 뺀다. 이번 주 좋아요 데이터가 하나도 없으면 review를 null로 돌려준다
+    (오류로 처리하지 않음). 화면에 나가는 대표 이미지는 리뷰 사진 중 첫 번째 장이다
+    (ReviewSerializer의 photos 배열 순서가 곧 제출 순서, DETAIL_SPEC 2-3).
 
     배너·추천처럼 메인 화면 구성요소는 지금까지 전부 로그인이 필요 없었던 패턴을 따라
     로그인 여부와 상관없이 호출할 수 있게 만들었다. SearchView와 같은 이유로
@@ -61,18 +65,18 @@ class HallOfFameView(APIView):
     @extend_schema(
         summary="명예의 전당 조회",
         description=(
-            "이번 달에 좋아요가 가장 많은, 사진이 있는 리뷰 하나를 반환한다.\n\n"
-            "그 달 좋아요 데이터가 하나도 없으면 review가 null로 온다."
+            "이번 주(월요일부터)에 좋아요가 가장 많은, 사진이 있는 리뷰 하나를 반환한다.\n\n"
+            "이번 주 좋아요 데이터가 하나도 없으면 review가 null로 온다."
         ),
         responses={200: HallOfFameResponseSerializer},
     )
     def get(self, request):
         today = timezone.localdate()
+        week_start = today - timedelta(days=today.weekday())  # 이번 주 월요일
         review = (
             Review.objects.filter(
                 is_hidden=False,
-                created_at__year=today.year,
-                created_at__month=today.month,
+                created_at__date__gte=week_start,
                 photos__isnull=False,
             )
             .annotate(like_count=Count("likes", distinct=True))
