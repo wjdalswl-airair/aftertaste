@@ -117,6 +117,7 @@ class PlaceDetailSerializer(serializers.ModelSerializer):
     is_favorited = serializers.SerializerMethodField()
     reviews = serializers.SerializerMethodField()
     review_average_rating = serializers.SerializerMethodField()
+    review_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Place
@@ -134,6 +135,7 @@ class PlaceDetailSerializer(serializers.ModelSerializer):
             "is_favorited",
             "reviews",
             "review_average_rating",
+            "review_count",
         ]
         read_only_fields = fields
 
@@ -157,3 +159,7 @@ class PlaceDetailSerializer(serializers.ModelSerializer):
     def get_review_average_rating(self, obj):
         average = obj.reviews.filter(is_hidden=False).aggregate(Avg("rating"))["rating__avg"]
         return round(average, 1) if average is not None else None
+
+    def get_review_count(self, obj):
+        # 목업의 "4.7 (3,211)"처럼 별점 평균 옆에 보여줄 리뷰 개수. 감춰진 리뷰는 뺀다.
+        return obj.reviews.filter(is_hidden=False).count()

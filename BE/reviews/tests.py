@@ -537,6 +537,7 @@ class HiddenReviewTests(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["review_average_rating"], 5.0)
+        self.assertEqual(response.data["review_count"], 1)
         self.assertEqual(len(response.data["reviews"]), 1)
 
 
@@ -563,7 +564,7 @@ class MyReviewListTests(TestCase):
 
 
 class PlaceDetailReviewSummaryTests(TestCase):
-    """명소 상세에 리뷰 목록, 평균 별점이 반영되는지 확인 (DETAIL_SPEC 3-3, 3-5)."""
+    """명소 상세에 리뷰 목록, 평균 별점, 리뷰 개수가 반영되는지 확인 (DETAIL_SPEC 3-3, 3-5)."""
 
     def setUp(self):
         self.client = APIClient()
@@ -577,6 +578,7 @@ class PlaceDetailReviewSummaryTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["reviews"], [])
         self.assertIsNone(response.data["review_average_rating"])
+        self.assertEqual(response.data["review_count"], 0)
 
     def test_reviews_and_average_reflected_in_place_detail(self):
         Review.objects.create(member=self.member1, place=self.place, rating=4, content="좋음", language="ko")
@@ -587,3 +589,4 @@ class PlaceDetailReviewSummaryTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["reviews"]), 2)
         self.assertEqual(response.data["review_average_rating"], 3.0)
+        self.assertEqual(response.data["review_count"], 2)
