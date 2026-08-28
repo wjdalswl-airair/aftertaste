@@ -1401,6 +1401,9 @@ class PlaceDetailTestData(TestCase):
             address="서울 종로구 사직로 161",
             photo_url="https://example.com/gyeongbokgung.jpg",
             business_hours="09:00~18:00",
+            recommended_time="5월, 초저녁",
+            photo_tips="근정전 앞에서 대각선 구도",
+            etiquette="나무를 꺾지 말아주세요",
             description="조선시대 정궁",
             latitude=Decimal("37.579617"),
             longitude=Decimal("126.977041"),
@@ -1446,6 +1449,25 @@ class PlaceDetailViewBasicFieldsTest(PlaceDetailTestData):
         self.assertEqual(response.data["description"], "조선시대 정궁")
         self.assertAlmostEqual(float(response.data["latitude"]), 37.579617, places=5)
         self.assertAlmostEqual(float(response.data["longitude"]), 126.977041, places=5)
+
+    def test_detail_includes_recommended_time_photo_tips_etiquette(self):
+        """여운 API 명세서의 명소 상세 필드 (DETAIL_SPEC 6-1 #25)."""
+        response = self.client.get(DETAIL_URL_TEMPLATE.format(self.place.id))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["recommended_time"], "5월, 초저녁")
+        self.assertEqual(response.data["photo_tips"], "근정전 앞에서 대각선 구도")
+        self.assertEqual(response.data["etiquette"], "나무를 꺾지 말아주세요")
+
+    def test_new_admin_fields_default_to_empty_string(self):
+        bare = create_place_with_source("빈명소", "TEST_SOURCE", "DETAIL_BARE")
+
+        response = self.client.get(DETAIL_URL_TEMPLATE.format(bare.id))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["recommended_time"], "")
+        self.assertEqual(response.data["photo_tips"], "")
+        self.assertEqual(response.data["etiquette"], "")
 
 
 class PlaceDetailViewWorksTest(PlaceDetailTestData):
