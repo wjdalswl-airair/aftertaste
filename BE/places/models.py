@@ -19,6 +19,11 @@ class Place(models.Model):
     description = models.TextField(blank=True)
     photo_url = models.URLField(blank=True)
     business_hours = models.CharField(max_length=200, blank=True)
+    # 목업/여운 API 명세서의 명소 상세 필드 (docs/DETAIL_SPEC.md 3-3, 6-1 #25, 2026-08-28).
+    # 전부 관리자 전용이고 번역하지 않는다(항상 한국어 원문, business_hours와 같은 취급).
+    recommended_time = models.CharField(max_length=200, blank=True)  # 추천 방문 시간 (예: "5월, 초저녁")
+    photo_tips = models.TextField(blank=True)  # 사진 팁
+    etiquette = models.TextField(blank=True)  # 주의할 점 (예: "나무를 꺾지 말아주세요")
 
     created_at = models.DateTimeField(auto_now_add=True)
 

@@ -61,6 +61,21 @@ class LoginViewTests(TestCase):
 
     @patch("accounts.authentication.verify_id_token")
     @patch("accounts.views.verify_id_token")
+    def test_long_social_name_is_truncated_to_nickname_max_length(self, mock_verify, mock_verify_auth):
+        """소셜에서 받은 이름이 20자를 넘으면 잘라서 저장한다 (그대로 넣으면 가입 실패)."""
+        long_name = "가" * 50
+        decoded = make_decoded_token("google-uid-longname", name=long_name)
+        mock_verify.return_value = decoded
+        mock_verify_auth.return_value = decoded
+
+        response = self.client.post(LOGIN_URL, {"agree_terms": True}, format="json", **self.auth_header)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        member = Member.objects.get(firebase_uid="google-uid-longname")
+        self.assertEqual(member.nickname, "가" * 20)
+
+    @patch("accounts.authentication.verify_id_token")
+    @patch("accounts.views.verify_id_token")
     def test_apple_login_creates_new_member(self, mock_verify, mock_verify_auth):
         decoded = make_decoded_token("apple-uid-1", provider="apple.com")
         mock_verify.return_value = decoded
@@ -183,6 +198,79 @@ class MeViewTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["id"], member.id)
         self.assertEqual(response.data["email"], "member@example.com")
+
+
+class MeProfileSummaryTests(TestCase):
+    """GET /api/account/ 프로필 응답의 활동 요약 (DETAIL_SPEC 3-1, 6-1 #22).
+
+    - reviewed_places_count: 내가 리뷰를 쓴 서로 다른 명소 수 (감춰진 리뷰 제외)
+    - created_courses_count: 내가 만든 코스 수
+    """
+
+    def setUp(self):
+        self.client = APIClient()
+        self.auth_header = {"HTTP_AUTHORIZATION": "Bearer fake-token"}
+        self.member = Member.objects.create(
+            firebase_uid="summary-uid",
+            provider=Member.Provider.GOOGLE,
+            agreed_terms_at="2026-01-01T00:00:00Z",
+        )
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_counts_are_zero_for_new_member(self, mock_verify):
+        mock_verify.return_value = make_decoded_token("summary-uid")
+
+        response = self.client.get(ME_URL, **self.auth_header)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["reviewed_places_count"], 0)
+        self.assertEqual(response.data["created_courses_count"], 0)
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_reviewed_places_count_dedupes_by_place_and_excludes_hidden(self, mock_verify):
+        from courses.models import Course
+        from places.models import Place
+        from reviews.models import Review
+
+        mock_verify.return_value = make_decoded_token("summary-uid")
+        place_a = Place.objects.create(name="경복궁")
+        place_b = Place.objects.create(name="남산타워")
+
+        # 같은 명소에 리뷰 2개 → 1로 센다
+        Review.objects.create(member=self.member, place=place_a, rating=5, content="1", language="ko")
+        Review.objects.create(member=self.member, place=place_a, rating=4, content="2", language="ko")
+        Review.objects.create(member=self.member, place=place_b, rating=3, content="3", language="ko")
+        # 감춰진 리뷰만 있는 명소는 안 센다
+        place_c = Place.objects.create(name="숨겨진명소")
+        Review.objects.create(
+            member=self.member, place=place_c, rating=1, content="4", language="ko", is_hidden=True
+        )
+        Course.objects.create(place=place_a, creator=self.member, title="내 코스 1")
+        Course.objects.create(place=place_b, creator=self.member, title="내 코스 2")
+
+        response = self.client.get(ME_URL, **self.auth_header)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["reviewed_places_count"], 2)
+        self.assertEqual(response.data["created_courses_count"], 2)
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_other_members_activity_does_not_count(self, mock_verify):
+        from places.models import Place
+        from reviews.models import Review
+
+        mock_verify.return_value = make_decoded_token("summary-uid")
+        other = Member.objects.create(
+            firebase_uid="other-summary-uid",
+            provider=Member.Provider.GOOGLE,
+            agreed_terms_at="2026-01-01T00:00:00Z",
+        )
+        place = Place.objects.create(name="경복궁")
+        Review.objects.create(member=other, place=place, rating=5, content="남의 리뷰", language="ko")
+
+        response = self.client.get(ME_URL, **self.auth_header)
+
+        self.assertEqual(response.data["reviewed_places_count"], 0)
 
 
 class MemberModelTests(TestCase):
@@ -417,16 +505,16 @@ class MeNicknamePatchTests(TestCase):
             agreed_terms_at="2026-01-01T00:00:00Z",
         )
         mock_verify.return_value = make_decoded_token("nickname-maxlen-uid")
-        exactly_100 = "가" * 100
+        exactly_max = "가" * 20  # 닉네임 최대 길이 (DETAIL_SPEC 6-1 #21)
 
         response = self.client.patch(
-            ME_URL, {"nickname": exactly_100}, format="json",
+            ME_URL, {"nickname": exactly_max}, format="json",
             **self.auth_header,
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         member.refresh_from_db()
-        self.assertEqual(member.nickname, exactly_100)
+        self.assertEqual(member.nickname, exactly_max)
 
     @patch("accounts.authentication.verify_id_token")
     def test_nickname_over_max_length_is_rejected_with_400_not_db_error(self, mock_verify):
@@ -437,7 +525,7 @@ class MeNicknamePatchTests(TestCase):
             agreed_terms_at="2026-01-01T00:00:00Z",
         )
         mock_verify.return_value = make_decoded_token("nickname-toolong-uid")
-        too_long = "가" * 101
+        too_long = "가" * 21  # 닉네임 최대 길이(20자)를 넘김
 
         response = self.client.patch(
             ME_URL, {"nickname": too_long}, format="json",
@@ -476,6 +564,83 @@ class MeNicknamePatchTests(TestCase):
         self.assertEqual(member.nickname, "새이름")
         self.assertEqual(member.nationality, "KR")
         self.assertEqual(member.language, "ko")
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_logged_in_member_can_change_profile_image_url(self, mock_verify):
+        member = Member.objects.create(
+            firebase_uid="profile-img-uid",
+            provider=Member.Provider.GOOGLE,
+            profile_image_url="https://old.example.com/a.jpg",
+            agreed_terms_at="2026-01-01T00:00:00Z",
+        )
+        mock_verify.return_value = make_decoded_token("profile-img-uid")
+
+        response = self.client.patch(
+            ME_URL,
+            {"profile_image_url": "https://storage.example.com/new.jpg"},
+            format="json",
+            **self.auth_header,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        member.refresh_from_db()
+        self.assertEqual(member.profile_image_url, "https://storage.example.com/new.jpg")
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_blank_profile_image_url_clears_it(self, mock_verify):
+        member = Member.objects.create(
+            firebase_uid="profile-img-clear-uid",
+            provider=Member.Provider.APPLE,
+            profile_image_url="https://old.example.com/a.jpg",
+            agreed_terms_at="2026-01-01T00:00:00Z",
+        )
+        mock_verify.return_value = make_decoded_token("profile-img-clear-uid")
+
+        response = self.client.patch(
+            ME_URL, {"profile_image_url": ""}, format="json", **self.auth_header,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        member.refresh_from_db()
+        self.assertIsNone(member.profile_image_url)
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_invalid_profile_image_url_is_rejected_with_400(self, mock_verify):
+        member = Member.objects.create(
+            firebase_uid="profile-img-bad-uid",
+            provider=Member.Provider.GOOGLE,
+            profile_image_url="https://old.example.com/a.jpg",
+            agreed_terms_at="2026-01-01T00:00:00Z",
+        )
+        mock_verify.return_value = make_decoded_token("profile-img-bad-uid")
+
+        response = self.client.patch(
+            ME_URL, {"profile_image_url": "그냥 텍스트"}, format="json", **self.auth_header,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        member.refresh_from_db()
+        self.assertEqual(member.profile_image_url, "https://old.example.com/a.jpg")
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_patch_only_nickname_leaves_profile_image_untouched(self, mock_verify):
+        member = Member.objects.create(
+            firebase_uid="profile-img-partial-uid",
+            provider=Member.Provider.GOOGLE,
+            nickname="원래이름",
+            profile_image_url="https://keep.example.com/a.jpg",
+            agreed_terms_at="2026-01-01T00:00:00Z",
+        )
+        mock_verify.return_value = make_decoded_token("profile-img-partial-uid")
+
+        response = self.client.patch(
+            ME_URL, {"nickname": "새이름"}, format="json", **self.auth_header,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        member.refresh_from_db()
+        self.assertEqual(member.nickname, "새이름")
+        self.assertEqual(member.profile_image_url, "https://keep.example.com/a.jpg")
 
 
 class MeGetRegressionTests(TestCase):

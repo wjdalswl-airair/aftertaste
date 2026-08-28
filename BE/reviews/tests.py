@@ -231,7 +231,7 @@ class ReviewWriteTests(TestCase):
     # 글자 수 제한 (경계값 포함)
 
     @patch("accounts.authentication.verify_id_token")
-    def test_content_exactly_1000_chars_is_accepted(self, mock_verify):
+    def test_content_at_max_length_is_accepted(self, mock_verify):
         mock_verify.return_value = make_decoded_token("review-writer-uid")
 
         response = self.client.post(
@@ -244,7 +244,7 @@ class ReviewWriteTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     @patch("accounts.authentication.verify_id_token")
-    def test_content_1001_chars_is_rejected_not_db_error(self, mock_verify):
+    def test_content_over_max_length_is_rejected_not_db_error(self, mock_verify):
         mock_verify.return_value = make_decoded_token("review-writer-uid")
 
         response = self.client.post(
@@ -260,20 +260,17 @@ class ReviewWriteTests(TestCase):
     # 사진 장수 제한 (경계값 포함)
 
     @patch("accounts.authentication.verify_id_token")
-    def test_exactly_3_photos_is_accepted(self, mock_verify):
+    def test_photos_at_max_count_is_accepted(self, mock_verify):
         mock_verify.return_value = make_decoded_token("review-writer-uid")
+        photo_urls = [f"http://example.com/{i}.jpg" for i in range(REVIEW_MAX_PHOTOS)]
 
         response = self.client.post(
             reviews_url(self.place.id),
             {
                 "rating": 5,
-                "content": "사진 3장",
+                "content": "사진 최대 장수",
                 "language": "ko",
-                "photo_urls": [
-                    "http://example.com/1.jpg",
-                    "http://example.com/2.jpg",
-                    "http://example.com/3.jpg",
-                ],
+                "photo_urls": photo_urls,
             },
             format="json",
             **self.auth_header,
@@ -281,24 +278,20 @@ class ReviewWriteTests(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         review = Review.objects.get(pk=response.data["reviewId"])
-        self.assertEqual(review.photos.count(), 3)
+        self.assertEqual(review.photos.count(), REVIEW_MAX_PHOTOS)
 
     @patch("accounts.authentication.verify_id_token")
-    def test_4_photos_is_rejected(self, mock_verify):
+    def test_photos_over_max_count_is_rejected(self, mock_verify):
         mock_verify.return_value = make_decoded_token("review-writer-uid")
+        photo_urls = [f"http://example.com/{i}.jpg" for i in range(REVIEW_MAX_PHOTOS + 1)]
 
         response = self.client.post(
             reviews_url(self.place.id),
             {
                 "rating": 5,
-                "content": "사진 4장",
+                "content": "사진 초과",
                 "language": "ko",
-                "photo_urls": [
-                    "http://example.com/1.jpg",
-                    "http://example.com/2.jpg",
-                    "http://example.com/3.jpg",
-                    "http://example.com/4.jpg",
-                ],
+                "photo_urls": photo_urls,
             },
             format="json",
             **self.auth_header,
@@ -537,6 +530,7 @@ class HiddenReviewTests(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["review_average_rating"], 5.0)
+        self.assertEqual(response.data["review_count"], 1)
         self.assertEqual(len(response.data["reviews"]), 1)
 
 
@@ -563,7 +557,7 @@ class MyReviewListTests(TestCase):
 
 
 class PlaceDetailReviewSummaryTests(TestCase):
-    """명소 상세에 리뷰 목록, 평균 별점이 반영되는지 확인 (DETAIL_SPEC 3-3, 3-5)."""
+    """명소 상세에 리뷰 목록, 평균 별점, 리뷰 개수가 반영되는지 확인 (DETAIL_SPEC 3-3, 3-5)."""
 
     def setUp(self):
         self.client = APIClient()
@@ -577,6 +571,7 @@ class PlaceDetailReviewSummaryTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["reviews"], [])
         self.assertIsNone(response.data["review_average_rating"])
+        self.assertEqual(response.data["review_count"], 0)
 
     def test_reviews_and_average_reflected_in_place_detail(self):
         Review.objects.create(member=self.member1, place=self.place, rating=4, content="좋음", language="ko")
@@ -587,3 +582,4 @@ class PlaceDetailReviewSummaryTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["reviews"]), 2)
         self.assertEqual(response.data["review_average_rating"], 3.0)
+        self.assertEqual(response.data["review_count"], 2)

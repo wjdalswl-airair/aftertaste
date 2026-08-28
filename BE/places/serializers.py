@@ -53,6 +53,12 @@ class AutocompleteResponseSerializer(serializers.Serializer):
     suggestions = serializers.ListField(child=serializers.CharField())
 
 
+class PopularKeywordsResponseSerializer(serializers.Serializer):
+    """GET /api/places/search/popular/ 응답 형태. 인기 검색어를 많이 검색된 순으로 담는다."""
+
+    keywords = serializers.ListField(child=serializers.CharField())
+
+
 class RecommendResponseSerializer(serializers.Serializer):
     """GET /api/places/recommend/ 응답 형태."""
 
@@ -106,7 +112,8 @@ class PlaceDetailSerializer(serializers.ModelSerializer):
     """GET /api/places/<id>/ 응답. 명소 기본 정보 + 등장 작품 + 주변 상권 + 리뷰를 한 화면 분량으로 담는다.
 
     name/description은 PlaceSearchSerializer.name과 같은 규칙으로 번역문을 고른다.
-    address/business_hours는 번역 대상이 아니라 항상 한국어 그대로 나간다.
+    address/business_hours/recommended_time/photo_tips/etiquette는 번역 대상이 아니라
+    항상 한국어 그대로 나간다.
     """
 
     name = serializers.SerializerMethodField()
@@ -117,6 +124,7 @@ class PlaceDetailSerializer(serializers.ModelSerializer):
     is_favorited = serializers.SerializerMethodField()
     reviews = serializers.SerializerMethodField()
     review_average_rating = serializers.SerializerMethodField()
+    review_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Place
@@ -126,6 +134,9 @@ class PlaceDetailSerializer(serializers.ModelSerializer):
             "address",
             "photo_url",
             "business_hours",
+            "recommended_time",
+            "photo_tips",
+            "etiquette",
             "description",
             "latitude",
             "longitude",
@@ -134,6 +145,7 @@ class PlaceDetailSerializer(serializers.ModelSerializer):
             "is_favorited",
             "reviews",
             "review_average_rating",
+            "review_count",
         ]
         read_only_fields = fields
 
@@ -157,3 +169,7 @@ class PlaceDetailSerializer(serializers.ModelSerializer):
     def get_review_average_rating(self, obj):
         average = obj.reviews.filter(is_hidden=False).aggregate(Avg("rating"))["rating__avg"]
         return round(average, 1) if average is not None else None
+
+    def get_review_count(self, obj):
+        # 목업의 "4.7 (3,211)"처럼 별점 평균 옆에 보여줄 리뷰 개수. 감춰진 리뷰는 뺀다.
+        return obj.reviews.filter(is_hidden=False).count()

@@ -94,7 +94,7 @@ class BannerListViewTests(TestCase):
 # main/views.py HallOfFameView, TopPlacesView 참고.
 # ---------------------------------------------------------------------------
 
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 from unittest.mock import patch
 
 from django.utils import timezone
@@ -143,7 +143,7 @@ class HallOfFameViewTest(TestCase):
         self.client = APIClient()
         self.place = create_place("명예의전당명소")
 
-    def test_review_with_most_likes_this_month_is_selected(self):
+    def test_review_with_most_likes_this_week_is_selected(self):
         author1 = create_member("hof-author-1")
         low_like_review = create_review_with_photo(author1, self.place)
         add_likes(low_like_review, 1, "hof-low")
@@ -183,23 +183,43 @@ class HallOfFameViewTest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["review"]["id"], visible_review.id)
 
-    def test_no_reviews_this_month_returns_null_review_not_error(self):
+    def test_no_reviews_this_week_returns_null_review_not_error(self):
         response = self.client.get(HALL_OF_FAME_URL)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIsNone(response.data["review"])
 
-    def test_last_month_review_is_excluded(self):
-        author = create_member("hof-lastmonth")
-        last_month_review = create_review_with_photo(author, self.place)
-        add_likes(last_month_review, 5, "hof-lastmonth-like")
-        past_date = timezone.now() - timedelta(days=40)
-        Review.objects.filter(pk=last_month_review.id).update(created_at=past_date)
+    def test_review_from_before_this_week_is_excluded(self):
+        """이번 주 월요일 0시 이전에 쓰인 리뷰는 좋아요가 많아도 후보에서 빠진다."""
+        author = create_member("hof-lastweek")
+        old_review = create_review_with_photo(author, self.place)
+        add_likes(old_review, 5, "hof-lastweek-like")
+
+        today = timezone.localdate()
+        week_start = today - timedelta(days=today.weekday())
+        before_week = timezone.make_aware(datetime.combine(week_start, time.min)) - timedelta(seconds=1)
+        Review.objects.filter(pk=old_review.id).update(created_at=before_week)
 
         response = self.client.get(HALL_OF_FAME_URL)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIsNone(response.data["review"])
+
+    def test_review_earlier_this_week_is_included(self):
+        """이번 주 월요일 0시 이후에 쓰인 리뷰는 오늘이 아니어도 후보에 들어간다."""
+        author = create_member("hof-thisweek")
+        review = create_review_with_photo(author, self.place)
+        add_likes(review, 2, "hof-thisweek-like")
+
+        today = timezone.localdate()
+        week_start = today - timedelta(days=today.weekday())
+        just_after_week_start = timezone.make_aware(datetime.combine(week_start, time.min)) + timedelta(minutes=1)
+        Review.objects.filter(pk=review.id).update(created_at=just_after_week_start)
+
+        response = self.client.get(HALL_OF_FAME_URL)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["review"]["id"], review.id)
 
     @patch("accounts.authentication.verify_id_token")
     def test_invalid_token_does_not_return_401(self, mock_verify):

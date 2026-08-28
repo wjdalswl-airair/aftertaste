@@ -51,7 +51,7 @@ class PlaceReviewListCreateView(APIView):
 
     @extend_schema(
         summary="리뷰 작성",
-        description="별점·글·사진(최대 3장)으로 리뷰를 남긴다. 로그인이 필요하다.",
+        description="별점·글(최대 500자)·사진(최대 5장)으로 리뷰를 남긴다. 로그인이 필요하다.",
         request=ReviewWriteSerializer,
         responses={
             201: OpenApiResponse(description="{ reviewId }"),
