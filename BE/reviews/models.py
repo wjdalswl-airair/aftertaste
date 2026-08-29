@@ -9,6 +9,10 @@ from places.models import Place
 REVIEW_CONTENT_MAX_LENGTH = 500
 REVIEW_MAX_PHOTOS = 5
 
+# 한 리뷰에 서로 다른 사람이 이 수만큼 신고하면 자동으로 숨긴다 (docs/DETAIL_SPEC.md 6-1 #13, 2026-08-29).
+# 같은 사람의 중복 신고는 ReviewReport.unique_together 때문에 1건으로만 센다.
+REVIEW_REPORT_HIDE_THRESHOLD = 5
+
 
 class Review(models.Model):
     """명소 후기. 별점·글·사진과 함께 원래 무슨 언어로 썼는지도 저장한다.
