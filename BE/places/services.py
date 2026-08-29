@@ -38,9 +38,33 @@ def to_decimal(value):
         return None, False
 
 
-# KCISA CSV의 미디어타입 → Work.category. 우리 서비스는 영화·드라마 촬영지라
-# drama/movie만 다루고, 나머지(show=예능, artist=뮤직비디오 등)는 아예 가져오지 않는다.
+# 공공데이터 출처마다 "촬영물 종류"를 적는 칸 이름과 값이 다르다. 각 출처의 값을
+# 우리 Work.category("DRAMA"/"MOVIE")로 바꾸는 표를 출처별로 둔다. 표에 없는 값은
+# None → 우리 서비스(영화·드라마 촬영지)가 다루지 않으므로 아예 가져오지 않는다.
+
+# KCISA CSV의 미디어타입. show=예능, artist=뮤직비디오 등은 표에 없다.
 _MEDIA_TYPE_TO_CATEGORY = {"drama": "DRAMA", "movie": "MOVIE"}
+
+# 경기 데이터 드림 "촬영지원 현황"의 촬영구분명(POTOGRF_DIV_NM). 실제 응답에 39종이 나오는데
+# (대소문자도 뒤섞여 있어 소문자로 맞춰 비교), 그중 영화·드라마로 분명한 것만 넣는다.
+# 'TV'·'기타'는 드라마·예능·홍보영상이 섞여 있어 규칙으로 못 나눈다 → 제외하고, 관리자가
+# 손으로 분류하는 기능을 나중에 붙인다 (docs/DETAIL_SPEC.md 6-1 #28, 7장 #1, 2026-08-29).
+_GYEONGGI_DIV_TO_CATEGORY = {
+    # 영화 계열
+    "상업장편": "MOVIE",
+    "상업장편(해외)": "MOVIE",
+    "해외장편": "MOVIE",
+    "장편영화": "MOVIE",
+    "독립장편": "MOVIE",
+    "독립단편": "MOVIE",
+    "개인단편": "MOVIE",
+    "학생단편": "MOVIE",
+    "단편": "MOVIE",
+    # 드라마 계열
+    "ott드라마": "DRAMA",
+    "tv드라마": "DRAMA",
+    "웹드라마": "DRAMA",
+}
 
 # Work.title은 CharField(max_length=200)이라 넘으면 저장이 실패한다. 잘라서 저장한다
 # (translation.py의 NAME_TITLE_MAX_LENGTH 처리와 같은 방식).
@@ -51,18 +75,31 @@ def media_type_to_category(media_type):
     """KCISA 미디어타입 문자열을 Work.category 값으로 바꾼다.
 
     drama/movie가 아니면(예능·뮤직비디오·빈값 등) None. import 커맨드가 이 값으로
-    "가져올 행인지"를 판단하고, link_place_to_work가 같은 기준으로 작품을 잇는다.
+    "가져올 행인지"를 판단하고, 그 값을 link_place_to_work에 그대로 넘긴다.
     """
     return _MEDIA_TYPE_TO_CATEGORY.get((media_type or "").strip().lower())
 
 
-def link_place_to_work(place, *, title, media_type):
+def gyeonggi_div_to_category(div_name):
+    """경기 데이터 드림 촬영구분명을 Work.category 값으로 바꾼다.
+
+    영화·드라마로 분명한 구분만 값이 나오고, 나머지('TV'·'기타'·CF·MV·다큐 등)는 None.
+    media_type_to_category와 같은 자리에서 같은 용도로 쓰인다 (import 커맨드가 "가져올
+    행인지" 판단 + link_place_to_work에 넘길 category).
+    """
+    return _GYEONGGI_DIV_TO_CATEGORY.get((div_name or "").strip().lower())
+
+
+def link_place_to_work(place, *, title, category):
     """촬영지(place)를 그 작품(Work)에 잇는다. 영화·드라마 촬영지에만 적용된다.
 
-    - media_type이 drama/movie가 아니거나 title이 비어 있으면 아무것도 안 하고 None을 돌려준다.
-    - 공백을 정리한 제목 문자열이 같으면 같은 작품으로 본다 — KCISA CSV엔 작품을 구분할
-      다른 키(연도·작품ID)가 없고, 같은 드라마는 늘 같은 제목으로 적혀 있어 이걸로 충분하다.
-      서로 다른 출처(경기 데이터 드림 등) 사이의 표기 차이 병합은 별도 작업이다 (DETAIL_SPEC 7장 #1).
+    - category("DRAMA"/"MOVIE")는 호출하는 쪽이 출처별 표(media_type_to_category /
+      gyeonggi_div_to_category)로 미리 구해서 넘긴다. None이거나 title이 비어 있으면
+      아무것도 안 하고 (None, False)를 돌려준다.
+    - 공백을 정리한 제목 문자열이 같고 category가 같으면 같은 작품으로 본다. 출처마다
+      작품을 구분할 공통 키(연도·작품ID)가 없어서 제목 매칭으로 잇는다. 그래서 서로 다른
+      출처가 만든 같은 작품이 제목만 같으면 자연스럽게 하나의 Work로 합쳐진다. 표기가
+      다른 경우("도깨비" ↔ "쓸쓸하고 찬란하神-도깨비")의 병합은 별도 작업 (DETAIL_SPEC 7장 #1).
     - 이미 이어진 place-work면 아무것도 바꾸지 않는다(get_or_create만). scene_description(장면
       설명)은 관리자가 채우는 값이라 재수집으로 덮어쓰지 않는다 — business_hours 보존과 같은 원칙.
 
@@ -71,7 +108,6 @@ def link_place_to_work(place, *, title, media_type):
     """
     from places.models import PlaceWork, Work
 
-    category = media_type_to_category(media_type)
     if category is None:
         return None, False
 

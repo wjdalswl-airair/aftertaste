@@ -4,6 +4,7 @@ import io
 import json
 import os
 import tempfile
+import zlib
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -12,7 +13,13 @@ from django.test import TestCase
 
 from places.management.commands.import_places import Command as ImportPlacesCommand
 from places.models import Place, PlaceSource, PlaceTranslation, PlaceWork, Work, WorkTranslation
-from places.services import build_composite_source_id, haversine_distance_meters, save_place_from_source
+from places.services import (
+    build_composite_source_id,
+    gyeonggi_div_to_category,
+    haversine_distance_meters,
+    media_type_to_category,
+    save_place_from_source,
+)
 
 SAMPLE_DIR = os.path.join(os.path.dirname(__file__), "sample_data")
 SAMPLE_V1 = os.path.join(SAMPLE_DIR, "sample_places_v1.json")
@@ -496,14 +503,14 @@ def _fake_gg_fetch(page_index, page_size):
                 {
                     "sigun_nm": "고양시",
                     "potogrf_yy": "2022",
-                    "potogrf_div_nm": "드라마",
+                    "potogrf_div_nm": "TV드라마",
                     "work_nm": "작품A",
                     "potogrf_plc_nm": "장소A",
                 },
                 {
                     "sigun_nm": "고양시",
                     "potogrf_yy": "2022",
-                    "potogrf_div_nm": "드라마",
+                    "potogrf_div_nm": "TV드라마",
                     "work_nm": "작품B",
                     "potogrf_plc_nm": "",
                 },
@@ -515,7 +522,7 @@ def _fake_gg_fetch(page_index, page_size):
                 {
                     "sigun_nm": "고양시",
                     "potogrf_yy": "2022",
-                    "potogrf_div_nm": "드라마",
+                    "potogrf_div_nm": "TV드라마",
                     "work_nm": "작품C",
                     "potogrf_plc_nm": "장소C",
                 },
@@ -609,7 +616,7 @@ class ImportGyeonggiDataDreamCommandTest(TestCase):
                 {
                     "sigun_nm": "고양시",
                     "potogrf_yy": "2022",
-                    "potogrf_div_nm": "드라마",
+                    "potogrf_div_nm": "TV드라마",
                     "work_nm": "무한작품",
                     "potogrf_plc_nm": "무한장소",
                 }
@@ -621,6 +628,116 @@ class ImportGyeonggiDataDreamCommandTest(TestCase):
 
         self.assertEqual(mock_fetch.call_count, 3)
         self.assertIn("페이지 상한", output)
+
+
+class DivAndMediaTypeToCategoryTest(TestCase):
+    """출처별 "촬영물 종류" 문자열 → Work.category 매핑 (docs/DETAIL_SPEC.md 6-1 #27·#28)."""
+
+    def test_kcisa_media_type(self):
+        self.assertEqual(media_type_to_category("drama"), "DRAMA")
+        self.assertEqual(media_type_to_category("movie"), "MOVIE")
+        self.assertEqual(media_type_to_category("MOVIE"), "MOVIE")
+        self.assertIsNone(media_type_to_category("show"))
+        self.assertIsNone(media_type_to_category("artist"))
+        self.assertIsNone(media_type_to_category(""))
+        self.assertIsNone(media_type_to_category(None))
+
+    def test_gyeonggi_div_movie_and_drama(self):
+        for div in ["상업장편", "상업장편(해외)", "해외장편", "장편영화", "독립장편",
+                    "독립단편", "개인단편", "학생단편", "단편"]:
+            self.assertEqual(gyeonggi_div_to_category(div), "MOVIE", div)
+        for div in ["OTT드라마", "TV드라마", "웹드라마"]:
+            self.assertEqual(gyeonggi_div_to_category(div), "DRAMA", div)
+
+    def test_gyeonggi_div_case_and_whitespace(self):
+        self.assertEqual(gyeonggi_div_to_category("ott드라마"), "DRAMA")
+        self.assertEqual(gyeonggi_div_to_category("  TV드라마 "), "DRAMA")
+
+    def test_gyeonggi_div_excluded_values_return_none(self):
+        for div in ["TV", "tv", "기타", "CF", "MV", "뮤직비디오", "다큐멘터리",
+                    "유튜브", "홍보영상", "TV예능", "OTT예능", "", None]:
+            self.assertIsNone(gyeonggi_div_to_category(div), div)
+
+
+def _gg_pages(items):
+    """페이지 하나짜리 경기 API 응답을 만든다."""
+    def fetch(page_index, page_size):
+        return {"total_count": len(items), "items": items if page_index == 1 else []}
+    return fetch
+
+
+def _gg_geocode_ok(query, size=1):
+    # 장소명마다 100m보다 훨씬 먼 서로 다른 좌표를 준다(crc32로 결정론적 분산).
+    seed = zlib.crc32(query.encode("utf-8"))
+    return [{
+        "place_name": query,
+        "address_name": f"경기도 {query}",
+        "road_address_name": f"경기도 {query}로 1",
+        "latitude": 37.0 + (seed % 500) / 100,
+        "longitude": 127.0 + (seed // 500 % 500) / 100,
+        "category_name": "",
+    }]
+
+
+class ImportGyeonggiDataDreamWorkFilterTest(TestCase):
+    """경기 import가 영화·드라마 구분만 가져오고 작품을 잇는다 (docs/DETAIL_SPEC.md 6-1 #28)."""
+
+    def _run(self, items):
+        with patch(
+            "places.management.commands.import_gyeonggi_data_dream.gyeonggi_data_dream.fetch_photography_support",
+            side_effect=_gg_pages(items),
+        ), patch(
+            "places.management.commands.import_gyeonggi_data_dream.kakao_geocoding.search_place",
+            side_effect=_gg_geocode_ok,
+        ) as mock_search:
+            out = io.StringIO()
+            call_command("import_gyeonggi_data_dream", stdout=out, stderr=out)
+            return out.getvalue(), mock_search
+
+    def _item(self, div, work, place):
+        return {"sigun_nm": "고양시", "potogrf_yy": "2022", "potogrf_div_nm": div,
+                "work_nm": work, "potogrf_plc_nm": place}
+
+    def test_non_media_rows_skip_place_and_geocoding(self):
+        output, mock_search = self._run([
+            self._item("상업장편", "범죄도시3", "고양시 클럽"),
+            self._item("OTT드라마", "약한영웅", "고양시 돈오소"),
+            self._item("기타", "홍보영상", "고양시 스타타워"),
+            self._item("TV", "동네 한 바퀴", "고양시 행신동"),
+        ])
+
+        self.assertEqual(Place.objects.count(), 2)
+        self.assertIn("영화·드라마 아니라 건너뜀 2건", output)
+        # 걸러진 행은 지오코딩(카카오 호출)까지 가지 않는다.
+        self.assertEqual(mock_search.call_count, 2)
+
+    def test_media_rows_link_work_with_right_category(self):
+        self._run([
+            self._item("상업장편", "파묘", "고양시 지축동"),
+            self._item("OTT드라마", "닭강정", "고양시 호수공원"),
+        ])
+
+        self.assertEqual(Work.objects.get(title="파묘").category, Work.Category.MOVIE)
+        self.assertEqual(Work.objects.get(title="닭강정").category, Work.Category.DRAMA)
+        self.assertEqual(PlaceWork.objects.count(), 2)
+
+    def test_work_merges_with_existing_kcisa_work_by_title(self):
+        kcisa_work = Work.objects.create(title="약한영웅", category=Work.Category.DRAMA)
+
+        self._run([self._item("OTT드라마", "약한영웅", "고양시 돈오소")])
+
+        self.assertEqual(Work.objects.filter(title="약한영웅").count(), 1)
+        pw = PlaceWork.objects.get(work=kcisa_work)
+        self.assertEqual(pw.place.name, "고양시 돈오소")
+
+    def test_rerun_is_idempotent(self):
+        items = [self._item("상업장편", "파묘", "고양시 지축동")]
+        self._run(items)
+        self._run(items)
+
+        self.assertEqual(Place.objects.count(), 1)
+        self.assertEqual(Work.objects.filter(title="파묘").count(), 1)
+        self.assertEqual(PlaceWork.objects.count(), 1)
 
 
 def _fake_kcisa_rows():

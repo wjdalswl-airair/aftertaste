@@ -43,7 +43,8 @@ class Command(BaseCommand):
 
         for row in rows:
             # 영화·드라마 촬영지만 가져온다. 예능·뮤직비디오 행은 명소 자체를 만들지 않는다.
-            if media_type_to_category(row.get("media_type")) is None:
+            category = media_type_to_category(row.get("media_type"))
+            if category is None:
                 skipped_not_media_count += 1
                 continue
 
@@ -76,9 +77,7 @@ class Command(BaseCommand):
                 updated_count += 1
 
             # matched_by가 무엇이든(새로 만듦/거리 병합/갱신) 그 명소를 작품에 잇는다.
-            _, linked = link_place_to_work(
-                place, title=row.get("title"), media_type=row.get("media_type")
-            )
+            _, linked = link_place_to_work(place, title=row.get("title"), category=category)
             if linked:
                 work_linked_count += 1
 
