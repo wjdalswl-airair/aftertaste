@@ -748,6 +748,8 @@ class ImportKcisaCommandTest(TestCase):
         mock_parse.return_value = [
             {
                 "sequence_no": "99",
+                "media_type": "drama",
+                "title": "어떤드라마",
                 "place_name": "새이름",
                 "address": "새주소",
                 "business_hours": "새시간",
@@ -764,6 +766,121 @@ class ImportKcisaCommandTest(TestCase):
         self.assertEqual(existing.address, "기존주소")
         self.assertEqual(existing.business_hours, "기존시간")
         self.assertIn("좌표 100m 이내 기존 명소와 병합 1건", output)
+        # 거리로 병합된 기존 명소에도 작품이 연결된다.
+        self.assertTrue(existing.place_works.filter(work__title="어떤드라마").exists())
+
+
+def _kcisa_row(seq, media_type, title, place_name, lat, lng):
+    """작품 연결 테스트용 KCISA 행. 좌표를 겹치지 않게 넣어 100m 병합을 피한다."""
+    return {
+        "sequence_no": seq,
+        "media_type": media_type,
+        "title": title,
+        "place_name": place_name,
+        "place_type": "cafe",
+        "description": "",
+        "business_hours": "",
+        "break_time": "",
+        "closed_days": "",
+        "address": f"{place_name} 주소",
+        "latitude": lat,
+        "longitude": lng,
+        "phone": "",
+        "last_updated": "",
+    }
+
+
+class ImportKcisaWorkLinkingTest(TestCase):
+    """KCISA import가 drama/movie 행만 가져오고 그 자리에서 Work·PlaceWork를 잇는다
+    (docs/DETAIL_SPEC.md 6-1 #27, plans/vast-brewing-dove.md)."""
+
+    def _run(self, rows):
+        with patch(
+            "places.management.commands.import_kcisa.kcisa_csv.parse_filming_locations",
+            return_value=rows,
+        ):
+            out = io.StringIO()
+            call_command("import_kcisa", file="dummy.csv", stdout=out)
+            return out.getvalue()
+
+    def test_drama_row_creates_work_and_placework(self):
+        self._run([_kcisa_row("1", "drama", "도깨비", "중앙고등학교", "37.10", "127.10")])
+
+        work = Work.objects.get(title="도깨비")
+        self.assertEqual(work.category, Work.Category.DRAMA)
+        place = get_place_by_source("KCISA", "1")
+        self.assertTrue(PlaceWork.objects.filter(place=place, work=work).exists())
+
+    def test_movie_row_uses_movie_category(self):
+        self._run([_kcisa_row("2", "movie", "1987", "남영동 대공분실", "37.20", "127.20")])
+
+        self.assertEqual(Work.objects.get(title="1987").category, Work.Category.MOVIE)
+
+    def test_show_and_artist_rows_are_skipped_entirely(self):
+        output = self._run(
+            [
+                _kcisa_row("10", "show", "나 혼자 산다", "어느 식당", "37.30", "127.30"),
+                _kcisa_row("11", "artist", "SF9", "어느 골목", "37.40", "127.40"),
+                _kcisa_row("12", "", "미상", "미디어타입 없음", "37.50", "127.50"),
+            ]
+        )
+
+        self.assertEqual(Place.objects.count(), 0)
+        self.assertEqual(PlaceSource.objects.count(), 0)
+        self.assertEqual(Work.objects.count(), 0)
+        self.assertIn("영화·드라마 아니라 건너뜀 3건", output)
+
+    def test_same_title_across_places_makes_one_work_many_placeworks(self):
+        self._run(
+            [
+                _kcisa_row("1", "drama", "도깨비", "중앙고등학교", "37.10", "127.10"),
+                _kcisa_row("2", "drama", "도깨비", "주문진 방파제", "37.60", "128.60"),
+                _kcisa_row("3", "drama", "도깨비", "운암정", "37.70", "127.70"),
+            ]
+        )
+
+        self.assertEqual(Work.objects.filter(title="도깨비").count(), 1)
+        self.assertEqual(PlaceWork.objects.filter(work__title="도깨비").count(), 3)
+
+    def test_title_whitespace_is_normalized(self):
+        self._run([_kcisa_row("1", "drama", "  스카이   캐슬  ", "명소", "37.10", "127.10")])
+
+        self.assertTrue(Work.objects.filter(title="스카이 캐슬").exists())
+
+    def test_reimport_is_idempotent(self):
+        rows = [_kcisa_row("1", "drama", "도깨비", "중앙고등학교", "37.10", "127.10")]
+        self._run(rows)
+        self._run(rows)
+
+        self.assertEqual(Work.objects.filter(title="도깨비").count(), 1)
+        self.assertEqual(PlaceWork.objects.count(), 1)
+
+    def test_reimport_preserves_admin_scene_description(self):
+        rows = [_kcisa_row("1", "drama", "도깨비", "중앙고등학교", "37.10", "127.10")]
+        self._run(rows)
+
+        pw = PlaceWork.objects.get(work__title="도깨비")
+        pw.scene_description = "저승사자와 처음 마주치는 장면"
+        pw.save()
+
+        self._run(rows)
+
+        pw.refresh_from_db()
+        self.assertEqual(pw.scene_description, "저승사자와 처음 마주치는 장면")
+
+    def test_place_in_show_and_drama_is_kept_via_drama_row(self):
+        """경복궁이 예능·드라마 양쪽에 나오면, 예능 행은 버려도 드라마 행이 경복궁을 만든다."""
+        self._run(
+            [
+                _kcisa_row("show1", "show", "어느 예능", "경복궁", "37.579617", "126.977041"),
+                _kcisa_row("drama1", "drama", "역적", "경복궁", "37.579617", "126.977041"),
+            ]
+        )
+
+        place = get_place_by_source("KCISA", "drama1")
+        self.assertEqual(place.name, "경복궁")
+        self.assertTrue(place.place_works.filter(work__title="역적").exists())
+        self.assertFalse(PlaceSource.objects.filter(source_id="show1").exists())
 
 
 # ---------------------------------------------------------------------------

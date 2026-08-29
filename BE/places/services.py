@@ -38,6 +38,52 @@ def to_decimal(value):
         return None, False
 
 
+# KCISA CSV의 미디어타입 → Work.category. 우리 서비스는 영화·드라마 촬영지라
+# drama/movie만 다루고, 나머지(show=예능, artist=뮤직비디오 등)는 아예 가져오지 않는다.
+_MEDIA_TYPE_TO_CATEGORY = {"drama": "DRAMA", "movie": "MOVIE"}
+
+# Work.title은 CharField(max_length=200)이라 넘으면 저장이 실패한다. 잘라서 저장한다
+# (translation.py의 NAME_TITLE_MAX_LENGTH 처리와 같은 방식).
+_WORK_TITLE_MAX_LENGTH = 200
+
+
+def media_type_to_category(media_type):
+    """KCISA 미디어타입 문자열을 Work.category 값으로 바꾼다.
+
+    drama/movie가 아니면(예능·뮤직비디오·빈값 등) None. import 커맨드가 이 값으로
+    "가져올 행인지"를 판단하고, link_place_to_work가 같은 기준으로 작품을 잇는다.
+    """
+    return _MEDIA_TYPE_TO_CATEGORY.get((media_type or "").strip().lower())
+
+
+def link_place_to_work(place, *, title, media_type):
+    """촬영지(place)를 그 작품(Work)에 잇는다. 영화·드라마 촬영지에만 적용된다.
+
+    - media_type이 drama/movie가 아니거나 title이 비어 있으면 아무것도 안 하고 None을 돌려준다.
+    - 공백을 정리한 제목 문자열이 같으면 같은 작품으로 본다 — KCISA CSV엔 작품을 구분할
+      다른 키(연도·작품ID)가 없고, 같은 드라마는 늘 같은 제목으로 적혀 있어 이걸로 충분하다.
+      서로 다른 출처(경기 데이터 드림 등) 사이의 표기 차이 병합은 별도 작업이다 (DETAIL_SPEC 7장 #1).
+    - 이미 이어진 place-work면 아무것도 바꾸지 않는다(get_or_create만). scene_description(장면
+      설명)은 관리자가 채우는 값이라 재수집으로 덮어쓰지 않는다 — business_hours 보존과 같은 원칙.
+
+    반환값: (work, linked) — work는 이어진 Work(대상이 아니면 None),
+            linked는 이번에 place-work 연결이 새로 생겼는지 여부.
+    """
+    from places.models import PlaceWork, Work
+
+    category = media_type_to_category(media_type)
+    if category is None:
+        return None, False
+
+    normalized_title = " ".join((title or "").split())[:_WORK_TITLE_MAX_LENGTH]
+    if not normalized_title:
+        return None, False
+
+    work, _ = Work.objects.get_or_create(title=normalized_title, category=category)
+    _, linked = PlaceWork.objects.get_or_create(place=place, work=work)
+    return work, linked
+
+
 def build_composite_source_id(*parts, delimiter="|"):
     """원본에 고유번호가 없는 출처를 위해, 여러 필드를 하나의 source_id 문자열로 합친다.
 
