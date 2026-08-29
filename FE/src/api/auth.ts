@@ -1,4 +1,5 @@
 import { auth } from '../lib/firebase'
+import { publicFetch } from './client'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL
 
@@ -58,4 +59,17 @@ export function loginWithFirebase(): Promise<Member> {
 // 내 정보 조회 (BE MeView)
 export function getMe(): Promise<Member> {
   return authorizedFetch<Member>('/api/account/', { method: 'GET' })
+}
+
+// 국적/언어 저장. 로그인 여부와 관계없이 부를 수 있다.
+// 로그인 상태면 서버가 실제로 저장하고, 비로그인이면 값만 검증해서 그대로 돌려준다
+// (비로그인 저장은 프론트가 localStorage로 직접 한다 — useLocaleStore).
+export function updateLocale(payload: {
+  nationality?: string
+  language?: string
+}): Promise<{ language: string | null }> {
+  return publicFetch<{ language: string | null }>('/api/account/locale/', {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
 }

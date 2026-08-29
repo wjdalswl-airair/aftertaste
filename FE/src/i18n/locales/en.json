@@ -1,0 +1,14 @@
+{
+  "mainPage": {
+    "hallOfFame": {
+      "title": "Hall of Fame",
+      "empty": "No hall of fame yet"
+    },
+    "topPlaces": {
+      "title": "Top 10 Spots"
+    },
+    "recommend": {
+      "title": "You might also like"
+    }
+  }
+}

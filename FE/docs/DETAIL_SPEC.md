@@ -82,7 +82,7 @@ React Router로 화면 단위 페이지를 분리한다 (PRD 6장 결정).
 | 스토어 | 담는 것 | 채워지는 시점 |
 |---|---|---|
 | `useAuthStore` | 로그인한 회원 정보 (`GET /account` 응답), 로그인 여부 | Firebase `onAuthStateChanged` 콜백에서 |
-| `useLocaleStore` | 선택한 국적/언어 | 메인 화면 국적 선택 시, `PATCH /account/locale`(로그인 시) 또는 로컬 저장(비로그인 시) |
+| `useLocaleStore` | 선택한 국적/언어 (Phase 2 구현 완료) | 메인 화면 국적 선택 시. `zustand/persist`로 항상 localStorage에 저장하고, 로그인 상태면 `PATCH /api/account/locale/`도 함께 호출 |
 
 화면별로만 쓰는 상태(검색어 입력값, 폼 값 등)는 전역 스토어에 넣지 않고 해당 페이지 컴포넌트 안에 둔다 (불필요한 전역화 금지, karpathy-guidlines 2번).
 
@@ -149,19 +149,26 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 - API: `POST /api/account/login/` (확정)
 - 상태: 로그인 성공 시 `useAuthStore` 갱신 후 이전 화면 또는 `/`로 이동
 
-### S-02. 메인 — `pages/MainPage.tsx`
-- 컴포넌트: 배너 슬라이드, 명예의 전당, 국적 선택, Top10 캐러셀
-- API: `GET /main/highlights` (계획, 명예의전당), `GET /spots/top` (계획, Top10), `GET /banners` (계획)
-- 참고: BE PHASE 순서상 명예의전당·Top10은 리뷰·즐겨찾기 데이터가 쌓인 뒤(Phase 3)에나 값이 채워진다. 그 전까지는 빈 상태 UI를 함께 준비한다.
+### S-02. 메인 — `pages/MainPage.tsx` (Phase 2, 구현 완료)
+- 컴포넌트: `BannerSlider`, `HallOfFameCard`, `NationalityPicker`, `TopPlacesCarousel`, `RecommendedSpots`
+- API (전부 확정, 실제 BE 코드로 확인함 — 2026-08-29):
+  - `GET /api/banners/` → `{ banners: [{ id, image_url, link_url, order }] }`
+  - `GET /api/main/hall-of-fame/` → `{ review: {...} | null }` (없으면 `null`, 200 정상 응답)
+  - `GET /api/main/top-places/` → `{ places: [{ id, name, address, photo_url, favorite_count }] }`
+  - `PATCH /api/account/locale/` → `{ nationality?, language? }` 요청, `{ language }` 응답. 로그인 불필요(선택), 비로그인이면 검증만 하고 저장은 프론트가 `useLocaleStore`(localStorage)로 한다.
+- 국적 선택은 PRD상 "미정"이었으나, BE 번역 지원 언어가 영어만으로 결정된 것에 맞춰 **한국(ko) / 해외(en) 2개만** 만들었다 (2026-08-29, 사용자 확인).
+- 명예의전당·Top10은 BE 자체 문서엔 "Phase3 전엔 못 채운다"고 되어 있지만, 실제 코드는 스텁이 아니라 진짜 랭킹 로직이 이미 구현돼 있다. 데이터가 없으면 각각 `null`/`[]`을 정상 응답하므로 그 값 그대로 빈 상태 UI를 보여준다.
 
 ### S-03. 검색 결과 — `pages/SearchPage.tsx`
 - 컴포넌트: 검색창(자동완성), 드라마/영화 필터, 장소/작품 섹션
-- API: `GET /search/spots`, `GET /search/works` (둘 다 계획)
+- API: `GET /api/places/search/`, `GET /api/places/search/autocomplete/` (BE 구현 완료, FE는 아직 이 화면을 만들지 않음 — 별도 Phase)
 - 예외: 결과 없음 → "검색결과가 존재하지 않습니다"
 
-### S-04. 추천 (위치 기반) — 메인 화면(S-02) 내부 기능
-- API: `GET /spots/recommend` (계획)
-- 위치 권한 허용/거부에 따라 파라미터 유무만 달라짐 (PRD F-04)
+### S-04. 추천 (위치 기반) — 메인 화면(S-02) 내부 기능, Phase 2 구현 완료
+- API: `GET /api/places/recommend/` (확정, `src/api/spots.ts`의 `getRecommendedSpots`)
+  - `lat`, `lng` 쿼리 파라미터(선택). 없거나 잘못되면 BE가 랜덤 3곳을 돌려준다.
+  - 항상 3개, `{ places: [{ id, name, address, photo_url }] }`
+- 위치 권한 허용/거부는 `src/hooks/useGeolocation.ts`가 판단. 거부해도 재요청하지 않는다.
 
 ### S-05. 명소 상세 — `pages/SpotDetailPage.tsx`
 - 컴포넌트: 카카오맵, 명소 정보, 작품 정보, 리뷰 목록, 주변 상권, 즐겨찾기 버튼

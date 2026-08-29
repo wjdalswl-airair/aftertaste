@@ -2,15 +2,8 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { RequireAuth } from './components/RequireAuth'
 import { useInitAuth } from './hooks/useInitAuth'
 import { LoginPage } from './pages/LoginPage'
+import { MainPage } from './pages/MainPage'
 import { useAuthStore } from './store/useAuthStore'
-
-function HomePage() {
-  return (
-    <main className="flex min-h-dvh items-center justify-center">
-      <p className="font-brand text-2xl text-ink">여운</p>
-    </main>
-  )
-}
 
 // Phase 1에서 로그인 가드가 실제로 동작하는지 확인하기 위한 임시 화면.
 // 진짜 마이페이지는 Phase 7에서 만든다.
@@ -28,7 +21,7 @@ function App() {
 
   return (
     <Routes>
-      <Route path="/" element={<HomePage />} />
+      <Route path="/" element={<MainPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route element={<RequireAuth />}>
         <Route path="/mypage" element={<TempMyPage />} />

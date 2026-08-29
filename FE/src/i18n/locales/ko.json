@@ -1,0 +1,14 @@
+{
+  "mainPage": {
+    "hallOfFame": {
+      "title": "이달의 명예의 전당",
+      "empty": "아직 명예의 전당이 없어요"
+    },
+    "topPlaces": {
+      "title": "명소 Top10"
+    },
+    "recommend": {
+      "title": "이런 곳은 어때요?"
+    }
+  }
+}

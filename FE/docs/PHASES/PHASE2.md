@@ -37,17 +37,47 @@
 
 - `GET /spots/top` (계획) 호출. 좌우로 넘겨 보는 캐러셀로 표시한다.
 
+## 진행 상황 (2026-08-29)
+
+**구현 완료.**
+
+| 파일 | 역할 |
+|---|---|
+| `src/api/client.ts` | 로그인 선택(optional-auth) API 공용 fetch 헬퍼 (`publicFetch`) |
+| `src/api/main.ts` | `GET /api/banners/`, `/api/main/hall-of-fame/`, `/api/main/top-places/` |
+| `src/api/spots.ts` | `GET /api/places/recommend/` |
+| `src/api/auth.ts` | `updateLocale()` 추가 (`PATCH /api/account/locale/`) |
+| `src/store/useLocaleStore.ts` | 국적/언어 상태, `zustand/persist`로 localStorage 저장 |
+| `src/i18n/` | react-i18next 설정, `ko.json`/`en.json` |
+| `src/hooks/useGeolocation.ts` | 위치 권한 훅 |
+| `src/components/BannerSlider.tsx`, `NationalityPicker.tsx`, `RecommendedSpots.tsx`, `TopPlacesCarousel.tsx`, `HallOfFameCard.tsx` | 메인 화면 구성 요소 |
+| `src/pages/MainPage.tsx` | 위 컴포넌트 조합, `/` 라우트로 교체 |
+
+국적 선택은 PRD상 "미정"이었으나, BE 번역 지원 언어가 영어만인 것에 맞춰 **한국 / 해외(영어) 2개만** 만들기로 결정 (2026-08-29, 사용자 확인). 자세한 내용은 `docs/DETAIL_SPEC.md` S-02 참고.
+
+**Commands**
+- `npm run test`: 21개 테스트 통과 (Phase 1 것 포함, Phase 2에서 10개 추가)
+- `npm run lint`: passed
+- `npm run build`: passed
+
+**아직 확인 안 됨 (브라우저에서 직접 확인해야 함)**
+- 배너가 실제로 보이는지 (관리자가 등록한 배너 콘텐츠가 있어야 함 — 없으면 안 보이는 게 정상)
+- 국적 선택 시 화면 문구 언어가 실제로 바뀌는지
+- 위치 권한 허용/거부 각각 추천 3곳이 뜨는지
+- Top10 캐러셀 좌우 스크롤
+- 명예의 전당 빈 상태(데이터 없을 때) 확인
+
 ## 완료 기준 체크리스트
 
-- [ ] 배너가 보인다
-- [ ] 국적을 선택하면 화면 UI 문구의 언어가 바뀐다
-- [ ] 국적을 선택하지 않으면 한국어로 보인다
-- [ ] 위치 권한을 허용하면 위치 기반 추천이 보인다
-- [ ] 위치 권한을 거부해도 화면이 깨지지 않고 대체 추천이 보인다
-- [ ] Top10 캐러셀이 좌우로 넘어간다
-- [ ] 명예의 전당 자리가 있고, 데이터가 없어도 에러 없이 빈 상태로 보인다
-- [ ] 관련 유닛 테스트(배너/추천/Top10 API 함수 성공·실패 처리, `useLocaleStore`) 통과 (Vitest)
-- [ ] `npm run lint`, `npm run build` 통과
+- [ ] 배너가 보인다 (브라우저 확인 필요)
+- [ ] 국적을 선택하면 화면 UI 문구의 언어가 바뀐다 (브라우저 확인 필요)
+- [x] 국적을 선택하지 않으면 한국어로 보인다 (`useLocaleStore` 기본값 `ko`, `i18next` 기본 `lng: 'ko'`)
+- [ ] 위치 권한을 허용하면 위치 기반 추천이 보인다 (브라우저 확인 필요)
+- [ ] 위치 권한을 거부해도 화면이 깨지지 않고 대체 추천이 보인다 (브라우저 확인 필요)
+- [ ] Top10 캐러셀이 좌우로 넘어간다 (브라우저 확인 필요)
+- [ ] 명예의 전당 자리가 있고, 데이터가 없어도 에러 없이 빈 상태로 보인다 (브라우저 확인 필요)
+- [x] 관련 유닛 테스트(배너/추천/Top10 API 함수 성공·실패 처리, `useLocaleStore`) 통과 (Vitest, 2026-08-29)
+- [x] `npm run lint`, `npm run build` 통과
 
 ## 넘어가기 전 확인
 
