@@ -60,7 +60,9 @@ export function LoginPage() {
       {error && <p className="text-sm text-primary">{error}</p>}
 
       <p className="text-xs text-ink-tertiary">
-        로그인 시 이용약관 및 개인정보처리방침에 동의합니다.
+        로그인 시
+        <br />
+        이용약관 및 개인정보처리방침에 동의합니다.
       </p>
     </main>
   )
