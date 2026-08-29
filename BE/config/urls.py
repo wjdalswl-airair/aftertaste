@@ -22,6 +22,12 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
+from courses.views import MyCourseListView
+from favorites.views import MyFavoriteListView
+from main.views import HallOfFameView, TopPlacesView
+from places.views import PopularKeywordsView
+from reviews.views import MyReviewListView
+
 
 @extend_schema(exclude=True)
 @api_view(["GET"])
@@ -33,6 +39,26 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/health/", health_check, name="health-check"),
     path("api/account/", include("accounts.urls")),
+    # 여운_API명세서의 "내 리뷰 조회"(/account/reviews), "내 즐겨찾기 조회"(/account/bookmarks →
+    # 이 프로젝트 용어로는 favorites)와 경로를 맞춘다. accounts 앱이 reviews/favorites를
+    # 알 필요는 없어서(방 분리), accounts.urls에 넣지 않고 여기서 바로 라우팅한다.
+    path("api/account/reviews/", MyReviewListView.as_view(), name="my-reviews"),
+    path("api/account/favorites/", MyFavoriteListView.as_view(), name="my-favorites"),
+    # 내가 만든 코스 목록(마이페이지용). 위와 같은 이유로 courses.urls에 안 넣고 여기서 바로 라우팅한다.
+    path("api/account/courses/", MyCourseListView.as_view(), name="my-courses"),
+    path("api/banners/", include("main.urls")),
+    # 명예의 전당·Top10은 배너와 달리 "메인 화면"에 속하는 별개 구성요소라
+    # /api/banners/ 프리픽스를 쓰면 이름이 안 맞는다. main 앱 자체의 url 프리픽스가
+    # 아직 없어서(main.urls는 /api/banners/에 묶여 있음), MyReviewListView/
+    # MyFavoriteListView와 같은 방식으로 여기서 바로 라우팅한다 (PHASES/PHASE3.md 6번).
+    path("api/main/hall-of-fame/", HallOfFameView.as_view(), name="hall-of-fame"),
+    path("api/main/top-places/", TopPlacesView.as_view(), name="top-places"),
+    # 추천(인기) 검색어. 여운_API명세서 흐름상 /search/ 아래에 두는 게 자연스러워서
+    # places.urls(/api/places/) 밑이 아니라 여기서 바로 라우팅한다 (DETAIL_SPEC 6-1 #23).
+    path("api/search/popular/", PopularKeywordsView.as_view(), name="search-popular"),
+    path("api/places/", include("places.urls")),
+    path("api/reviews/", include("reviews.urls")),
+    path("api/courses/", include("courses.urls")),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path(
         "api/docs/",

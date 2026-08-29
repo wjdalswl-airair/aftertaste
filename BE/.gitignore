@@ -1,6 +1,9 @@
 # Created by https://www.toptal.com/developers/gitignore/api/python,react,django,firebase
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,react,django,firebase
 
+screenshots/
+실패경험.md
+
 ### Django ###
 *.log
 *.pot

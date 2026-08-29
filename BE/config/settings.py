@@ -13,8 +13,13 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# .env 파일(git에 안 올라감)에 적어둔 값을 환경변수로 읽어들인다.
+load_dotenv(BASE_DIR / ".env")
 
 
 # Quick-start development settings - unsuitable for production
@@ -38,10 +43,17 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    # 유사 검색(trigram_similar, TrigramSimilarity)에 필요 — PostgreSQL 전용 조회 기능
+    "django.contrib.postgres",
     "rest_framework",
     "drf_spectacular",
     "corsheaders",
     "accounts",
+    "places",
+    "main",
+    "reviews",
+    "favorites",
+    "courses",
 ]
 
 MIDDLEWARE = [
@@ -134,6 +146,22 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:5173",
 ]
+
+
+# 외부 공공데이터 API 키
+# 실제 호출 코드는 places/sources/ 아래에 있다 (docs/DETAIL_SPEC.md 7장 참고).
+# 한국문화정보원(KCISA)은 API가 아니라 CSV 파일로만 제공돼서 키가 필요 없지만,
+# 나중에 API가 열릴 수도 있어서 자리는 남겨둔다.
+KOBIS_API_KEY = os.environ.get("KOBIS_API_KEY", "")
+GYEONGGI_DATA_DREAM_API_KEY = os.environ.get("GYEONGGI_DATA_DREAM_API_KEY", "")
+KCISA_API_KEY = os.environ.get("KCISA_API_KEY", "")
+
+# 카카오맵 지오코딩용 REST API 키. 좌표가 없는 출처(경기 데이터 드림)의 장소명을
+# 좌표로 바꿔서, 좌표가 있는 다른 출처(한국문화정보원)와 같은 명소인지 비교하는 데 쓴다.
+KAKAO_API_KEY = os.environ.get("KAKAO_API_KEY", "")
+
+# Google Cloud Translation API (v2) 키. 명소·작품 번역에 쓴다 (docs/DETAIL_SPEC.md 6-1 #13).
+GOOGLE_TRANSLATE_API_KEY = os.environ.get("GOOGLE_TRANSLATE_API_KEY", "")
 
 
 # Firebase Authentication
