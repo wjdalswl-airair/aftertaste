@@ -2,11 +2,16 @@ services:
   db:
     image: postgres:16
     environment:
-      POSTGRES_DB: aftertaste
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      # 접속 정보는 .env 파일에서 가져온다. git에 안 올라가는 파일이라
+      # 비밀번호가 코드에 박히지 않는다. .env가 없으면 컨테이너가 뜨지 않는다.
+      POSTGRES_DB: ${DB_NAME:-aftertaste}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?".env에 DB_PASSWORD를 설정하세요"}
     ports:
-      - "5432:5432"
+      # 127.0.0.1 로 묶어서 이 PC 안에서만 접속된다.
+      # 예전엔 "5432:5432"(=0.0.0.0)라 외부에 열려 있었고, 자동 공격 봇에 DB가 삭제됐다.
+      # (실패경험.md 2026-08-29 참고)
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
