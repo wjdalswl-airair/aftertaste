@@ -9,6 +9,8 @@
     <link rel="preload" as="font" type="font/woff2" href="/src/assets/fonts/IBMPlexSansKR-Regular.woff2" crossorigin />
     <link rel="preload" as="font" type="font/woff2" href="/src/assets/fonts/IBMPlexSansKR-Bold.woff2" crossorigin />
     <title>여운</title>
+    <!-- 명소 상세 화면 지도용 카카오맵 JS SDK. 키는 .env의 VITE_KAKAO_JS_KEY를 Vite가 빌드 시 치환한다 -->
+    <script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=%VITE_KAKAO_JS_KEY%&autoload=false" defer></script>
   </head>
   <body>
     <div id="root"></div>

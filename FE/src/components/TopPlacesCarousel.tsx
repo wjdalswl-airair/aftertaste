@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router-dom'
 import { getTopPlaces, type TopPlace } from '../api/main'
 import { FavoriteButton } from './FavoriteButton'
 import { Skeleton } from './Skeleton'
@@ -38,14 +39,14 @@ export function TopPlacesCarousel() {
       {places && places.length > 0 && (
         <div className="scrollbar-hide flex snap-x snap-mandatory gap-3 overflow-x-auto px-4">
           {places.map((place) => (
-            <div key={place.id} className="w-[110px] flex-shrink-0 snap-center">
+            <Link key={place.id} to={`/spots/${place.id}`} className="w-[110px] flex-shrink-0 snap-center">
               <div className="relative">
                 <img src={place.photo_url} alt="" className="aspect-square w-full rounded-md object-cover" />
                 <FavoriteButton placeId={place.id} />
               </div>
               <p className="mt-1 truncate text-xs text-ink">{place.name}</p>
               <p className="truncate text-[11px] text-ink-secondary">{place.address}</p>
-            </div>
+            </Link>
           ))}
         </div>
       )}
