@@ -27,11 +27,12 @@ export function WorkDetailPage() {
 
   return (
     <main className="flex min-h-dvh flex-col gap-8 pb-24">
-      <header className="flex items-center justify-between px-4 pt-6">
+      <header className="grid min-h-16 grid-cols-[24px_1fr_24px] items-center px-4 pt-6">
         <button type="button" onClick={() => navigate(-1)} aria-label="뒤로가기">
           <ArrowLeft size={24} className="text-ink" />
         </button>
-        <button type="button" onClick={handleShare} aria-label="공유">
+        <div />
+        <button type="button" onClick={handleShare} aria-label="공유" className="justify-self-end">
           <Share2 size={22} className="text-ink" />
         </button>
       </header>
@@ -57,7 +58,7 @@ export function WorkDetailPage() {
               <p className="text-sm text-primary">
                 {work.category === 'DRAMA' ? t('searchPage.filters.drama') : t('searchPage.filters.movie')}
               </p>
-              <p className="text-2xl font-bold text-ink">{work.title}</p>
+              <p className="text-xl font-bold text-ink">{work.title}</p>
             </div>
 
             <div className="flex flex-col gap-4 rounded-2xl bg-accent/15 p-5">

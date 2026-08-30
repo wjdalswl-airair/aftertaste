@@ -50,6 +50,7 @@
     "reviewButton": "Write a review",
     "reviewsTitle": "Visitor reviews",
     "reviewsEmpty": "No reviews yet",
+    "reviewsMore": "See more",
     "courseCta": "Get an AI course from this spot",
     "mapTitle": "Map",
     "mapUnavailable": "Map unavailable",
@@ -69,5 +70,31 @@
   "bookmarksPage": {
     "title": "My saved spots",
     "empty": "No saved spots yet"
+  },
+  "ratingModal": {
+    "question": "How was this place?",
+    "submitButton": "Rate",
+    "hint": "Add a review with photos, too!"
+  },
+  "reviewForm": {
+    "title": "Write a review",
+    "editTitle": "Edit review",
+    "ratingLabel": "Rating",
+    "photoLabel": "Photos",
+    "photoUploadError": "Couldn't upload the photo. Please try again.",
+    "contentLabel": "Your review",
+    "contentPlaceholder": "Share your experience here",
+    "submitButton": "Submit"
+  },
+  "reviewList": {
+    "sortLatest": "Latest",
+    "sortPopular": "Popular",
+    "empty": "No reviews yet"
+  },
+  "reviewDetail": {
+    "notFound": "Not found",
+    "edit": "Edit",
+    "delete": "Delete",
+    "cancel": "Cancel"
   }
 }

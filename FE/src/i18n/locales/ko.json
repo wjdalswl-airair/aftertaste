@@ -50,6 +50,7 @@
     "reviewButton": "리뷰 남기기",
     "reviewsTitle": "방문자 리뷰",
     "reviewsEmpty": "아직 리뷰가 없어요",
+    "reviewsMore": "더보기",
     "courseCta": "이 장소로 AI 코스 추천받기",
     "mapTitle": "지도",
     "mapUnavailable": "지도를 표시할 수 없어요",
@@ -69,5 +70,31 @@
   "bookmarksPage": {
     "title": "내가 저장한 명소",
     "empty": "아직 저장한 명소가 없어요"
+  },
+  "ratingModal": {
+    "question": "이곳은 어떠셨나요?",
+    "submitButton": "별점 남기기",
+    "hint": "사진과 함께 후기도 남겨보세요 !"
+  },
+  "reviewForm": {
+    "title": "리뷰 작성",
+    "editTitle": "리뷰 수정",
+    "ratingLabel": "별점",
+    "photoLabel": "사진 첨부",
+    "photoUploadError": "사진 업로드에 실패했어요. 다시 시도해주세요.",
+    "contentLabel": "방문 후기",
+    "contentPlaceholder": "이곳에서의 경험을 남겨주세요",
+    "submitButton": "등록"
+  },
+  "reviewList": {
+    "sortLatest": "최신순",
+    "sortPopular": "인기순",
+    "empty": "아직 리뷰가 없어요"
+  },
+  "reviewDetail": {
+    "notFound": "존재하지 않습니다",
+    "edit": "수정하기",
+    "delete": "삭제하기",
+    "cancel": "취소"
   }
 }
