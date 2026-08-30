@@ -1,0 +1,40 @@
+{
+  "mainPage": {
+    "greeting": {
+      "hello": "안녕하세요",
+      "nameSuffix": ", {{name}}님",
+      "subtitle": "오늘은 어떤 장면 속으로 떠나볼까요?"
+    },
+    "hero": {
+      "title": "금주의 명예의 전당",
+      "recommendTitle": "이 장소, 어떠세요?",
+      "empty": "아직 준비 중이에요"
+    },
+    "topPlaces": {
+      "title": "전국 Top 10 촬영지",
+      "empty": "아직 준비 중이에요"
+    },
+    "recommend": {
+      "title": "내 주변 명소",
+      "empty": "아직 준비 중이에요"
+    }
+  },
+  "searchPage": {
+    "title": "무엇을\n찾고 계신가요?",
+    "placeholder": "촬영지, 작품을 검색해보세요",
+    "searchButton": "검색",
+    "clearButton": "지우기",
+    "popularKeywordsTitle": "추천 검색어",
+    "recentSearchesTitle": "최근 검색어",
+    "recentSearchesClear": "전체 삭제",
+    "resultsTitle": "\"{{query}}\" 검색 결과",
+    "placesFoundTitle": "명소에서 검색됨",
+    "worksFoundTitle": "작품에서 검색됨",
+    "noResults": "검색 결과가 존재하지 않습니다",
+    "filters": {
+      "all": "전체",
+      "drama": "드라마",
+      "movie": "영화"
+    }
+  }
+}
