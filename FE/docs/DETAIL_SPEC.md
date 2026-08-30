@@ -40,7 +40,7 @@ API 연동 정보는 세 곳에서 나왔고, **신뢰도가 다르다.**
 
 ```
 src/
-  api/          # 도메인별 API 함수 (auth.ts, spots.ts, reviews.ts, bookmarks.ts, search.ts, courses.ts)
+  api/          # 도메인별 API 함수 (auth.ts, spots.ts, works.ts, reviews.ts, bookmarks.ts, search.ts, courses.ts)
   components/   # 여러 화면에서 재사용하는 UI 조각 (Button, Card, BottomNav 등)
   pages/        # 화면 단위 컴포넌트. 라우트 하나당 파일 하나 (PRD의 S-01~S-11과 대응)
   store/        # Zustand 전역 상태 (useAuthStore, useLocaleStore)
@@ -65,6 +65,7 @@ React Router로 화면 단위 페이지를 분리한다 (PRD 6장 결정).
 | `/` | S-02 메인 | ❌ |
 | `/search` | S-03 검색 결과 | ❌ |
 | `/spots/:spotId` | S-05 명소 상세 | ❌ |
+| `/works/:workId` | (PRD/Phase에 없음, 별도 정리 필요) 작품 상세 | ❌ |
 | `/bookmarks` | S-06 즐겨찾기 목록 | ✅ |
 | `/spots/:spotId/reviews/new` | S-07 리뷰 작성 | ✅ |
 | `/reviews/:reviewId/edit` | S-07 리뷰 수정 | ✅ |
@@ -201,7 +202,17 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 - 명소 상세로 이동하는 진입점: 메인 화면 Top10/추천 카드(`RecommendedSpots.tsx`, `TopPlacesCarousel.tsx`), 검색 결과의 명소 카드(`SearchPage.tsx`)를 이번에 `/spots/{id}`로 연결했다 (Phase2/3 때 "Phase4 끝나면 연결" 하기로 했던 부분).
 - 예외: 없는 명소 → "존재하지 않습니다"
 
-**참고 — 작품 상세는 별도**: Figma엔 "작품 상세"(node-id `102:1174`, 작품 정보 + 그 작품의 촬영지 목록) 화면도 있지만, PRD/Phase 문서 어디에도 없고 BE API(`GET /api/works/{id}/` 같은)도 없다. FE는 API 스펙만 정리해서 전달했고(2026-08-30), BE가 준비되면 별도로 진행한다. 그 전까지 검색 결과의 "작품" 카드는 클릭해도 이동하지 않는다.
+### 작품 상세 — `pages/WorkDetailPage.tsx` (`/works/:workId`, 2026-08-30 구현)
+**PRD/Phase 문서에 없는 화면이다.** Figma엔 "작품 상세"(node-id `102:1174`, 작품 정보 + 그 작품의 촬영지 목록) 목업이 있는데, 사용자가 "라우트는 FE에서 정하면 되니까 먼저 만들고 API는 나중에 BE와 상의하겠다"고 해서 FE(라우트+화면+API 함수)만 먼저 만들었다. 나중에 어느 Phase에 넣을지는 별도로 정리해야 한다.
+- API: `GET /api/works/{work_id}/` — **BE에 아직 없다.** `src/api/works.ts`의 `getWorkDetail()`이 이 경로로 스펙대로 호출하도록만 만들어뒀고, BE가 구현하면 FE 수정 없이 바로 동작한다. 그 전까지는 항상 실패 → "존재하지 않습니다"로 보인다(정상).
+- 응답 스펙(안): `{ id, title, description, category, release_date, main_cast, director, poster_url, places: [{id,name,address,photo_url}] }`
+- Figma 목업과 실제 `Work` 모델이 안 맞는 부분:
+  1. 목업의 "극본" 행 — `Work` 모델에 해당 필드가 없어서 **뺐다**.
+  2. 목업의 "방영날짜"는 시작~종료 범위지만, `Work.release_date`는 날짜 하나뿐이라 **시작일만** 보여준다.
+  3. 목업엔 히어로 이미지에 북마크(즐겨찾기) 아이콘이 있지만, PRD상 즐겨찾기는 명소/코스에만 있는 기능이라(작품 즐겨찾기 자체가 없음) **넣지 않았다**.
+- "자세히 보러가기" 버튼은 목적지가 정해진 게 없어 정적(비활성)으로만 둔다.
+- 진입점: 검색 결과의 작품 카드(`SearchPage.tsx`), 명소 상세의 작품 태그(`SpotDetailPage.tsx`)를 `/works/{id}`로 연결했다.
+- 예외: 없는 작품 → "존재하지 않습니다"
 
 ### S-06. 즐겨찾기 목록 — `pages/BookmarksPage.tsx`
 - API: `GET /account/bookmarks`, `POST /spots/{spotId}/bookmark`, `DELETE /spots/{spotId}/bookmark` (전부 계획)

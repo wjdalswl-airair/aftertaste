@@ -55,5 +55,15 @@
     "mapUnavailable": "Map unavailable",
     "noCoordinates": "No location data",
     "directions": "Directions"
+  },
+  "workDetail": {
+    "notFound": "Not found",
+    "mainCast": "Cast",
+    "director": "Director",
+    "releaseDate": "Release date",
+    "storyTitle": "The story",
+    "detailButton": "See more",
+    "placesTitle": "Filming spots in \"{{title}}\"",
+    "placesEmpty": "No filming spots yet"
   }
 }

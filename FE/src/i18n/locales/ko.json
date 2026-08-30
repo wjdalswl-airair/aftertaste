@@ -55,5 +55,15 @@
     "mapUnavailable": "지도를 표시할 수 없어요",
     "noCoordinates": "위치 정보가 없어요",
     "directions": "길찾기"
+  },
+  "workDetail": {
+    "notFound": "존재하지 않습니다",
+    "mainCast": "주연",
+    "director": "연출",
+    "releaseDate": "방영날짜",
+    "storyTitle": "이 작품의 이야기",
+    "detailButton": "자세히 보러가기",
+    "placesTitle": "<{{title}}> 촬영지",
+    "placesEmpty": "아직 등록된 촬영지가 없어요"
   }
 }

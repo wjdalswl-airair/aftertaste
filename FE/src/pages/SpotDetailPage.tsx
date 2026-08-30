@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { getPlaceDetail, type PlaceDetail } from '../api/spots'
 import { BottomNav } from '../components/BottomNav'
 import { FavoriteButton } from '../components/FavoriteButton'
@@ -83,10 +83,10 @@ export function SpotDetailPage() {
             <div className="flex items-start justify-between">
               <div className="flex flex-col gap-1">
                 {place.works[0] && (
-                  <p className="text-sm text-primary">
+                  <Link to={`/works/${place.works[0].work.id}`} className="text-sm text-primary">
                     {place.works[0].work.category === 'DRAMA' ? t('searchPage.filters.drama') : t('searchPage.filters.movie')}{' '}
                     &lt;{place.works[0].work.title}&gt;
-                  </p>
+                  </Link>
                 )}
                 <p className="text-2xl font-bold text-ink">{place.name}</p>
               </div>

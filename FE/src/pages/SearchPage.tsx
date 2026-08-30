@@ -169,6 +169,7 @@ export function SearchPage() {
                 {filteredWorks.map((work) => (
                   <ResultRow
                     key={work.id}
+                    to={`/works/${work.id}`}
                     thumbnail={work.poster_url}
                     title={work.title}
                     subtitle={work.category === 'DRAMA' ? t('searchPage.filters.drama') : t('searchPage.filters.movie')}
@@ -253,7 +254,6 @@ type ResultRowProps = {
   thumbnail: string
   title: string
   subtitle: string
-  // 이동할 곳이 있을 때만 넘긴다 (명소 상세는 있지만, 작품 상세는 아직 없음).
   to?: string
 }
 

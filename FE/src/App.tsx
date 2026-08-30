@@ -6,6 +6,7 @@ import { LoginPage } from './pages/LoginPage'
 import { MainPage } from './pages/MainPage'
 import { SearchPage } from './pages/SearchPage'
 import { SpotDetailPage } from './pages/SpotDetailPage'
+import { WorkDetailPage } from './pages/WorkDetailPage'
 import { useAuthStore } from './store/useAuthStore'
 
 // Phase 1에서 로그인 가드가 실제로 동작하는지 확인하기 위한 임시 화면.
@@ -33,6 +34,7 @@ function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/search" element={<SearchPage />} />
       <Route path="/spots/:placeId" element={<SpotDetailPage />} />
+      <Route path="/works/:workId" element={<WorkDetailPage />} />
       <Route element={<RequireAuth />}>
         <Route path="/mypage" element={<TempMyPage />} />
       </Route>
