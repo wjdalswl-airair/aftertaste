@@ -28,7 +28,9 @@ class Review(models.Model):
     # 리뷰를 쓸 때 사용한 언어 (예: "ko", "en"). 값 자체를 검증하는 지원 언어 목록은
     # 아직 안 정해졌다 (docs/DETAIL_SPEC.md 7장 #8) — 지금은 프론트가 보내는 값을 그대로 저장한다.
     language = models.CharField(max_length=10)
-    # 관리자가 신고를 확인하고 감출 때 True로 바꾼다 (건수 자동 숨김 아님, 6-1 #13)
+    # 서로 다른 사람이 REVIEW_REPORT_HIDE_THRESHOLD명 신고하면 그 순간 자동으로 True가 되고
+    # (reviews/views.py ReviewReportView), 관리자가 admin에서 직접 감추거나 다시 풀 수도
+    # 있다 (6-1 #13, 2026-08-29).
     is_hidden = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -71,8 +73,11 @@ class ReviewLike(models.Model):
 class ReviewReport(models.Model):
     """리뷰 신고. 한 사람이 같은 리뷰를 여러 번 신고해도 한 건만 접수한다.
 
-    처리는 건수와 상관없이 관리자가 Django admin에서 수동으로 확인하고 Review.is_hidden을
-    감춘다. 자동 임계치 숨김 기능은 만들지 않는다 (docs/DETAIL_SPEC.md 6-1 #13).
+    서로 다른 사람이 REVIEW_REPORT_HIDE_THRESHOLD명 신고하면 그 순간 Review.is_hidden을
+    자동으로 True로 바꾼다 (docs/DETAIL_SPEC.md 6-1 #13, 2026-08-29. 처리 위치는
+    reviews/views.py ReviewReportView). 신고 수가 임계값에 "딱 도달"하는 한 번만
+    처리하므로, 관리자가 admin에서 확인 후 풀어준 리뷰는 이후 신고로 다시 자동 숨김되지
+    않는다. 관리자의 수동 숨김·해제는 admin에서 그대로 한다.
     """
 
     review = models.ForeignKey(Review, on_delete=models.CASCADE, related_name="reports")
