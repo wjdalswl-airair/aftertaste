@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { LanguageSheet } from './components/LanguageSheet'
 import { RequireAuth } from './components/RequireAuth'
 import { useInitAuth } from './hooks/useInitAuth'
 import { LoginPage } from './pages/LoginPage'
@@ -10,8 +11,13 @@ import { useAuthStore } from './store/useAuthStore'
 function TempMyPage() {
   const member = useAuthStore((state) => state.member)
   return (
-    <main className="flex min-h-dvh items-center justify-center">
-      <p className="text-ink">로그인됨: {member?.nickname}</p>
+    <main className="flex min-h-dvh flex-col">
+      <header className="flex items-center justify-end px-4 pt-6">
+        <LanguageSheet />
+      </header>
+      <div className="flex flex-1 items-center justify-center">
+        <p className="text-ink">로그인됨: {member?.nickname}</p>
+      </div>
     </main>
   )
 }

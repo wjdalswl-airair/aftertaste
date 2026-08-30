@@ -35,33 +35,35 @@ export function LanguageSheet() {
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end">
+        <div className="fixed inset-0 z-50 mx-auto w-full max-w-[480px]">
           <button
             type="button"
             aria-label="닫기"
             className="absolute inset-0 bg-black/40"
             onClick={() => setOpen(false)}
           />
-          <div className="relative w-full animate-[sheet-up_0.2s_ease-out] rounded-t-2xl bg-white p-4 pb-8">
-            {OPTIONS.map((option) => (
+          <div className="absolute inset-x-0 bottom-0 flex flex-col">
+            <div className="w-full animate-[sheet-up_0.2s_ease-out] rounded-t-2xl bg-white p-4 pb-8">
+              {OPTIONS.map((option) => (
+                <button
+                  key={option.nationality}
+                  type="button"
+                  onClick={() => handleSelect(option)}
+                  className={`block w-full rounded-lg px-4 py-3 text-center ${
+                    option.nationality === nationality ? 'font-bold text-primary' : 'text-ink'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
               <button
-                key={option.nationality}
                 type="button"
-                onClick={() => handleSelect(option)}
-                className={`block w-full rounded-lg px-4 py-3 text-center ${
-                  option.nationality === nationality ? 'font-bold text-primary' : 'text-ink'
-                }`}
+                onClick={() => setOpen(false)}
+                className="mt-2 block w-full py-3 text-center text-ink-tertiary"
               >
-                {option.label}
+                취소
               </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="mt-2 block w-full py-3 text-center text-ink-tertiary"
-            >
-              취소
-            </button>
+            </div>
           </div>
         </div>
       )}

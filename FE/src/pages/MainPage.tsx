@@ -1,7 +1,8 @@
+import { LogIn } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router-dom'
 import { BottomNav } from '../components/BottomNav'
 import { Hero } from '../components/Hero'
-import { LanguageSheet } from '../components/LanguageSheet'
 import { RecommendedSpots } from '../components/RecommendedSpots'
 import { TopPlacesCarousel } from '../components/TopPlacesCarousel'
 import { useAuthStore } from '../store/useAuthStore'
@@ -15,7 +16,11 @@ export function MainPage() {
     <main className="flex min-h-dvh flex-col gap-6 pb-24">
       <header className="flex items-center justify-between px-4 pt-6">
         <p className="font-brand text-2xl font-bold text-primary">여운</p>
-        <LanguageSheet />
+        {!isLoading && !member && (
+          <Link to="/login" aria-label="로그인">
+            <LogIn size={22} className="text-ink" />
+          </Link>
+        )}
       </header>
 
       <div className="px-4">
