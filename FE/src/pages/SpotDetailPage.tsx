@@ -15,6 +15,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { getPlaceDetail, type PlaceDetail } from '../api/spots'
 import { BottomNav } from '../components/BottomNav'
 import { FavoriteButton } from '../components/FavoriteButton'
+import { RatingModal } from '../components/RatingModal'
 import { Skeleton } from '../components/Skeleton'
 import { loadKakaoMaps } from '../lib/kakaoMap'
 import { useAuthStore } from '../store/useAuthStore'
@@ -27,6 +28,7 @@ export function SpotDetailPage() {
 
   // undefined: 로딩 중, null: 존재하지 않거나 실패
   const [place, setPlace] = useState<PlaceDetail | null | undefined>(undefined)
+  const [showRatingModal, setShowRatingModal] = useState(false)
 
   useEffect(() => {
     setPlace(undefined)
@@ -39,20 +41,30 @@ export function SpotDetailPage() {
     navigator.clipboard.writeText(window.location.href).catch(() => {})
   }
 
-  function handleReviewAction() {
+  function requireLogin() {
     if (!member) {
       navigate('/login', { state: { message: '로그인이 필요한 기능입니다' } })
+      return false
     }
-    // 로그인 상태의 실제 별점/리뷰 작성은 Phase5에서 만든다.
+    return true
+  }
+
+  // 리뷰 작성 화면엔 별점 UI가 없어서(Figma 목업과 동일하게), "별점 남기기"/"리뷰 남기기"
+  // 둘 다 먼저 이 모달에서 별점을 고른 뒤에 작성 화면으로 넘어간다.
+  function handleReviewClick() {
+    if (requireLogin()) {
+      setShowRatingModal(true)
+    }
   }
 
   return (
     <main className="flex min-h-dvh flex-col gap-8 pb-24">
-      <header className="flex items-center justify-between px-4 pt-6">
+      <header className="grid min-h-16 grid-cols-[24px_1fr_24px] items-center px-4 pt-6">
         <button type="button" onClick={() => navigate(-1)} aria-label="뒤로가기">
           <ArrowLeft size={24} className="text-ink" />
         </button>
-        <button type="button" onClick={handleShare} aria-label="공유">
+        <div />
+        <button type="button" onClick={handleShare} aria-label="공유" className="justify-self-end">
           <Share2 size={22} className="text-ink" />
         </button>
       </header>
@@ -88,7 +100,7 @@ export function SpotDetailPage() {
                     &lt;{place.works[0].work.title}&gt;
                   </Link>
                 )}
-                <p className="text-2xl font-bold text-ink">{place.name}</p>
+                <p className="text-xl font-bold text-ink">{place.name}</p>
               </div>
               {place.review_count > 0 && (
                 <div className="flex shrink-0 items-center gap-1 pt-1">
@@ -124,14 +136,14 @@ export function SpotDetailPage() {
             <div className="flex gap-2.5">
               <button
                 type="button"
-                onClick={handleReviewAction}
+                onClick={handleReviewClick}
                 className="flex-1 rounded-full border border-primary py-3 text-sm font-medium text-primary"
               >
                 {t('spotDetail.rateButton')}
               </button>
               <button
                 type="button"
-                onClick={handleReviewAction}
+                onClick={handleReviewClick}
                 className="flex-1 rounded-full bg-primary py-3 text-sm font-medium text-white"
               >
                 {t('spotDetail.reviewButton')}
@@ -140,13 +152,24 @@ export function SpotDetailPage() {
           </div>
 
           <section className="px-4">
-            <h2 className="mb-3 text-lg font-bold text-ink">{t('spotDetail.reviewsTitle')}</h2>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-ink">{t('spotDetail.reviewsTitle')}</h2>
+              {place.reviews.length > 0 && (
+                <Link to={`/spots/${placeId}/reviews`} className="text-sm text-ink-tertiary">
+                  {t('spotDetail.reviewsMore')}
+                </Link>
+              )}
+            </div>
             {place.reviews.length === 0 ? (
               <p className="text-sm text-ink-tertiary">{t('spotDetail.reviewsEmpty')}</p>
             ) : (
               <div className="scrollbar-hide flex gap-3 overflow-x-auto">
                 {place.reviews.map((review) => (
-                  <div key={review.id} className="w-[110px] flex-shrink-0">
+                  <Link
+                    key={review.id}
+                    to={`/spots/${placeId}/reviews/${review.id}`}
+                    className="w-[110px] flex-shrink-0"
+                  >
                     {review.photos[0] ? (
                       <img
                         src={review.photos[0].photo_url}
@@ -156,9 +179,9 @@ export function SpotDetailPage() {
                     ) : (
                       <div className="h-[110px] w-full rounded-xl bg-divider" />
                     )}
-                    <p className="mt-1 truncate text-[11px] text-ink">{review.author_nickname}</p>
-                    <p className="truncate text-[11px] text-ink-secondary">{review.content}</p>
-                  </div>
+                    <p className="mt-2 truncate pl-3 text-xs text-ink">{review.author_nickname}</p>
+                    <p className="truncate pl-3 text-xs text-ink-secondary">{review.content}</p>
+                  </Link>
                 ))}
               </div>
             )}
@@ -179,6 +202,17 @@ export function SpotDetailPage() {
             <SpotMap place={place} />
           </section>
         </>
+      )}
+
+      {showRatingModal && place && (
+        <RatingModal
+          place={{ name: place.name, photo_url: place.photo_url }}
+          onClose={() => setShowRatingModal(false)}
+          onNext={(rating) => {
+            setShowRatingModal(false)
+            navigate(`/spots/${placeId}/reviews/new`, { state: { rating } })
+          }}
+        />
       )}
 
       <BottomNav />

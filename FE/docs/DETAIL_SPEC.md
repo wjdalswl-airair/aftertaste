@@ -222,9 +222,19 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 - `/mypage`(진짜 마이페이지, Phase7)에 진입 링크를 아직 안 넣었다 — 사용자 확인 후 이번엔 화면/로직만 먼저 만들고 진입 동선은 나중에 연결하기로 함(2026-08-30).
 - 예외: 비로그인 시도 → `RequireAuth`가 "로그인이 필요한 기능입니다" 안내 후 `/login`으로. 저장한 게 없으면 빈 상태(오류 아님).
 
-### S-07. 리뷰 작성/수정 — `pages/ReviewFormPage.tsx`
-- 컴포넌트: 별점, 텍스트, 사진 업로드
-- API: `POST /spots/{spotId}/reviews`, `PATCH /reviews/{reviewId}`, `DELETE /reviews/{reviewId}` (전부 계획)
+### S-07. 리뷰 작성/수정/삭제 — `pages/ReviewFormPage.tsx`, `ReviewListPage.tsx`, `ReviewDetailPage.tsx` (Phase 6, 구현 완료 — 2026-08-30)
+- API (전부 확정, 실제 BE 코드로 확인함 — `reviews/views.py`):
+  - `GET/POST /api/places/{place_id}/reviews/` — 목록(로그인 불필요)/작성(로그인 필요, `rating` 1~5·`content` 필수 최대 500자·`language`·`photo_urls`).
+  - `PATCH/DELETE /api/reviews/{id}/` — 수정/삭제, 작성자 본인만(403). 삭제는 이미 없는 리뷰도 204(조용히 성공).
+  - `POST/DELETE /api/reviews/{id}/like/` — 좋아요/취소.
+- **좋아요 UI를 이번 Phase에 포함시켰다.** `PHASE6.md` 원안엔 "좋아요·신고 버튼은 화면에 없다"고 돼 있었지만, Figma 목업(리뷰 더보기/상세 화면)에 하트가 있고 BE API도 이미 구현돼 있어서 사용자 확인 후 포함했다(2026-08-30). 신고는 목업에도 없어서 계속 범위 밖.
+- `content`가 BE 모델에서 필수(빈 값 불가)라 **별점만 단독으로 등록하는 API 자체가 없다.** 그래서 "별점 등록" 모달(`RatingModal.tsx`)은 서버에 아무것도 안 보내고 고른 별점 값만 들고 리뷰 작성 화면으로 이동하며, 거기서 텍스트까지 채워야 최종 등록(POST)된다.
+- Figma "리뷰 등록" 목업엔 별점 UI가 안 보였지만, `rating`이 없으면 제출 자체가 불가능해서 작성 화면에도 별점 줄을 추가했다(모달에서 값 넘어오면 미리 선택됨, 직접 바꿀 수도 있음). 같은 화면에 명확한 "등록" 버튼도 캡처에 안 잡혀서 하단에 직접 추가했다.
+- **`GET /api/reviews/{id}/`(리뷰 단건 조회)가 없다.** "리뷰 더보기"/"리뷰 상세" 화면은 명소별 목록(`GET /api/places/{id}/reviews/`)에서 해당 id를 찾아 쓰는 방식으로 우회했다 — 그래서 라우트를 `/spots/:placeId/reviews`, `/spots/:placeId/reviews/:reviewId`처럼 명소 하위로 중첩했다.
+- **`ReviewSerializer`에 "내가 쓴 글인지" 여부 필드가 없다** (즐겨찾기의 `is_favorited`, 좋아요의 `is_liked_by_me` 같은 필드가 리뷰엔 없음). 지금은 로그인한 회원의 닉네임과 `author_nickname` 문자열을 비교하는 걸로 임시 처리했다 — 닉네임이 겹치면 오작동할 수 있어 정확한 방법이 아니다. BE에 `is_mine` 같은 필드 추가를 요청해야 한다.
+- 리뷰 더보기의 "최신순/인기순"은 서버를 다시 안 부르고 이미 받아온 목록을 클라이언트에서 `created_at`/`like_count` 기준으로 정렬한다.
+- 사진은 Firebase Storage에 먼저 업로드(`src/lib/reviewPhotoUpload.ts`, `reviews/{uid}/{timestamp}-{filename}` 경로)한 뒤 URL을 `photo_urls`로 보낸다. `src/lib/firebase.ts`에 `storage` export를 새로 추가했다.
+- 명소 상세의 "방문자 리뷰" 섹션에 "더보기" 링크와 카드별 상세 링크를 추가했다(목업엔 명시된 진입 동선이 없어서 직접 추가).
 
 ### S-08. 코스 — `pages/CoursePage.tsx`
 - API: `GET /spots/{spotId}/courses` (계획), `GET /courses/{courseId}/share` (계획)
