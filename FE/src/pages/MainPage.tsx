@@ -28,7 +28,7 @@ export function MainPage() {
           {t('mainPage.greeting.hello')}
           {!isLoading && member && t('mainPage.greeting.nameSuffix', { name: member.nickname })}
         </h1>
-        <p className="mt-1 text-sm text-ink-secondary">{t('mainPage.greeting.subtitle')}</p>
+        <p className="mt-2 text-ink-secondary">{t('mainPage.greeting.subtitle')}</p>
       </div>
 
       <Hero />

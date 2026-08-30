@@ -98,7 +98,7 @@ export function SearchPage() {
         {submittedQuery ? (
           <h1 className="text-xl font-bold text-ink">{t('searchPage.resultsTitle', { query: submittedQuery })}</h1>
         ) : (
-          <h1 className="whitespace-pre-line text-2xl font-bold text-ink">{t('searchPage.title')}</h1>
+          <h1 className="whitespace-pre-line text-xl font-bold text-ink">{t('searchPage.title')}</h1>
         )}
       </div>
 
@@ -207,8 +207,8 @@ export function SearchPage() {
           {recentSearches.length > 0 && (
             <section className="px-4">
               <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-sm font-bold text-ink">{t('searchPage.recentSearchesTitle')}</h2>
-                <button type="button" onClick={clearRecentSearches} className="text-xs text-ink-tertiary">
+                <h2 className="text-base font-bold text-ink">{t('searchPage.recentSearchesTitle')}</h2>
+                <button type="button" onClick={clearRecentSearches} className="text-sm text-ink-tertiary">
                   {t('searchPage.recentSearchesClear')}
                 </button>
               </div>
@@ -220,7 +220,7 @@ export function SearchPage() {
                     onClick={() => handleSubmit(keyword)}
                     className="rounded-full border border-ink-tertiary px-3 py-2 text-sm text-ink-secondary"
                   >
-                    {keyword}
+                    #{keyword}
                   </button>
                 ))}
               </div>
@@ -228,7 +228,7 @@ export function SearchPage() {
           )}
 
           <section className="px-4 mt-6">
-            <h2 className="mb-4 text-sm font-bold text-ink">{t('searchPage.popularKeywordsTitle')}</h2>
+            <h2 className="mb-4 text-base font-bold text-ink">{t('searchPage.popularKeywordsTitle')}</h2>
             <div className="flex flex-wrap gap-3">
               {popularKeywords.map((keyword) => (
                 <button
