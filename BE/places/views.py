@@ -377,6 +377,7 @@ class RecommendationView(APIView):
         parameters=[
             OpenApiParameter("lat", float, description="현재 위도 (선택)"),
             OpenApiParameter("lng", float, description="현재 경도 (선택)"),
+            OpenApiParameter("lang", str, description="응답 언어 (예: en). 안 주면 로그인 회원의 언어 → 한국어 순"),
         ],
         responses={200: RecommendResponseSerializer},
     )
@@ -392,7 +393,12 @@ class RecommendationView(APIView):
         else:
             places = _random_places(RECOMMEND_COUNT)
 
-        return Response({"places": PlaceSearchSerializer(places, many=True).data})
+        # SearchView·PlaceDetailView와 같은 방식으로 응답 언어를 정한다: ?lang= → 로그인
+        # 회원의 언어 → 한국어 원문. 이걸 안 넘기면 추천 목록만 항상 한국어로 나갔다.
+        language = resolve_language(request)
+        return Response(
+            {"places": PlaceSearchSerializer(places, many=True, context={"language": language}).data}
+        )
 
 
 def _fetch_nearby_places(place):
