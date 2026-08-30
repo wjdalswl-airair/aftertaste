@@ -9,6 +9,7 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from config.api_messages import NOT_FOUND_MESSAGE
 from favorites.models import Favorite
 from places.models import Place, PlaceWork, SearchHistory, Work
 from reviews.models import Review
@@ -54,7 +55,6 @@ FAVORITE_SCORE_WEIGHT = 1
 REVIEW_SCORE_WEIGHT = 1
 
 NO_RESULT_MESSAGE = "검색결과가 존재하지 않습니다"
-NOT_FOUND_MESSAGE = "존재하지 않습니다"
 
 # 명소 상세의 "주변 상권" 조회 설정. 반경 1km 안에서 음식점·카페·관광명소 카테고리를
 # 각각 카카오 카테고리 검색으로 가져와 합친다 (PHASES/PHASE2.md 2-5 "주변 상권 검색 기준", 2026-08-19).

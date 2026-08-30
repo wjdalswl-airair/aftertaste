@@ -3,12 +3,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from config.api_messages import NOT_FOUND_MESSAGE
 from courses.models import Course
 from favorites.models import Favorite
-from favorites.serializers import FavoriteSerializer
+from favorites.serializers import FavoriteListResponseSerializer, FavoriteSerializer
 from places.models import Place
-
-NOT_FOUND_MESSAGE = "존재하지 않습니다"
 
 
 class MyFavoriteListView(APIView):
@@ -18,7 +17,7 @@ class MyFavoriteListView(APIView):
 
     @extend_schema(
         summary="내 즐겨찾기 조회",
-        responses={200: FavoriteSerializer(many=True), 401: OpenApiResponse(description="로그인 필요")},
+        responses={200: FavoriteListResponseSerializer, 401: OpenApiResponse(description="로그인 필요")},
     )
     def get(self, request):
         favorites = (

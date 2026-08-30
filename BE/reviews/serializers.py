@@ -53,6 +53,14 @@ class ReviewSerializer(serializers.ModelSerializer):
         return obj.likes.filter(member=request.user).exists()
 
 
+class ReviewListResponseSerializer(serializers.Serializer):
+    """리뷰 목록 응답 형태. 배열을 그대로 주지 않고 reviews 키로 감싼다
+    (main 앱의 *ResponseSerializer, places의 SearchResponseSerializer와 같은 방식).
+    실제 뷰 응답 모양과 Swagger 문서를 일치시키기 위한 것이다."""
+
+    reviews = ReviewSerializer(many=True)
+
+
 class ReviewWriteSerializer(serializers.ModelSerializer):
     """리뷰 쓰기·고치기에 쓰는 시리얼라이저. photo_urls로 사진 URL 목록을 받는다.
 

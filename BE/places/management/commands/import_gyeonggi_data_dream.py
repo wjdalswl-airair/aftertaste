@@ -73,6 +73,8 @@ class Command(BaseCommand):
 
                 best_match = candidates[0]
                 address = best_match.get("road_address_name") or best_match.get("address_name") or ""
+                # 카카오 지오코딩이 준 좌표는 이미 float라 to_decimal이 실패할 일이 없다.
+                # 그래서 다른 import 커맨드와 달리 성공여부(두 번째 반환값)는 확인하지 않는다.
                 latitude, _ = to_decimal(best_match.get("latitude"))
                 longitude, _ = to_decimal(best_match.get("longitude"))
 

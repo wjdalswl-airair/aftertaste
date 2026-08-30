@@ -4,11 +4,15 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from config.api_messages import NOT_FOUND_MESSAGE
 from places.models import Place
 from reviews.models import REVIEW_REPORT_HIDE_THRESHOLD, Review, ReviewLike, ReviewReport
-from reviews.serializers import ReviewReportSerializer, ReviewSerializer, ReviewWriteSerializer
-
-NOT_FOUND_MESSAGE = "존재하지 않습니다"
+from reviews.serializers import (
+    ReviewListResponseSerializer,
+    ReviewReportSerializer,
+    ReviewSerializer,
+    ReviewWriteSerializer,
+)
 
 
 def _visible_reviews(place):
@@ -39,7 +43,7 @@ class PlaceReviewListCreateView(APIView):
     @extend_schema(
         summary="명소 리뷰 목록 조회",
         description="관리자가 감추지 않은 리뷰를 최신순으로 반환한다. 로그인이 필요 없다.",
-        responses={200: ReviewSerializer(many=True), 404: OpenApiResponse(description="명소 없음")},
+        responses={200: ReviewListResponseSerializer, 404: OpenApiResponse(description="명소 없음")},
     )
     def get(self, request, place_id):
         try:
@@ -176,7 +180,7 @@ class MyReviewListView(APIView):
 
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(summary="내 리뷰 조회", responses={200: ReviewSerializer(many=True), 401: OpenApiResponse(description="로그인 필요")})
+    @extend_schema(summary="내 리뷰 조회", responses={200: ReviewListResponseSerializer, 401: OpenApiResponse(description="로그인 필요")})
     def get(self, request):
         reviews = Review.objects.filter(member=request.user).order_by("-created_at")
         return Response({"reviews": ReviewSerializer(reviews, many=True, context={"request": request}).data})

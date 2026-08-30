@@ -4,11 +4,14 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from config.api_messages import NOT_FOUND_MESSAGE
 from courses.models import Course
-from courses.serializers import CourseSerializer, CourseWriteSerializer
+from courses.serializers import (
+    CourseListResponseSerializer,
+    CourseSerializer,
+    CourseWriteSerializer,
+)
 from places.models import Place
-
-NOT_FOUND_MESSAGE = "존재하지 않습니다"
 
 
 class PlaceCourseListCreateView(APIView):
@@ -34,7 +37,7 @@ class PlaceCourseListCreateView(APIView):
     @extend_schema(
         summary="명소 기준 코스 목록 조회",
         description="이 명소를 기준으로 만들어진 코스 목록을 반환한다. 로그인이 필요 없다.",
-        responses={200: CourseSerializer(many=True), 404: OpenApiResponse(description="명소 없음")},
+        responses={200: CourseListResponseSerializer, 404: OpenApiResponse(description="명소 없음")},
     )
     def get(self, request, place_id):
         try:
@@ -140,7 +143,7 @@ class MyCourseListView(APIView):
 
     @extend_schema(
         summary="내 코스 조회",
-        responses={200: CourseSerializer(many=True), 401: OpenApiResponse(description="로그인 필요")},
+        responses={200: CourseListResponseSerializer, 401: OpenApiResponse(description="로그인 필요")},
     )
     def get(self, request):
         courses = (
