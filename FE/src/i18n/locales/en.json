@@ -1,0 +1,22 @@
+{
+  "mainPage": {
+    "greeting": {
+      "hello": "Hello",
+      "nameSuffix": ", {{name}}",
+      "subtitle": "Where would you like to explore today?"
+    },
+    "hero": {
+      "title": "This Week's Hall of Fame",
+      "recommendTitle": "How about this place?",
+      "empty": "Coming soon"
+    },
+    "topPlaces": {
+      "title": "Top 10 Nationwide",
+      "empty": "Coming soon"
+    },
+    "recommend": {
+      "title": "Nearby Spots",
+      "empty": "Coming soon"
+    }
+  }
+}

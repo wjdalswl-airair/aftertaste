@@ -1,5 +1,51 @@
 @import "tailwindcss";
 
+/* 로고/브랜드 텍스트 전용 폰트 (유한킴벌리 푸른숲체) */
+@font-face {
+  font-family: '푸른숲체';
+  src: url('./assets/fonts/유한킴벌리_푸른숲체_Light.woff2') format('woff2');
+  font-weight: 300;
+  font-display: swap;
+}
+@font-face {
+  font-family: '푸른숲체';
+  src: url('./assets/fonts/유한킴벌리_푸른숲체_Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: '푸른숲체';
+  src: url('./assets/fonts/유한킴벌리_푸른숲체_Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+
+/* 본문 전용 폰트 (IBM Plex Sans KR) */
+@font-face {
+  font-family: 'IBMPlexSansKR';
+  src: url('./assets/fonts/IBMPlexSansKR-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'IBMPlexSansKR';
+  src: url('./assets/fonts/IBMPlexSansKR-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'IBMPlexSansKR';
+  src: url('./assets/fonts/IBMPlexSansKR-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'IBMPlexSansKR';
+  src: url('./assets/fonts/IBMPlexSansKR-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+
 /*
   여운 Design System 토큰 (Figma "Yeoun Design System" 프레임 기준)
   값을 바꿔야 하면 Figma가 먼저 바뀌어야 한다. 여기서 임의로 값만 고치지 않는다.
@@ -7,7 +53,7 @@
 @theme {
   --color-primary: #f47c5c;
   --color-accent: #f8b08b;
-  --color-background: #fff5f0;
+  --color-background: #ffffff;
   --color-ink: #2b2320;
   --color-ink-secondary: #9c8ab0;
   --color-ink-tertiary: #c9bab0;
@@ -20,14 +66,33 @@
   --radius-xl: 24px;
   --radius-2xl: 28px;
 
-  --font-sans: 'Noto Sans KR', system-ui, sans-serif;
-  --font-brand: 'Gowun Batang', serif;
+  --font-sans: 'IBMPlexSansKR', system-ui, sans-serif;
+  --font-brand: '푸른숲체', serif;
 }
 
 body {
   margin: 0;
   background: var(--color-background);
   color: var(--color-ink);
+}
+
+/* 가로 스크롤 캐러셀에서 스크롤바를 숨긴다 (배너/Top10/추천 카드 등) */
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* 바텀시트가 아래에서 올라오는 애니메이션 (LanguageSheet) */
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
 }
 
 #root {

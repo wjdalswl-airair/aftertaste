@@ -49,8 +49,9 @@
 - build: `npm run build`
 - lint: `npm run lint`
 - preview: `npm run preview`
+- test: `npm run test` (Vitest)
 
-테스트 러너는 Vitest로 결정됨 (아직 설치 전). 범위는 넓게 잡지 않는다 — API 함수(성공/실패 처리), Zustand 스토어 로직, 로그인 여부에 따른 라우팅 가드만 테스트한다. 화면 전체나 E2E(Playwright 등)는 이번 범위에서 하지 않는다. 설치 후 `test: npm run test`를 이 섹션에 추가한다.
+테스트 범위는 넓게 잡지 않는다 — API 함수(성공/실패 처리), Zustand 스토어 로직, 로그인 여부에 따른 라우팅 가드만 테스트한다. 화면 전체나 E2E(Playwright 등)는 이번 범위에서 하지 않는다.
 
 # Code Style
 
