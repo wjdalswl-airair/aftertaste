@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getRecommendedSpots, type RecommendedSpot } from '../api/spots'
 import { useGeolocation } from '../hooks/useGeolocation'
+import { FavoriteButton } from './FavoriteButton'
 import { Skeleton } from './Skeleton'
 
 export function RecommendedSpots() {
@@ -39,7 +40,10 @@ export function RecommendedSpots() {
         <div className="scrollbar-hide flex snap-x snap-mandatory gap-3 overflow-x-auto px-4">
           {spots.map((spot) => (
             <div key={spot.id} className="w-[110px] flex-shrink-0 snap-center">
-              <img src={spot.photo_url} alt="" className="aspect-square w-full rounded-md object-cover" />
+              <div className="relative">
+                <img src={spot.photo_url} alt="" className="aspect-square w-full rounded-md object-cover" />
+                <FavoriteButton placeId={spot.id} />
+              </div>
               <p className="mt-1 truncate text-xs text-ink">{spot.name}</p>
               <p className="truncate text-[11px] text-ink-secondary">{spot.address}</p>
             </div>

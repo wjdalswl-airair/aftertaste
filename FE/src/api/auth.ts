@@ -19,7 +19,7 @@ type ErrorBody = { detail?: string }
 
 // 로그인이 필요한 API를 호출할 때 공통으로 쓰는 함수.
 // Firebase가 가진 idToken을 매번 새로 꺼내서 헤더에 붙인다 (토큰을 직접 저장하지 않음).
-async function authorizedFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+export async function authorizedFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const idToken = await auth.currentUser?.getIdToken()
   if (!idToken) {
     throw new Error('로그인이 필요합니다')
