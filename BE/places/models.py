@@ -1,6 +1,7 @@
 from django.db import models
 
 from accounts.models import Member
+from config.constants import LANGUAGE_CODE_MAX_LENGTH
 
 
 class Place(models.Model):
@@ -108,7 +109,7 @@ class PlaceTranslation(models.Model):
     """
 
     place = models.ForeignKey(Place, on_delete=models.CASCADE, related_name="translations")
-    language = models.CharField(max_length=10)
+    language = models.CharField(max_length=LANGUAGE_CODE_MAX_LENGTH)
     name = models.CharField(max_length=200, blank=True)
     description = models.TextField(blank=True)
 
@@ -127,7 +128,7 @@ class WorkTranslation(models.Model):
     """작품 제목·설명의 언어별 번역문. 규칙은 PlaceTranslation과 같다."""
 
     work = models.ForeignKey(Work, on_delete=models.CASCADE, related_name="translations")
-    language = models.CharField(max_length=10)
+    language = models.CharField(max_length=LANGUAGE_CODE_MAX_LENGTH)
     title = models.CharField(max_length=200, blank=True)
     description = models.TextField(blank=True)
 

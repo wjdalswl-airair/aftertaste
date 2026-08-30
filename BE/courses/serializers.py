@@ -58,6 +58,13 @@ class CourseSerializer(serializers.ModelSerializer):
         return "탈퇴한 사용자" if obj.creator.is_withdrawn else obj.creator.nickname
 
 
+class CourseListResponseSerializer(serializers.Serializer):
+    """코스 목록 응답 형태. 배열을 그대로 주지 않고 courses 키로 감싼다
+    (main 앱의 *ResponseSerializer와 같은 방식). 뷰 응답 모양과 Swagger 문서를 맞춘다."""
+
+    courses = CourseSerializer(many=True)
+
+
 class CoursePlaceWriteSerializer(serializers.ModelSerializer):
     """코스 생성·수정 요청에서 장소 하나(식당/카페/그 외)를 받는 입력.
 

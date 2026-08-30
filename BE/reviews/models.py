@@ -2,6 +2,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 from accounts.models import Member
+from config.constants import LANGUAGE_CODE_MAX_LENGTH
 from places.models import Place
 
 # 리뷰 글자 수·사진 장수 제한 (docs/DETAIL_SPEC.md 6-1 #14).
@@ -27,7 +28,7 @@ class Review(models.Model):
     content = models.TextField(max_length=REVIEW_CONTENT_MAX_LENGTH)
     # 리뷰를 쓸 때 사용한 언어 (예: "ko", "en"). 값 자체를 검증하는 지원 언어 목록은
     # 아직 안 정해졌다 (docs/DETAIL_SPEC.md 7장 #8) — 지금은 프론트가 보내는 값을 그대로 저장한다.
-    language = models.CharField(max_length=10)
+    language = models.CharField(max_length=LANGUAGE_CODE_MAX_LENGTH)
     # 서로 다른 사람이 REVIEW_REPORT_HIDE_THRESHOLD명 신고하면 그 순간 자동으로 True가 되고
     # (reviews/views.py ReviewReportView), 관리자가 admin에서 직접 감추거나 다시 풀 수도
     # 있다 (6-1 #13, 2026-08-29).
@@ -100,7 +101,7 @@ class ReviewTranslation(models.Model):
     """
 
     review = models.ForeignKey(Review, on_delete=models.CASCADE, related_name="translations")
-    language = models.CharField(max_length=10)
+    language = models.CharField(max_length=LANGUAGE_CODE_MAX_LENGTH)
     translated_content = models.TextField(blank=True)
 
     class Meta:

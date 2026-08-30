@@ -1,5 +1,7 @@
 from django.db import models
 
+from config.constants import LANGUAGE_CODE_MAX_LENGTH
+
 # 닉네임 최대 길이 (docs/DETAIL_SPEC.md 6-1 #21). 소셜 로그인으로 받은 이름이 이보다
 # 길면 이 길이에 맞춰 잘라서 저장한다 (accounts/views.py LoginView 참고).
 NICKNAME_MAX_LENGTH = 20
@@ -19,7 +21,7 @@ class Member(models.Model):
 
     # 자리만 만들어 둔다. 실제로 값을 채우는 화면은 Phase 2.
     nationality = models.CharField(max_length=50, null=True, blank=True)
-    language = models.CharField(max_length=20, null=True, blank=True)
+    language = models.CharField(max_length=LANGUAGE_CODE_MAX_LENGTH, null=True, blank=True)
 
     agreed_terms_at = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
