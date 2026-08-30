@@ -20,9 +20,14 @@ from accounts.serializers import (
     MemberUpdateSerializer,
 )
 
+# Firebase ID 토큰의 firebase.sign_in_provider 문자열 → Member.Provider.
+# 카카오는 Firebase 기본 제공자가 아니라, 프론트가 Firebase에 OIDC 커스텀 제공자로
+# 붙여서 쓴다. 그래서 sign_in_provider 값이 "oidc.<프론트가 콘솔에 등록한 providerId>"
+# 형태다. 아래 "oidc.kakao"는 예상값이고, 실제 문자열은 프론트와 맞춰 확정해야 한다
+# (docs/DETAIL_SPEC.md 6-1 #19).
 PROVIDER_BY_SIGN_IN_PROVIDER = {
     "google.com": Member.Provider.GOOGLE,
-    "apple.com": Member.Provider.APPLE,
+    "oidc.kakao": Member.Provider.KAKAO,
 }
 
 
@@ -47,7 +52,7 @@ class LoginView(APIView):
     @extend_schema(
         summary="소셜 로그인 / 자동 회원가입",
         description=(
-            "Firebase ID 토큰(Google·Apple 로그인 결과)을 검증해서 회원을 찾거나 새로 만든다.\n\n"
+            "Firebase ID 토큰(Google·Kakao 로그인 결과)을 검증해서 회원을 찾거나 새로 만든다.\n\n"
             "- 이미 있는 회원이면 body 없이도 200을 반환한다.\n"
             "- 처음 오는 회원이면 body에 `agree_terms: true`가 있어야 가입이 완료된다."
         ),

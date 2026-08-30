@@ -76,16 +76,18 @@ class LoginViewTests(TestCase):
 
     @patch("accounts.authentication.verify_id_token")
     @patch("accounts.views.verify_id_token")
-    def test_apple_login_creates_new_member(self, mock_verify, mock_verify_auth):
-        decoded = make_decoded_token("apple-uid-1", provider="apple.com")
+    def test_kakao_login_creates_new_member(self, mock_verify, mock_verify_auth):
+        # 카카오는 Firebase OIDC 커스텀 제공자로 붙는다 → sign_in_provider가 "oidc.kakao".
+        # (실제 문자열은 프론트가 Firebase 콘솔에 등록한 providerId에 맞춰 확정, DETAIL_SPEC 6-1 #19)
+        decoded = make_decoded_token("kakao-uid-1", provider="oidc.kakao")
         mock_verify.return_value = decoded
         mock_verify_auth.return_value = decoded
 
         response = self.client.post(LOGIN_URL, {"agree_terms": True}, format="json", **self.auth_header)
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        member = Member.objects.get(firebase_uid="apple-uid-1")
-        self.assertEqual(member.provider, Member.Provider.APPLE)
+        member = Member.objects.get(firebase_uid="kakao-uid-1")
+        self.assertEqual(member.provider, Member.Provider.KAKAO)
 
     @patch("accounts.authentication.verify_id_token")
     @patch("accounts.views.verify_id_token")
@@ -590,7 +592,7 @@ class MeNicknamePatchTests(TestCase):
     def test_blank_profile_image_url_clears_it(self, mock_verify):
         member = Member.objects.create(
             firebase_uid="profile-img-clear-uid",
-            provider=Member.Provider.APPLE,
+            provider=Member.Provider.KAKAO,
             profile_image_url="https://old.example.com/a.jpg",
             agreed_terms_at="2026-01-01T00:00:00Z",
         )

@@ -66,7 +66,7 @@ class MemberProfileUpdateSerializer(serializers.ModelSerializer):
 
     프로필 사진은 서버가 파일을 받지 않는다. 리뷰 사진과 똑같이 프론트엔드가
     Firebase Storage에 올린 뒤 그 URL만 보내준다 (docs/DETAIL_SPEC.md 6-1 #2·#25).
-    빈 문자열이나 null을 보내면 사진을 지운다(Apple 로그인처럼 원래 사진이 없을 수도 있다).
+    빈 문자열이나 null을 보내면 사진을 지운다(소셜 로그인 종류에 따라 원래 사진이 없을 수도 있다).
     """
 
     profile_image_url = serializers.URLField(required=False, allow_null=True, allow_blank=True)
