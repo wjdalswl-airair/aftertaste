@@ -194,13 +194,3 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "0.1.0",
     "SERVE_INCLUDE_SCHEMA": False,
 }
-
-
-# Email
-# https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
-
-MAILERS = {
-    "default": {
-        "BACKEND": "django.core.mail.backends.console.EmailBackend",
-    },
-}
