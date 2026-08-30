@@ -138,7 +138,8 @@ class ReviewLikeView(APIView):
 class ReviewReportView(APIView):
     """리뷰 신고. 로그인이 필요하다.
 
-    같은 사람이 같은 리뷰를 여러 번 신고해도 한 건만 접수한다.
+    같은 사람이 같은 리뷰를 여러 번 신고해도 한 건만 접수한다. 새로 접수되면 201,
+    이미 신고한 리뷰를 또 신고하면 200 — 좋아요·즐겨찾기와 같은 멱등 규약이다.
     서로 다른 사람이 REVIEW_REPORT_HIDE_THRESHOLD명 신고하면 그 순간 자동으로 숨긴다
     (DETAIL_SPEC 6-1 #13). 관리자가 확인 후 풀어준 리뷰는 다시 자동으로 숨기지 않는다 —
     신고 수가 임계값을 "막 넘어서는" 그 한 번만 처리하기 때문이다. 관리자의 수동 숨김·해제는
@@ -148,7 +149,9 @@ class ReviewReportView(APIView):
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
-        summary="리뷰 신고", request=ReviewReportSerializer, responses={201: None, 401: OpenApiResponse(description="로그인 필요")}
+        summary="리뷰 신고",
+        request=ReviewReportSerializer,
+        responses={201: None, 200: None, 401: OpenApiResponse(description="로그인 필요")},
     )
     def post(self, request, review_id):
         try:
@@ -165,7 +168,7 @@ class ReviewReportView(APIView):
         if created and review.reports.count() == REVIEW_REPORT_HIDE_THRESHOLD and not review.is_hidden:
             review.is_hidden = True
             review.save(update_fields=["is_hidden"])
-        return Response(status=201)
+        return Response(status=201 if created else 200)
 
 
 class MyReviewListView(APIView):

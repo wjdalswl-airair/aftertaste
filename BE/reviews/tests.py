@@ -478,7 +478,8 @@ class ReviewReportTests(TestCase):
         )
 
         self.assertEqual(first.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(second.status_code, status.HTTP_201_CREATED)
+        # 이미 신고한 리뷰를 또 신고하면 새 접수가 아니므로 200 (좋아요·즐겨찾기와 같은 멱등 규약).
+        self.assertEqual(second.status_code, status.HTTP_200_OK)
         self.assertEqual(ReviewReport.objects.filter(review=self.review, member=self.reporter1).count(), 1)
 
     def test_reporting_nonexistent_review_returns_404(self):
