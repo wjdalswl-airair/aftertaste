@@ -65,5 +65,9 @@
     "detailButton": "자세히 보러가기",
     "placesTitle": "<{{title}}> 촬영지",
     "placesEmpty": "아직 등록된 촬영지가 없어요"
+  },
+  "bookmarksPage": {
+    "title": "내가 저장한 명소",
+    "empty": "아직 저장한 명소가 없어요"
   }
 }

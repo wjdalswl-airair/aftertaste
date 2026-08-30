@@ -210,13 +210,17 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
   1. 목업의 "극본" 행 — `Work` 모델에 해당 필드가 없어서 **뺐다**.
   2. 목업의 "방영날짜"는 시작~종료 범위지만, `Work.release_date`는 날짜 하나뿐이라 **시작일만** 보여준다.
   3. 목업엔 히어로 이미지에 북마크(즐겨찾기) 아이콘이 있지만, PRD상 즐겨찾기는 명소/코스에만 있는 기능이라(작품 즐겨찾기 자체가 없음) **넣지 않았다**.
-- "자세히 보러가기" 버튼은 목적지가 정해진 게 없어 정적(비활성)으로만 둔다.
+- "자세히 보러가기" 버튼은 목적지가 따로 없어서, 작품 제목으로 구글 검색하는 링크(`https://www.google.com/search?q={제목}`)로 연결한다(2026-08-30, 사용자 확인).
 - 진입점: 검색 결과의 작품 카드(`SearchPage.tsx`), 명소 상세의 작품 태그(`SpotDetailPage.tsx`)를 `/works/{id}`로 연결했다.
 - 예외: 없는 작품 → "존재하지 않습니다"
 
-### S-06. 즐겨찾기 목록 — `pages/BookmarksPage.tsx`
-- API: `GET /account/bookmarks`, `POST /spots/{spotId}/bookmark`, `DELETE /spots/{spotId}/bookmark` (전부 계획)
-- 예외: 비로그인 시도 → "로그인이 필요한 기능입니다"
+### S-06. 즐겨찾기 목록 — `pages/BookmarksPage.tsx` (Phase 5, 구현 완료 — 2026-08-30)
+- 저장/취소는 Phase2에서 이미 구현됨(`FavoriteButton`, `POST/DELETE /api/places/{id}/favorite/`) — 이번 Phase에서 새로 만든 건 목록 화면뿐.
+- API: `GET /api/account/favorites/`(확정, 실제 BE 코드로 확인함 — `favorites/views.py` `MyFavoriteListView`) → `{ favorites: [{ id, type: 'PLACE'|'COURSE', place: {id,name,address,photo_url}|null, course: {...}|null, created_at }] }`. 문서엔 `GET /account/bookmarks`로 돼 있었는데 실제 경로가 다르다.
+- 명소·코스 즐겨찾기가 한 응답에 섞여서 온다. 이번 Phase는 명소만 다루므로(코스는 Phase8) `type === 'PLACE'`인 것만 걸러서 보여준다.
+- Figma 목업 없어서 기존 명소 카드 스타일(썸네일+이름+주소, `SearchPage.tsx`의 명소 `ResultRow`와 동일한 마크업)로 만들었다. 각 항목 오른쪽에 `FavoriteButton`을 얹어서 목록에서 바로 취소도 가능하다(단, 취소해도 목록에서 즉시 안 사라짐 — 다시 들어오면 반영됨. 실시간 제거는 이번 범위 밖).
+- `/mypage`(진짜 마이페이지, Phase7)에 진입 링크를 아직 안 넣었다 — 사용자 확인 후 이번엔 화면/로직만 먼저 만들고 진입 동선은 나중에 연결하기로 함(2026-08-30).
+- 예외: 비로그인 시도 → `RequireAuth`가 "로그인이 필요한 기능입니다" 안내 후 `/login`으로. 저장한 게 없으면 빈 상태(오류 아님).
 
 ### S-07. 리뷰 작성/수정 — `pages/ReviewFormPage.tsx`
 - 컴포넌트: 별점, 텍스트, 사진 업로드

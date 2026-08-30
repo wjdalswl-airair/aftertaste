@@ -65,5 +65,9 @@
     "detailButton": "See more",
     "placesTitle": "Filming spots in \"{{title}}\"",
     "placesEmpty": "No filming spots yet"
+  },
+  "bookmarksPage": {
+    "title": "My saved spots",
+    "empty": "No saved spots yet"
   }
 }

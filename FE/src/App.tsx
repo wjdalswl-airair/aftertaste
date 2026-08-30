@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { LanguageSheet } from './components/LanguageSheet'
 import { RequireAuth } from './components/RequireAuth'
 import { useInitAuth } from './hooks/useInitAuth'
+import { BookmarksPage } from './pages/BookmarksPage'
 import { LoginPage } from './pages/LoginPage'
 import { MainPage } from './pages/MainPage'
 import { SearchPage } from './pages/SearchPage'
@@ -37,6 +38,7 @@ function App() {
       <Route path="/works/:workId" element={<WorkDetailPage />} />
       <Route element={<RequireAuth />}>
         <Route path="/mypage" element={<TempMyPage />} />
+        <Route path="/bookmarks" element={<BookmarksPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
