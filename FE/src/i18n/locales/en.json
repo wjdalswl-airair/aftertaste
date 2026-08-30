@@ -18,5 +18,23 @@
       "title": "Nearby Spots",
       "empty": "Coming soon"
     }
+  },
+  "searchPage": {
+    "title": "What are you\nlooking for?",
+    "placeholder": "Search filming spots or works",
+    "searchButton": "Search",
+    "clearButton": "Clear",
+    "popularKeywordsTitle": "Popular searches",
+    "recentSearchesTitle": "Recent searches",
+    "recentSearchesClear": "Clear all",
+    "resultsTitle": "Results for \"{{query}}\"",
+    "placesFoundTitle": "Found in spots",
+    "worksFoundTitle": "Found in works",
+    "noResults": "No results found",
+    "filters": {
+      "all": "All",
+      "drama": "Drama",
+      "movie": "Movie"
+    }
   }
 }
