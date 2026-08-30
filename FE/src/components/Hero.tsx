@@ -71,7 +71,7 @@ export function Hero() {
   }
 
   if (slides === undefined) {
-    return <Skeleton className="mx-4 h-56" />
+    return <Skeleton className="mx-4 h-56 rounded-lg" />
   }
 
   if (slides.length === 0) {

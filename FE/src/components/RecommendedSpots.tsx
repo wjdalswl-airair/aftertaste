@@ -27,7 +27,11 @@ export function RecommendedSpots() {
       {(spots === undefined || status === 'pending') && (
         <div className="flex gap-3 px-4">
           {[0, 1, 2].map((i) => (
-            <Skeleton key={i} className="aspect-square w-[110px] flex-shrink-0" />
+            <div key={i} className="w-[110px] flex-shrink-0">
+              <Skeleton className="aspect-square w-full rounded-md" />
+              <Skeleton className="mt-1 h-3 w-full rounded-sm" />
+              <Skeleton className="mt-1 h-3 w-2/3 rounded-sm" />
+            </div>
           ))}
         </div>
       )}
