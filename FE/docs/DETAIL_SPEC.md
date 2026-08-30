@@ -167,14 +167,15 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
   3. Hero 캡션의 명소/작품명은 `review.place`(id)로 `GET /api/places/{id}/`를 한 번 더 호출해서 채운다. 이 상세 응답의 `works` 필드 정확한 구조를 아직 검증 못 해서(`src/api/spots.ts`의 `PlaceDetail` 타입이 추정치), 실제로 작품명이 안 나올 수 있다 — 필드가 없으면 명소 이름만 보인다.
 
 ### S-03. 검색 결과 — `pages/SearchPage.tsx` (Phase 3, 구현 완료 — 2026-08-30)
-- 컴포넌트: 검색창(자동완성), 전체/작품/드라마/영화 필터 칩, 작품/명소 섹션, 추천 검색어, 최근 검색어
+- 컴포넌트: 검색창(자동완성), 전체/드라마/영화 필터 칩, 작품/명소 섹션, 추천 검색어, 최근 검색어
 - API (전부 확정, 실제 BE 코드로 확인함):
   - `GET /api/places/search/?q=&type=&lang=` → `{ places: [{id,name,address,photo_url}], works: [{id,title,category,poster_url}], message? }`. `q` 없으면 400, `type`(`WORK`/`DRAMA`/`MOVIE`)이 잘못돼도 400. 로그인 상태면 BE가 자동으로 검색 기록을 남긴다.
   - `GET /api/places/search/autocomplete/?q=` → `{ suggestions: string[] }`
   - `GET /api/search/popular/` (라우팅이 `/api/places/` 밑이 아니라 루트 바로 밑, `config/urls.py` 참고) → `{ keywords: string[] }`, 최근 30일 집계 상위 5개. PHASE3.md 원안엔 없었지만 이미 BE에 구현돼 있어 함께 넣기로 함(2026-08-30, 사용자 확인).
 - `lang` 파라미터는 다른 API들(추천 등)과 동일하게 FE가 보내지 않는다. 안 보내면 BE가 로그인 회원의 언어 → 한국어 순으로 알아서 고른다.
 - **최근 검색어는 로그인 여부와 상관없이 localStorage에만 저장한다.** PRD엔 "비로그인 사용자만 기기 저장"이라고 되어 있었지만, BE에 로그인 사용자의 검색 기록을 다시 조회하는 API가 없다(`SearchHistory`는 인기 검색어 집계·개인화 추천에만 쓰임) — 그래서 로그인해도 동일하게 기기 저장으로 처리했다(2026-08-30, 사용자 확인).
-- 필터 칩(전체/작품/드라마/영화) UI는 Figma 목업(node-id `102:1265`)에 없어서 직접 구성했다. 스타일은 `LanguageSheet.tsx`의 선택 표시(`font-bold text-primary`)와 동일하게 맞춤.
+- 필터 칩(전체/드라마/영화) UI는 Figma 목업(node-id `102:1265`)에 없어서 직접 구성했다. 스타일은 `LanguageSheet.tsx`의 선택 표시(`font-bold text-primary`)와 동일하게 맞춤. 위치는 "작품에서 검색됨" 타이틀 바로 아래(2026-08-30, 사용자 확인).
+- **필터는 API를 다시 안 부르고 FE에서만 걸러 보여준다.** 검색 API에 `type`을 넘기면 BE가 명소 결과를 아예 비워버려서(`SearchView`), 필터를 누를 때마다 "명소에서 검색됨" 섹션까지 같이 사라지는 문제가 있었다. 그래서 검색은 항상 `type` 없이(통합검색) 한 번만 부르고, 필터 클릭 시엔 이미 받아온 `works` 배열을 화면에서 `category`로 걸러서 보여준다. `places`는 필터와 무관하게 항상 그대로 보인다(2026-08-30, 사용자 확인).
 - 검색 결과 카드(장소/작품)는 클릭해도 이동하지 않는다 — 명소 상세(Phase4)가 아직 없어서, 메인 화면의 Top10/추천 카드와 동일하게 임시로 비워둠.
 - 예외: 결과 없음 → "검색결과가 존재하지 않습니다" (`message` 필드 또는 FE에서 빈 결과 판단)
 

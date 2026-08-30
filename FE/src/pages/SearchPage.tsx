@@ -48,9 +48,11 @@ export function SearchPage() {
     return () => clearTimeout(timer)
   }, [query, submittedQuery])
 
-  function runSearch(keyword: string, searchType: SearchType | undefined) {
+  // 필터(전체/드라마/영화)는 API를 다시 안 부르고, 이미 받아온 작품 목록을 화면에서만 걸러서 보여준다.
+  // (검색 API에 type을 넘기면 BE가 명소 결과를 아예 비워버려서, "명소에서 검색됨" 섹션까지 같이 사라지는 문제가 있었다.)
+  function runSearch(keyword: string) {
     setResults(undefined)
-    searchPlaces(keyword, searchType)
+    searchPlaces(keyword)
       .then(setResults)
       .catch(() => setResults({ places: [], works: [] }))
   }
@@ -64,15 +66,14 @@ export function SearchPage() {
     setSubmittedQuery(trimmed)
     setSuggestions([])
     addRecentSearch(trimmed)
-    runSearch(trimmed, type)
+    runSearch(trimmed)
   }
 
   function handleFilterChange(nextType: SearchType | undefined) {
     setType(nextType)
-    if (submittedQuery) {
-      runSearch(submittedQuery, nextType)
-    }
   }
+
+  const filteredWorks = results ? (type ? results.works.filter((work) => work.category === type) : results.works) : undefined
 
   function handleClear() {
     setQuery('')
@@ -161,11 +162,11 @@ export function SearchPage() {
               })}
             </div>
 
-            {results === undefined ? (
+            {filteredWorks === undefined ? (
               <ResultSkeleton />
-            ) : results.works.length > 0 ? (
+            ) : filteredWorks.length > 0 ? (
               <div className="flex flex-col gap-4">
-                {results.works.map((work) => (
+                {filteredWorks.map((work) => (
                   <ResultRow
                     key={work.id}
                     thumbnail={work.poster_url}
