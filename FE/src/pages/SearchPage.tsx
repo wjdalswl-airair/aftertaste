@@ -187,7 +187,13 @@ export function SearchPage() {
             ) : results.places.length > 0 ? (
               <div className="flex flex-col gap-4">
                 {results.places.map((place) => (
-                  <ResultRow key={place.id} thumbnail={place.photo_url} title={place.name} subtitle={place.address} />
+                  <ResultRow
+                    key={place.id}
+                    to={`/spots/${place.id}`}
+                    thumbnail={place.photo_url}
+                    title={place.name}
+                    subtitle={place.address}
+                  />
                 ))}
               </div>
             ) : (
@@ -247,19 +253,30 @@ type ResultRowProps = {
   thumbnail: string
   title: string
   subtitle: string
+  // 이동할 곳이 있을 때만 넘긴다 (명소 상세는 있지만, 작품 상세는 아직 없음).
+  to?: string
 }
 
-function ResultRow({ thumbnail, title, subtitle }: ResultRowProps) {
-  return (
-    <div className="flex items-center gap-3">
+function ResultRow({ thumbnail, title, subtitle, to }: ResultRowProps) {
+  const content = (
+    <>
       <img src={thumbnail} alt="" className="h-[74px] w-[75px] rounded-2xl object-cover" />
       <div className="flex-1">
         <p className="text-xs text-ink">{title}</p>
         <p className="text-[11px] text-ink-secondary">{subtitle}</p>
       </div>
       <ChevronRight size={20} className="text-ink-tertiary" />
-    </div>
+    </>
   )
+
+  if (to) {
+    return (
+      <Link to={to} className="flex items-center gap-3">
+        {content}
+      </Link>
+    )
+  }
+  return <div className="flex items-center gap-3">{content}</div>
 }
 
 function ResultSkeleton() {

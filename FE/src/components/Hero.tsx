@@ -139,8 +139,8 @@ function HallOfFameSlide({
   slide: Extract<Slide, { type: 'hallOfFame' }>
   title: string
 }) {
-  const work = slide.place?.works?.[0]
-  const workPrefix = work?.category === 'movie' ? '영화' : work?.category === 'drama' ? '드라마' : null
+  const work = slide.place?.works?.[0]?.work
+  const workPrefix = work?.category === 'MOVIE' ? '영화' : work?.category === 'DRAMA' ? '드라마' : null
 
   return (
     <>

@@ -7,7 +7,7 @@ interface ImportMetaEnv {
   readonly VITE_FIREBASE_PROJECT_ID: string
   readonly VITE_FIREBASE_STORAGE_BUCKET: string
   readonly VITE_FIREBASE_APP_ID: string
-  readonly VITE_KAKAO_MAP_APP_KEY?: string
+  readonly VITE_KAKAO_JS_KEY?: string
 }
 
 interface ImportMeta {

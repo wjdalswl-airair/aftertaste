@@ -15,14 +15,74 @@ export function getRecommendedSpots(coords?: { lat: number; lng: number }): Prom
   )
 }
 
+export type WorkInfo = {
+  id: number
+  title: string
+  description: string
+  category: 'DRAMA' | 'MOVIE'
+  release_date: string | null
+  main_cast: string
+  director: string
+  poster_url: string
+}
+
+// 명소에 연결된 작품 하나 + 이 명소가 그 작품에서 나온 장면 설명.
+export type PlaceWork = {
+  work: WorkInfo
+  scene_description: string
+}
+
+export type NearbyPlace = {
+  place_name: string | null
+  address_name: string | null
+  road_address_name: string | null
+  latitude: number
+  longitude: number
+  category_name: string | null
+}
+
+export type PlaceReviewPhoto = {
+  id: number
+  photo_url: string
+}
+
+export type PlaceReview = {
+  id: number
+  place: number
+  author_nickname: string
+  rating: number
+  content: string
+  language: string
+  photos: PlaceReviewPhoto[]
+  like_count: number
+  is_liked_by_me: boolean
+  created_at: string
+  updated_at: string
+}
+
 export type PlaceDetail = {
   id: number
   name: string
-  // 작품 연결 정보. 정확한 필드 구성은 BE 응답으로 확인 필요 (Hero 캡션 표시용, 없어도 화면은 안 깨짐).
-  works?: { title?: string; category?: 'drama' | 'movie' }[]
+  address: string
+  photo_url: string
+  business_hours: string
+  recommended_time: string
+  photo_tips: string
+  etiquette: string
+  description: string
+  // Place 모델의 DecimalField라 DRF가 정밀도 보존을 위해 문자열로 내려준다 (실제 API 응답으로 확인함).
+  latitude: string | null
+  longitude: string | null
+  works: PlaceWork[]
+  nearby_places: NearbyPlace[]
+  is_favorited: boolean
+  reviews: PlaceReview[]
+  review_average_rating: number | null
+  review_count: number
 }
 
-// 명예의 전당 리뷰의 명소 id로 이름/작품 정보를 보충할 때만 쓴다 (1건짜리 호출).
+// 명소 상세 (명소 정보 + 등장 작품 + 주변 상권 + 리뷰를 한 번에 받는다).
+// Hero의 명예의 전당 캡션 보충용으로도 재사용한다 (1건짜리 호출, 없어도 화면은 안 깨짐).
 export function getPlaceDetail(placeId: number): Promise<PlaceDetail> {
   return publicFetch<PlaceDetail>(`/api/places/${placeId}/`)
 }

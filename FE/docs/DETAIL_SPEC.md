@@ -185,10 +185,23 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
   - 항상 3개, `{ places: [{ id, name, address, photo_url }] }`
 - 위치 권한 허용/거부는 `src/hooks/useGeolocation.ts`가 판단. 거부해도 재요청하지 않는다.
 
-### S-05. 명소 상세 — `pages/SpotDetailPage.tsx`
-- 컴포넌트: 카카오맵, 명소 정보, 작품 정보, 리뷰 목록, 주변 상권, 즐겨찾기 버튼
-- API: `GET /spots/{spotId}` (계획), `GET /spots/{spotId}/reviews` (계획), `GET /spots/{spotId}/nearby` (계획, 카카오맵으로 교체)
+### S-05. 명소 상세 — `pages/SpotDetailPage.tsx` (Phase 4, 구현 완료 — 2026-08-30)
+- 컴포넌트: 카카오맵(+주변 상권 마커), 명소 정보, 작품 정보, 리뷰 목록, 즐겨찾기 버튼(`FavoriteButton` 재사용)
+- API: `GET /api/places/{place_id}/` **하나로 전부 해결** (확정, 실제 BE 코드로 확인함 — `places/views.py` `PlaceDetailView`). 명소 기본 정보 + 등장 작품(장면 설명 포함) + 주변 상권(카카오 API 프록시, 저장 안 함) + 리뷰 목록/평균 별점 + 로그인 시 즐겨찾기 여부(`is_favorited`)를 한 번에 준다. 로그인 없어도 호출 가능, 없는 명소는 404.
+- 즐겨찾기 등록/해제는 Phase2에서 이미 구현된 `POST/DELETE /api/places/{id}/favorite/`(`src/api/bookmarks.ts`)를 그대로 쓴다 — Phase4 계획엔 "표시만"이라고 돼 있었지만 실제로 이미 동작한다.
+- Figma 실제 목업(node-id `102:712`)을 사용자가 공유해줘서 그 기준으로 만들었다. 다만 목업과 실제 데이터 모델이 안 맞는 부분이 있어 아래처럼 처리했다(2026-08-30, 사용자 확인):
+  1. 목업의 "입장료" 행 — `Place` 모델에 필드 자체가 없어서 **뺐다**.
+  2. 모델의 `photo_tips`(사진 팁) — 목업엔 없지만 실제 데이터라 정보 카드에 추가했다.
+  3. 목업 "주요 촬영작"은 등장 작품 제목만 콤마로 나열한다. API는 작품별 `scene_description`(장면 설명)도 주지만, 목업에 보여줄 자리가 없어서 **화면엔 아직 안 넣었다** — 필요하면 나중에 UI 추가.
+  4. "이 장소로 AI 코스 추천받기" CTA, 지도 위 "주변 코스 추천받기" 라벨은 코스(S-08, 훨씬 뒤 Phase)라 정적으로만 보이고 실제 동작 없음.
+  5. "별점 남기기"/"리뷰 남기기" 버튼은 로그인 여부만 확인(비로그인 시 `/login`). 실제 작성 기능은 Phase5.
+  6. **`latitude`/`longitude`는 문자열로 온다** — `Place` 모델이 `DecimalField`라 DRF가 정밀도 보존을 위해 숫자가 아니라 문자열(`"37.579617"`)로 직렬화한다(테스트용 데이터로 직접 확인). `NearbyPlace`의 좌표는 `FloatField`라 그대로 숫자로 온다 — 같은 화면 안에서 좌표 타입이 다르니 헷갈리지 않게 `SpotDetailPage.tsx`에서 `Number()`로 변환해서 쓴다.
+- **카카오맵 키**: `.env`의 `VITE_KAKAO_JS_KEY`(JS 키, `VITE_KAKAO_...` 이름은 이번에 새로 정함 — BE의 `KAKAO_API_KEY`는 REST 키라 다른 키다)를 `index.html`에서 Vite `%ENV%` 치환으로 읽는다. 키가 없으면 `src/lib/kakaoMap.ts`의 `loadKakaoMaps()`가 `null`을 돌려줘서, 지도 자리에 "지도를 표시할 수 없어요" 폴백을 보여주고 나머지 화면은 정상 동작한다.
+- 카카오맵 SDK는 npm 타입 패키지가 없어 `src/types/kakao.d.ts`에 실제 쓰는 만큼만(`Map`/`Marker`/`LatLng`/`InfoWindow`/`load`) 최소 ambient 타입을 직접 선언했다.
+- 명소 상세로 이동하는 진입점: 메인 화면 Top10/추천 카드(`RecommendedSpots.tsx`, `TopPlacesCarousel.tsx`), 검색 결과의 명소 카드(`SearchPage.tsx`)를 이번에 `/spots/{id}`로 연결했다 (Phase2/3 때 "Phase4 끝나면 연결" 하기로 했던 부분).
 - 예외: 없는 명소 → "존재하지 않습니다"
+
+**참고 — 작품 상세는 별도**: Figma엔 "작품 상세"(node-id `102:1174`, 작품 정보 + 그 작품의 촬영지 목록) 화면도 있지만, PRD/Phase 문서 어디에도 없고 BE API(`GET /api/works/{id}/` 같은)도 없다. FE는 API 스펙만 정리해서 전달했고(2026-08-30), BE가 준비되면 별도로 진행한다. 그 전까지 검색 결과의 "작품" 카드는 클릭해도 이동하지 않는다.
 
 ### S-06. 즐겨찾기 목록 — `pages/BookmarksPage.tsx`
 - API: `GET /account/bookmarks`, `POST /spots/{spotId}/bookmark`, `DELETE /spots/{spotId}/bookmark` (전부 계획)

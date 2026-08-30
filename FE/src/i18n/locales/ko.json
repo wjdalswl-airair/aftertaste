@@ -36,5 +36,24 @@
       "drama": "드라마",
       "movie": "영화"
     }
+  },
+  "spotDetail": {
+    "notFound": "존재하지 않습니다",
+    "shareCopied": "링크가 복사됐어요",
+    "location": "위치",
+    "mainWorks": "주요 촬영작",
+    "photoTips": "사진 팁",
+    "businessHours": "운영시간",
+    "recommendedTime": "추천 방문 시간",
+    "etiquette": "주의할 점",
+    "rateButton": "별점 남기기",
+    "reviewButton": "리뷰 남기기",
+    "reviewsTitle": "방문자 리뷰",
+    "reviewsEmpty": "아직 리뷰가 없어요",
+    "courseCta": "이 장소로 AI 코스 추천받기",
+    "mapTitle": "지도",
+    "mapUnavailable": "지도를 표시할 수 없어요",
+    "noCoordinates": "위치 정보가 없어요",
+    "directions": "길찾기"
   }
 }

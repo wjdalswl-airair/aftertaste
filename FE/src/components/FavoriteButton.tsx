@@ -4,13 +4,25 @@ import { useNavigate } from 'react-router-dom'
 import { addFavorite, removeFavorite } from '../api/bookmarks'
 import { useAuthStore } from '../store/useAuthStore'
 
-// 명소 카드 썸네일 위에 얹는 즐겨찾기 별 버튼.
-// 목록 API(추천/Top10)가 즐겨찾기 여부를 안 줘서, 처음엔 항상 빈 별로 시작한다
-// (실제로 이미 즐겨찾기한 명소여도 목록에선 그렇게 보일 수 있음 — BE 응답에 필드 추가되면 고칠 것).
-export function FavoriteButton({ placeId }: { placeId: number }) {
+type FavoriteButtonProps = {
+  placeId: number
+  // 목록 API(추천/Top10)는 즐겨찾기 여부를 안 줘서 기본값은 항상 빈 별이다.
+  // 명소 상세처럼 실제 값(is_favorited)을 아는 화면에서만 넘겨준다.
+  initialFavorited?: boolean
+  size?: number
+  className?: string
+}
+
+// 명소 카드/상세 화면에 얹는 즐겨찾기 별 버튼.
+export function FavoriteButton({
+  placeId,
+  initialFavorited = false,
+  size = 16,
+  className = 'absolute right-1 top-1 rounded-full p-1',
+}: FavoriteButtonProps) {
   const navigate = useNavigate()
   const member = useAuthStore((state) => state.member)
-  const [isFavorited, setIsFavorited] = useState(false)
+  const [isFavorited, setIsFavorited] = useState(initialFavorited)
   const [pending, setPending] = useState(false)
 
   function handleClick(event: React.MouseEvent) {
@@ -35,13 +47,8 @@ export function FavoriteButton({ placeId }: { placeId: number }) {
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      aria-label="즐겨찾기"
-      className="absolute right-1 top-1 rounded-full p-1"
-    >
-      <Star size={16} className={isFavorited ? 'fill-primary text-primary' : 'text-primary'} />
+    <button type="button" onClick={handleClick} aria-label="즐겨찾기" className={className}>
+      <Star size={size} className={isFavorited ? 'fill-primary text-primary' : 'text-primary'} />
     </button>
   )
 }

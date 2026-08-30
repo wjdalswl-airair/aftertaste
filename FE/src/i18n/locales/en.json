@@ -36,5 +36,24 @@
       "drama": "Drama",
       "movie": "Movie"
     }
+  },
+  "spotDetail": {
+    "notFound": "Not found",
+    "shareCopied": "Link copied",
+    "location": "Location",
+    "mainWorks": "Featured in",
+    "photoTips": "Photo tips",
+    "businessHours": "Hours",
+    "recommendedTime": "Best time to visit",
+    "etiquette": "Etiquette",
+    "rateButton": "Rate",
+    "reviewButton": "Write a review",
+    "reviewsTitle": "Visitor reviews",
+    "reviewsEmpty": "No reviews yet",
+    "courseCta": "Get an AI course from this spot",
+    "mapTitle": "Map",
+    "mapUnavailable": "Map unavailable",
+    "noCoordinates": "No location data",
+    "directions": "Directions"
   }
 }
