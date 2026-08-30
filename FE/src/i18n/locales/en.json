@@ -1,0 +1,73 @@
+{
+  "mainPage": {
+    "greeting": {
+      "hello": "Hello",
+      "nameSuffix": ", {{name}}",
+      "subtitle": "Where would you like to explore today?"
+    },
+    "hero": {
+      "title": "This Week's Hall of Fame",
+      "recommendTitle": "How about this place?",
+      "empty": "Coming soon"
+    },
+    "topPlaces": {
+      "title": "Top 10 Nationwide",
+      "empty": "Coming soon"
+    },
+    "recommend": {
+      "title": "Nearby Spots",
+      "empty": "Coming soon"
+    }
+  },
+  "searchPage": {
+    "title": "What are you\nlooking for?",
+    "placeholder": "Search filming spots or works",
+    "searchButton": "Search",
+    "clearButton": "Clear",
+    "popularKeywordsTitle": "Popular searches",
+    "recentSearchesTitle": "Recent searches",
+    "recentSearchesClear": "Clear all",
+    "resultsTitle": "Results for \"{{query}}\"",
+    "placesFoundTitle": "Found in spots",
+    "worksFoundTitle": "Found in works",
+    "noResults": "No results found",
+    "filters": {
+      "all": "All",
+      "drama": "Drama",
+      "movie": "Movie"
+    }
+  },
+  "spotDetail": {
+    "notFound": "Not found",
+    "shareCopied": "Link copied",
+    "location": "Location",
+    "mainWorks": "Featured in",
+    "photoTips": "Photo tips",
+    "businessHours": "Hours",
+    "recommendedTime": "Best time to visit",
+    "etiquette": "Etiquette",
+    "rateButton": "Rate",
+    "reviewButton": "Write a review",
+    "reviewsTitle": "Visitor reviews",
+    "reviewsEmpty": "No reviews yet",
+    "courseCta": "Get an AI course from this spot",
+    "mapTitle": "Map",
+    "mapUnavailable": "Map unavailable",
+    "noCoordinates": "No location data",
+    "directions": "Directions"
+  },
+  "workDetail": {
+    "notFound": "Not found",
+    "mainCast": "Cast",
+    "director": "Director",
+    "releaseDate": "Release date",
+    "storyTitle": "The story",
+    "detailButton": "See more",
+    "placesTitle": "Filming spots in \"{{title}}\"",
+    "placesEmpty": "No filming spots yet"
+  },
+  "bookmarksPage": {
+    "title": "My saved spots",
+    "empty": "No saved spots yet"
+  }
+}

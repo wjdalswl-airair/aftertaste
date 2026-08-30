@@ -4,13 +4,13 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@400;500;700&display=swap"
-      rel="stylesheet"
-    />
+    <!-- 화면 진입 즉시 쓰이는 폰트만 미리 받아서 폰트 바뀌는 순간(FOUT)을 줄인다 -->
+    <link rel="preload" as="font" type="font/woff2" href="/src/assets/fonts/유한킴벌리_푸른숲체_Bold.woff2" crossorigin />
+    <link rel="preload" as="font" type="font/woff2" href="/src/assets/fonts/IBMPlexSansKR-Regular.woff2" crossorigin />
+    <link rel="preload" as="font" type="font/woff2" href="/src/assets/fonts/IBMPlexSansKR-Bold.woff2" crossorigin />
     <title>여운</title>
+    <!-- 명소 상세 화면 지도용 카카오맵 JS SDK. 키는 .env의 VITE_KAKAO_JS_KEY를 Vite가 빌드 시 치환한다 -->
+    <script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=%VITE_KAKAO_JS_KEY%&autoload=false" defer></script>
   </head>
   <body>
     <div id="root"></div>

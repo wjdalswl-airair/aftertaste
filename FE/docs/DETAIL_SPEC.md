@@ -40,7 +40,7 @@ API 연동 정보는 세 곳에서 나왔고, **신뢰도가 다르다.**
 
 ```
 src/
-  api/          # 도메인별 API 함수 (auth.ts, spots.ts, reviews.ts, bookmarks.ts, search.ts, courses.ts)
+  api/          # 도메인별 API 함수 (auth.ts, spots.ts, works.ts, reviews.ts, bookmarks.ts, search.ts, courses.ts)
   components/   # 여러 화면에서 재사용하는 UI 조각 (Button, Card, BottomNav 등)
   pages/        # 화면 단위 컴포넌트. 라우트 하나당 파일 하나 (PRD의 S-01~S-11과 대응)
   store/        # Zustand 전역 상태 (useAuthStore, useLocaleStore)
@@ -65,6 +65,7 @@ React Router로 화면 단위 페이지를 분리한다 (PRD 6장 결정).
 | `/` | S-02 메인 | ❌ |
 | `/search` | S-03 검색 결과 | ❌ |
 | `/spots/:spotId` | S-05 명소 상세 | ❌ |
+| `/works/:workId` | (PRD/Phase에 없음, 별도 정리 필요) 작품 상세 | ❌ |
 | `/bookmarks` | S-06 즐겨찾기 목록 | ✅ |
 | `/spots/:spotId/reviews/new` | S-07 리뷰 작성 | ✅ |
 | `/reviews/:reviewId/edit` | S-07 리뷰 수정 | ✅ |
@@ -82,7 +83,7 @@ React Router로 화면 단위 페이지를 분리한다 (PRD 6장 결정).
 | 스토어 | 담는 것 | 채워지는 시점 |
 |---|---|---|
 | `useAuthStore` | 로그인한 회원 정보 (`GET /account` 응답), 로그인 여부 | Firebase `onAuthStateChanged` 콜백에서 |
-| `useLocaleStore` | 선택한 국적/언어 | 메인 화면 국적 선택 시, `PATCH /account/locale`(로그인 시) 또는 로컬 저장(비로그인 시) |
+| `useLocaleStore` | 선택한 국적/언어 (Phase 2 구현 완료) | 메인 화면 국적 선택 시. `zustand/persist`로 항상 localStorage에 저장하고, 로그인 상태면 `PATCH /api/account/locale/`도 함께 호출 |
 
 화면별로만 쓰는 상태(검색어 입력값, 폼 값 등)는 전역 스토어에 넣지 않고 해당 페이지 컴포넌트 안에 둔다 (불필요한 전역화 금지, karpathy-guidlines 2번).
 
@@ -127,12 +128,12 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 |---|---|---|
 | `--color-primary` | `#F47C5C` | `bg-primary`, `text-primary` |
 | `--color-accent` | `#F8B08B` | `bg-accent` |
-| `--color-background` | `#FFF5F0` | `bg-background` |
+| `--color-background` | `#FFFFFF` | `bg-background` (2026-08-30 변경) |
 | `--color-ink` / `-secondary` / `-tertiary` | `#2B2320` / `#9C8AB0` / `#C9BAB0` | `text-ink`, `text-ink-secondary` |
 | `--color-divider` | `#F0E4DC` | `border-divider` |
 | `--radius-xs`~`--radius-2xl` | 8~28px | `rounded-lg` 등 |
-| `--font-sans` | Noto Sans KR | 본문 기본값 |
-| `--font-brand` | Gowun Batang | 로고/브랜드 텍스트에만 `font-brand` |
+| `--font-sans` | IBM Plex Sans KR (자체 호스팅) | 본문 기본값. 폰트 파일은 `src/assets/fonts/`, 등록은 `src/index.css`의 `@font-face` (2026-08-30) |
+| `--font-brand` | 푸른숲체 (유한킴벌리, 자체 호스팅) | 로고/브랜드 텍스트에만 `font-brand`. 폰트 파일은 `src/assets/fonts/`, 등록은 `src/index.css`의 `@font-face` (2026-08-30) |
 
 새 색상·radius가 필요하면 Figma가 먼저 바뀌어야 하고, 코드에서 임의로 값을 추가하지 않는다.
 
@@ -149,28 +150,77 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 - API: `POST /api/account/login/` (확정)
 - 상태: 로그인 성공 시 `useAuthStore` 갱신 후 이전 화면 또는 `/`로 이동
 
-### S-02. 메인 — `pages/MainPage.tsx`
-- 컴포넌트: 배너 슬라이드, 명예의 전당, 국적 선택, Top10 캐러셀
-- API: `GET /main/highlights` (계획, 명예의전당), `GET /spots/top` (계획, Top10), `GET /banners` (계획)
-- 참고: BE PHASE 순서상 명예의전당·Top10은 리뷰·즐겨찾기 데이터가 쌓인 뒤(Phase 3)에나 값이 채워진다. 그 전까지는 빈 상태 UI를 함께 준비한다.
+### S-02. 메인 — `pages/MainPage.tsx` (Phase 2, 구현 완료 — 2026-08-30 Figma 실제 목업에 맞춰 리디자인)
+- 컴포넌트: `Hero`(배너+명예의전당 병합), `LanguageSheet`(국적/언어 바텀시트), `BottomNav`(홈/검색/프로필), `TopPlacesCarousel`, `RecommendedSpots`
+- API (전부 확정, 실제 BE 코드로 확인함 — 2026-08-29):
+  - `GET /api/banners/` → `{ banners: [{ id, image_url, link_url, order }] }`
+  - `GET /api/main/hall-of-fame/` → `{ review: {...} | null }` (없으면 `null`, 200 정상 응답)
+  - `GET /api/main/top-places/` → `{ places: [{ id, name, address, photo_url, favorite_count }] }`
+  - `PATCH /api/account/locale/` → `{ nationality?, language? }` 요청, `{ language }` 응답. 로그인 불필요(선택), 비로그인이면 검증만 하고 저장은 프론트가 `useLocaleStore`(localStorage)로 한다.
+- 국적 선택은 PRD상 "미정"이었으나, BE 번역 지원 언어가 영어만으로 결정된 것에 맞춰 **한국(ko) / 해외(en) 2개만** 만들었다 (2026-08-29, 사용자 확인). UI는 Figma처럼 헤더 지구본 아이콘 → 바텀시트.
+- 명예의전당·Top10은 BE 자체 문서엔 "Phase3 전엔 못 채운다"고 되어 있지만, 실제 코드는 스텁이 아니라 진짜 랭킹 로직이 이미 구현돼 있다. 데이터가 없으면 각각 `null`/`[]`을 정상 응답하므로 그 값 그대로 빈 상태 UI를 보여준다.
+- **Hero(배너+명예의전당 병합, 2026-08-30 캐러셀로 확장)**: "금주의 명예의 전당"(`GET /api/main/hall-of-fame/`)과 "이 장소, 어떠세요?"(`GET /api/places/recommend/`의 첫 번째 결과) 두 슬라이드를 4초마다 자동 전환 + 손가락 스와이프로 넘겨볼 수 있는 캐러셀로 보여준다. 둘 다 없으면 `GET /api/banners/`로 대체하고, 그마저 없으면 아무것도 안 보인다.
+- **즐겨찾기 (2026-08-30 추가, `src/api/bookmarks.ts`)**: Top10·추천 카드 썸네일 위에 별 아이콘. `POST/DELETE /api/places/{id}/favorite/` 연동, 로그인 필요(`authorizedFetch` 재사용, `auth.ts`에서 export). 비로그인 상태로 누르면 `/login`으로 이동하며 "로그인이 필요한 기능입니다" 안내.
+  - **제약**: 목록 API(추천/Top10) 응답에 즐겨찾기 여부(`is_favorited`)가 없어서, 카드 별은 항상 빈 별로 시작한다. 이미 즐겨찾기한 명소를 다시 봐도 화면상으론 빈 별로 보임 — BE가 목록 응답에 `is_favorited`를 추가해주면 고칠 것.
+- **BE 데이터가 없어서 생긴 제약 — BE 확인 필요 (2026-08-30)**:
+  1. Top10/추천 카드의 부제(작품명)를 Figma는 보여주지만, 두 API 응답에 작품명이 없어 **`address`로 대신 표시** 중이다.
+  2. 추천 카드의 거리 뱃지(예: "거리 1.2km")도 Figma엔 있지만, API 응답에 좌표가 없어 만들지 못했다.
+  3. Hero 캡션의 명소/작품명은 `review.place`(id)로 `GET /api/places/{id}/`를 한 번 더 호출해서 채운다. 이 상세 응답의 `works` 필드 정확한 구조를 아직 검증 못 해서(`src/api/spots.ts`의 `PlaceDetail` 타입이 추정치), 실제로 작품명이 안 나올 수 있다 — 필드가 없으면 명소 이름만 보인다.
 
-### S-03. 검색 결과 — `pages/SearchPage.tsx`
-- 컴포넌트: 검색창(자동완성), 드라마/영화 필터, 장소/작품 섹션
-- API: `GET /search/spots`, `GET /search/works` (둘 다 계획)
-- 예외: 결과 없음 → "검색결과가 존재하지 않습니다"
+### S-03. 검색 결과 — `pages/SearchPage.tsx` (Phase 3, 구현 완료 — 2026-08-30)
+- 컴포넌트: 검색창(자동완성), 전체/드라마/영화 필터 칩, 작품/명소 섹션, 추천 검색어, 최근 검색어
+- API (전부 확정, 실제 BE 코드로 확인함):
+  - `GET /api/places/search/?q=&type=&lang=` → `{ places: [{id,name,address,photo_url}], works: [{id,title,category,poster_url}], message? }`. `q` 없으면 400, `type`(`WORK`/`DRAMA`/`MOVIE`)이 잘못돼도 400. 로그인 상태면 BE가 자동으로 검색 기록을 남긴다.
+  - `GET /api/places/search/autocomplete/?q=` → `{ suggestions: string[] }`
+  - `GET /api/search/popular/` (라우팅이 `/api/places/` 밑이 아니라 루트 바로 밑, `config/urls.py` 참고) → `{ keywords: string[] }`, 최근 30일 집계 상위 5개. PHASE3.md 원안엔 없었지만 이미 BE에 구현돼 있어 함께 넣기로 함(2026-08-30, 사용자 확인).
+- `lang` 파라미터는 다른 API들(추천 등)과 동일하게 FE가 보내지 않는다. 안 보내면 BE가 로그인 회원의 언어 → 한국어 순으로 알아서 고른다.
+- **최근 검색어는 로그인 여부와 상관없이 localStorage에만 저장한다.** PRD엔 "비로그인 사용자만 기기 저장"이라고 되어 있었지만, BE에 로그인 사용자의 검색 기록을 다시 조회하는 API가 없다(`SearchHistory`는 인기 검색어 집계·개인화 추천에만 쓰임) — 그래서 로그인해도 동일하게 기기 저장으로 처리했다(2026-08-30, 사용자 확인).
+- 필터 칩(전체/드라마/영화) UI는 Figma 목업(node-id `102:1265`)에 없어서 직접 구성했다. 스타일은 `LanguageSheet.tsx`의 선택 표시(`font-bold text-primary`)와 동일하게 맞춤. 위치는 "작품에서 검색됨" 타이틀 바로 아래(2026-08-30, 사용자 확인).
+- **필터는 API를 다시 안 부르고 FE에서만 걸러 보여준다.** 검색 API에 `type`을 넘기면 BE가 명소 결과를 아예 비워버려서(`SearchView`), 필터를 누를 때마다 "명소에서 검색됨" 섹션까지 같이 사라지는 문제가 있었다. 그래서 검색은 항상 `type` 없이(통합검색) 한 번만 부르고, 필터 클릭 시엔 이미 받아온 `works` 배열을 화면에서 `category`로 걸러서 보여준다. `places`는 필터와 무관하게 항상 그대로 보인다(2026-08-30, 사용자 확인).
+- 검색 결과 카드(장소/작품)는 클릭해도 이동하지 않는다 — 명소 상세(Phase4)가 아직 없어서, 메인 화면의 Top10/추천 카드와 동일하게 임시로 비워둠.
+- 예외: 결과 없음 → "검색결과가 존재하지 않습니다" (`message` 필드 또는 FE에서 빈 결과 판단)
 
-### S-04. 추천 (위치 기반) — 메인 화면(S-02) 내부 기능
-- API: `GET /spots/recommend` (계획)
-- 위치 권한 허용/거부에 따라 파라미터 유무만 달라짐 (PRD F-04)
+### S-04. 추천 (위치 기반) — 메인 화면(S-02) 내부 기능, Phase 2 구현 완료
+- API: `GET /api/places/recommend/` (확정, `src/api/spots.ts`의 `getRecommendedSpots`)
+  - `lat`, `lng` 쿼리 파라미터(선택). 없거나 잘못되면 BE가 랜덤 3곳을 돌려준다.
+  - 항상 3개, `{ places: [{ id, name, address, photo_url }] }`
+- 위치 권한 허용/거부는 `src/hooks/useGeolocation.ts`가 판단. 거부해도 재요청하지 않는다.
 
-### S-05. 명소 상세 — `pages/SpotDetailPage.tsx`
-- 컴포넌트: 카카오맵, 명소 정보, 작품 정보, 리뷰 목록, 주변 상권, 즐겨찾기 버튼
-- API: `GET /spots/{spotId}` (계획), `GET /spots/{spotId}/reviews` (계획), `GET /spots/{spotId}/nearby` (계획, 카카오맵으로 교체)
+### S-05. 명소 상세 — `pages/SpotDetailPage.tsx` (Phase 4, 구현 완료 — 2026-08-30)
+- 컴포넌트: 카카오맵(+주변 상권 마커), 명소 정보, 작품 정보, 리뷰 목록, 즐겨찾기 버튼(`FavoriteButton` 재사용)
+- API: `GET /api/places/{place_id}/` **하나로 전부 해결** (확정, 실제 BE 코드로 확인함 — `places/views.py` `PlaceDetailView`). 명소 기본 정보 + 등장 작품(장면 설명 포함) + 주변 상권(카카오 API 프록시, 저장 안 함) + 리뷰 목록/평균 별점 + 로그인 시 즐겨찾기 여부(`is_favorited`)를 한 번에 준다. 로그인 없어도 호출 가능, 없는 명소는 404.
+- 즐겨찾기 등록/해제는 Phase2에서 이미 구현된 `POST/DELETE /api/places/{id}/favorite/`(`src/api/bookmarks.ts`)를 그대로 쓴다 — Phase4 계획엔 "표시만"이라고 돼 있었지만 실제로 이미 동작한다.
+- Figma 실제 목업(node-id `102:712`)을 사용자가 공유해줘서 그 기준으로 만들었다. 다만 목업과 실제 데이터 모델이 안 맞는 부분이 있어 아래처럼 처리했다(2026-08-30, 사용자 확인):
+  1. 목업의 "입장료" 행 — `Place` 모델에 필드 자체가 없어서 **뺐다**.
+  2. 모델의 `photo_tips`(사진 팁) — 목업엔 없지만 실제 데이터라 정보 카드에 추가했다.
+  3. 목업 "주요 촬영작"은 등장 작품 제목만 콤마로 나열한다. API는 작품별 `scene_description`(장면 설명)도 주지만, 목업에 보여줄 자리가 없어서 **화면엔 아직 안 넣었다** — 필요하면 나중에 UI 추가.
+  4. "이 장소로 AI 코스 추천받기" CTA, 지도 위 "주변 코스 추천받기" 라벨은 코스(S-08, 훨씬 뒤 Phase)라 정적으로만 보이고 실제 동작 없음.
+  5. "별점 남기기"/"리뷰 남기기" 버튼은 로그인 여부만 확인(비로그인 시 `/login`). 실제 작성 기능은 Phase5.
+  6. **`latitude`/`longitude`는 문자열로 온다** — `Place` 모델이 `DecimalField`라 DRF가 정밀도 보존을 위해 숫자가 아니라 문자열(`"37.579617"`)로 직렬화한다(테스트용 데이터로 직접 확인). `NearbyPlace`의 좌표는 `FloatField`라 그대로 숫자로 온다 — 같은 화면 안에서 좌표 타입이 다르니 헷갈리지 않게 `SpotDetailPage.tsx`에서 `Number()`로 변환해서 쓴다.
+- **카카오맵 키**: `.env`의 `VITE_KAKAO_JS_KEY`(JS 키, `VITE_KAKAO_...` 이름은 이번에 새로 정함 — BE의 `KAKAO_API_KEY`는 REST 키라 다른 키다)를 `index.html`에서 Vite `%ENV%` 치환으로 읽는다. 키가 없으면 `src/lib/kakaoMap.ts`의 `loadKakaoMaps()`가 `null`을 돌려줘서, 지도 자리에 "지도를 표시할 수 없어요" 폴백을 보여주고 나머지 화면은 정상 동작한다.
+- 카카오맵 SDK는 npm 타입 패키지가 없어 `src/types/kakao.d.ts`에 실제 쓰는 만큼만(`Map`/`Marker`/`LatLng`/`InfoWindow`/`load`) 최소 ambient 타입을 직접 선언했다.
+- 명소 상세로 이동하는 진입점: 메인 화면 Top10/추천 카드(`RecommendedSpots.tsx`, `TopPlacesCarousel.tsx`), 검색 결과의 명소 카드(`SearchPage.tsx`)를 이번에 `/spots/{id}`로 연결했다 (Phase2/3 때 "Phase4 끝나면 연결" 하기로 했던 부분).
 - 예외: 없는 명소 → "존재하지 않습니다"
 
-### S-06. 즐겨찾기 목록 — `pages/BookmarksPage.tsx`
-- API: `GET /account/bookmarks`, `POST /spots/{spotId}/bookmark`, `DELETE /spots/{spotId}/bookmark` (전부 계획)
-- 예외: 비로그인 시도 → "로그인이 필요한 기능입니다"
+### 작품 상세 — `pages/WorkDetailPage.tsx` (`/works/:workId`, 2026-08-30 구현)
+**PRD/Phase 문서에 없는 화면이다.** Figma엔 "작품 상세"(node-id `102:1174`, 작품 정보 + 그 작품의 촬영지 목록) 목업이 있는데, 사용자가 "라우트는 FE에서 정하면 되니까 먼저 만들고 API는 나중에 BE와 상의하겠다"고 해서 FE(라우트+화면+API 함수)만 먼저 만들었다. 나중에 어느 Phase에 넣을지는 별도로 정리해야 한다.
+- API: `GET /api/works/{work_id}/` — **BE에 아직 없다.** `src/api/works.ts`의 `getWorkDetail()`이 이 경로로 스펙대로 호출하도록만 만들어뒀고, BE가 구현하면 FE 수정 없이 바로 동작한다. 그 전까지는 항상 실패 → "존재하지 않습니다"로 보인다(정상).
+- 응답 스펙(안): `{ id, title, description, category, release_date, main_cast, director, poster_url, places: [{id,name,address,photo_url}] }`
+- Figma 목업과 실제 `Work` 모델이 안 맞는 부분:
+  1. 목업의 "극본" 행 — `Work` 모델에 해당 필드가 없어서 **뺐다**.
+  2. 목업의 "방영날짜"는 시작~종료 범위지만, `Work.release_date`는 날짜 하나뿐이라 **시작일만** 보여준다.
+  3. 목업엔 히어로 이미지에 북마크(즐겨찾기) 아이콘이 있지만, PRD상 즐겨찾기는 명소/코스에만 있는 기능이라(작품 즐겨찾기 자체가 없음) **넣지 않았다**.
+- "자세히 보러가기" 버튼은 목적지가 따로 없어서, 작품 제목으로 구글 검색하는 링크(`https://www.google.com/search?q={제목}`)로 연결한다(2026-08-30, 사용자 확인).
+- 진입점: 검색 결과의 작품 카드(`SearchPage.tsx`), 명소 상세의 작품 태그(`SpotDetailPage.tsx`)를 `/works/{id}`로 연결했다.
+- 예외: 없는 작품 → "존재하지 않습니다"
+
+### S-06. 즐겨찾기 목록 — `pages/BookmarksPage.tsx` (Phase 5, 구현 완료 — 2026-08-30)
+- 저장/취소는 Phase2에서 이미 구현됨(`FavoriteButton`, `POST/DELETE /api/places/{id}/favorite/`) — 이번 Phase에서 새로 만든 건 목록 화면뿐.
+- API: `GET /api/account/favorites/`(확정, 실제 BE 코드로 확인함 — `favorites/views.py` `MyFavoriteListView`) → `{ favorites: [{ id, type: 'PLACE'|'COURSE', place: {id,name,address,photo_url}|null, course: {...}|null, created_at }] }`. 문서엔 `GET /account/bookmarks`로 돼 있었는데 실제 경로가 다르다.
+- 명소·코스 즐겨찾기가 한 응답에 섞여서 온다. 이번 Phase는 명소만 다루므로(코스는 Phase8) `type === 'PLACE'`인 것만 걸러서 보여준다.
+- Figma 목업 없어서 기존 명소 카드 스타일(썸네일+이름+주소, `SearchPage.tsx`의 명소 `ResultRow`와 동일한 마크업)로 만들었다. 각 항목 오른쪽에 `FavoriteButton`을 얹어서 목록에서 바로 취소도 가능하다(단, 취소해도 목록에서 즉시 안 사라짐 — 다시 들어오면 반영됨. 실시간 제거는 이번 범위 밖).
+- `/mypage`(진짜 마이페이지, Phase7)에 진입 링크를 아직 안 넣었다 — 사용자 확인 후 이번엔 화면/로직만 먼저 만들고 진입 동선은 나중에 연결하기로 함(2026-08-30).
+- 예외: 비로그인 시도 → `RequireAuth`가 "로그인이 필요한 기능입니다" 안내 후 `/login`으로. 저장한 게 없으면 빈 상태(오류 아님).
 
 ### S-07. 리뷰 작성/수정 — `pages/ReviewFormPage.tsx`
 - 컴포넌트: 별점, 텍스트, 사진 업로드

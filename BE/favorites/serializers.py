@@ -23,3 +23,10 @@ class FavoriteSerializer(serializers.ModelSerializer):
 
     def get_type(self, obj):
         return "PLACE" if obj.place_id else "COURSE"
+
+
+class FavoriteListResponseSerializer(serializers.Serializer):
+    """즐겨찾기 목록 응답 형태. 배열을 그대로 주지 않고 favorites 키로 감싼다
+    (main 앱의 *ResponseSerializer와 같은 방식). 뷰 응답 모양과 Swagger 문서를 맞춘다."""
+
+    favorites = FavoriteSerializer(many=True)

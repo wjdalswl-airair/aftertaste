@@ -4,11 +4,15 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from config.api_messages import NOT_FOUND_MESSAGE
 from places.models import Place
-from reviews.models import Review, ReviewLike, ReviewReport
-from reviews.serializers import ReviewReportSerializer, ReviewSerializer, ReviewWriteSerializer
-
-NOT_FOUND_MESSAGE = "존재하지 않습니다"
+from reviews.models import REVIEW_REPORT_HIDE_THRESHOLD, Review, ReviewLike, ReviewReport
+from reviews.serializers import (
+    ReviewListResponseSerializer,
+    ReviewReportSerializer,
+    ReviewSerializer,
+    ReviewWriteSerializer,
+)
 
 
 def _visible_reviews(place):
@@ -39,7 +43,7 @@ class PlaceReviewListCreateView(APIView):
     @extend_schema(
         summary="명소 리뷰 목록 조회",
         description="관리자가 감추지 않은 리뷰를 최신순으로 반환한다. 로그인이 필요 없다.",
-        responses={200: ReviewSerializer(many=True), 404: OpenApiResponse(description="명소 없음")},
+        responses={200: ReviewListResponseSerializer, 404: OpenApiResponse(description="명소 없음")},
     )
     def get(self, request, place_id):
         try:
@@ -79,7 +83,7 @@ class ReviewDetailView(APIView):
     @extend_schema(
         summary="리뷰 수정",
         request=ReviewWriteSerializer,
-        responses={200: None, 401: OpenApiResponse(description="로그인 필요"), 403: OpenApiResponse(description="작성자 아님")},
+        responses={204: None, 401: OpenApiResponse(description="로그인 필요"), 403: OpenApiResponse(description="작성자 아님")},
     )
     def patch(self, request, review_id):
         try:
@@ -91,7 +95,8 @@ class ReviewDetailView(APIView):
         serializer = ReviewWriteSerializer(review, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response(status=200)
+        # 수정 성공 시 본문 없이 204 (다른 PATCH 엔드포인트와 규약 통일).
+        return Response(status=204)
 
     @extend_schema(
         summary="리뷰 삭제",
@@ -138,14 +143,20 @@ class ReviewLikeView(APIView):
 class ReviewReportView(APIView):
     """리뷰 신고. 로그인이 필요하다.
 
-    같은 사람이 같은 리뷰를 여러 번 신고해도 한 건만 접수한다. 신고된 리뷰를 감추는 건
-    관리자가 Django admin에서 수동으로 한다 (DETAIL_SPEC 6-1 #13).
+    같은 사람이 같은 리뷰를 여러 번 신고해도 한 건만 접수한다. 새로 접수되면 201,
+    이미 신고한 리뷰를 또 신고하면 200 — 좋아요·즐겨찾기와 같은 멱등 규약이다.
+    서로 다른 사람이 REVIEW_REPORT_HIDE_THRESHOLD명 신고하면 그 순간 자동으로 숨긴다
+    (DETAIL_SPEC 6-1 #13). 관리자가 확인 후 풀어준 리뷰는 다시 자동으로 숨기지 않는다 —
+    신고 수가 임계값을 "막 넘어서는" 그 한 번만 처리하기 때문이다. 관리자의 수동 숨김·해제는
+    그대로 admin에서 한다.
     """
 
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
-        summary="리뷰 신고", request=ReviewReportSerializer, responses={201: None, 401: OpenApiResponse(description="로그인 필요")}
+        summary="리뷰 신고",
+        request=ReviewReportSerializer,
+        responses={201: None, 200: None, 401: OpenApiResponse(description="로그인 필요")},
     )
     def post(self, request, review_id):
         try:
@@ -153,8 +164,16 @@ class ReviewReportView(APIView):
         except Review.DoesNotExist:
             return Response({"detail": NOT_FOUND_MESSAGE}, status=404)
         reason = request.data.get("reason", "")
-        ReviewReport.objects.get_or_create(review=review, member=request.user, defaults={"reason": reason})
-        return Response(status=201)
+        _, created = ReviewReport.objects.get_or_create(
+            review=review, member=request.user, defaults={"reason": reason}
+        )
+        # 신고 수가 임계값에 "딱 도달하는" 그 한 번만 자동 숨김. 그 뒤 신고(6번째~)나
+        # 관리자가 풀어준 뒤의 신고로는 다시 숨기지 않는다. 신고는 삭제되지 않으므로
+        # count는 created=True마다 1씩만 늘어 이 조건을 정확히 한 번 통과한다.
+        if created and review.reports.count() == REVIEW_REPORT_HIDE_THRESHOLD and not review.is_hidden:
+            review.is_hidden = True
+            review.save(update_fields=["is_hidden"])
+        return Response(status=201 if created else 200)
 
 
 class MyReviewListView(APIView):
@@ -162,7 +181,7 @@ class MyReviewListView(APIView):
 
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(summary="내 리뷰 조회", responses={200: ReviewSerializer(many=True), 401: OpenApiResponse(description="로그인 필요")})
+    @extend_schema(summary="내 리뷰 조회", responses={200: ReviewListResponseSerializer, 401: OpenApiResponse(description="로그인 필요")})
     def get(self, request):
         reviews = Review.objects.filter(member=request.user).order_by("-created_at")
         return Response({"reviews": ReviewSerializer(reviews, many=True, context={"request": request}).data})

@@ -12,7 +12,14 @@ from rest_framework.test import APIClient
 from accounts.firebase import InvalidFirebaseToken
 from accounts.models import Member
 from places.models import Place
-from reviews.models import REVIEW_CONTENT_MAX_LENGTH, REVIEW_MAX_PHOTOS, Review, ReviewLike, ReviewReport
+from reviews.models import (
+    REVIEW_CONTENT_MAX_LENGTH,
+    REVIEW_MAX_PHOTOS,
+    REVIEW_REPORT_HIDE_THRESHOLD,
+    Review,
+    ReviewLike,
+    ReviewReport,
+)
 
 
 def reviews_url(place_id):
@@ -322,7 +329,7 @@ class ReviewEditDeleteTests(TestCase):
             HTTP_AUTHORIZATION="Bearer fake-token",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.review.refresh_from_db()
         self.assertEqual(self.review.content, "고친 글")
 
@@ -471,7 +478,8 @@ class ReviewReportTests(TestCase):
         )
 
         self.assertEqual(first.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(second.status_code, status.HTTP_201_CREATED)
+        # 이미 신고한 리뷰를 또 신고하면 새 접수가 아니므로 200 (좋아요·즐겨찾기와 같은 멱등 규약).
+        self.assertEqual(second.status_code, status.HTTP_200_OK)
         self.assertEqual(ReviewReport.objects.filter(review=self.review, member=self.reporter1).count(), 1)
 
     def test_reporting_nonexistent_review_returns_404(self):
@@ -497,6 +505,75 @@ class ReviewReportTests(TestCase):
             )
 
         self.assertEqual(ReviewReport.objects.filter(review=self.review).count(), 2)
+
+
+class ReviewReportAutoHideTests(TestCase):
+    """서로 다른 사람이 REVIEW_REPORT_HIDE_THRESHOLD명 신고하면 자동으로 숨긴다 (DETAIL_SPEC 6-1 #13)."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.place = Place.objects.create(name="경복궁", address="서울시 종로구")
+        self.owner = create_member("ah-owner-uid")
+        self.review = Review.objects.create(
+            member=self.owner, place=self.place, rating=1, content="자동숨김 테스트", language="ko"
+        )
+
+    def _report_as(self, uid):
+        if not Member.objects.filter(firebase_uid=uid).exists():
+            create_member(uid)
+        with patch("accounts.authentication.verify_id_token") as mock_verify:
+            mock_verify.return_value = make_decoded_token(uid)
+            return self.client.post(
+                review_report_url(self.review.id),
+                {"reason": "부적절"},
+                format="json",
+                HTTP_AUTHORIZATION="Bearer fake-token",
+            )
+
+    def test_below_threshold_stays_visible(self):
+        for i in range(REVIEW_REPORT_HIDE_THRESHOLD - 1):
+            self._report_as(f"ah-reporter-{i}")
+
+        self.review.refresh_from_db()
+        self.assertFalse(self.review.is_hidden)
+
+    def test_reaching_threshold_hides_review(self):
+        for i in range(REVIEW_REPORT_HIDE_THRESHOLD):
+            self._report_as(f"ah-reporter-{i}")
+
+        self.review.refresh_from_db()
+        self.assertTrue(self.review.is_hidden)
+
+    def test_further_reports_after_hidden_do_not_error(self):
+        for i in range(REVIEW_REPORT_HIDE_THRESHOLD + 2):
+            response = self._report_as(f"ah-reporter-{i}")
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        self.review.refresh_from_db()
+        self.assertTrue(self.review.is_hidden)
+
+    def test_same_member_reporting_many_times_does_not_hide(self):
+        for _ in range(REVIEW_REPORT_HIDE_THRESHOLD + 3):
+            self._report_as("ah-single-reporter")
+
+        self.review.refresh_from_db()
+        self.assertFalse(self.review.is_hidden)
+        self.assertEqual(ReviewReport.objects.filter(review=self.review).count(), 1)
+
+    def test_admin_unhide_is_not_undone_by_later_report(self):
+        for i in range(REVIEW_REPORT_HIDE_THRESHOLD):
+            self._report_as(f"ah-reporter-{i}")
+        self.review.refresh_from_db()
+        self.assertTrue(self.review.is_hidden)
+
+        # 관리자가 확인하고 다시 보이게 함
+        self.review.is_hidden = False
+        self.review.save(update_fields=["is_hidden"])
+
+        # 그 뒤 또 신고가 들어와도 다시 숨기지 않는다
+        self._report_as("ah-reporter-late")
+        self.review.refresh_from_db()
+        self.assertFalse(self.review.is_hidden)
 
 
 class HiddenReviewTests(TestCase):

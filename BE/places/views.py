@@ -9,6 +9,7 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from config.api_messages import NOT_FOUND_MESSAGE
 from favorites.models import Favorite
 from places.models import Place, PlaceWork, SearchHistory, Work
 from reviews.models import Review
@@ -54,7 +55,6 @@ FAVORITE_SCORE_WEIGHT = 1
 REVIEW_SCORE_WEIGHT = 1
 
 NO_RESULT_MESSAGE = "검색결과가 존재하지 않습니다"
-NOT_FOUND_MESSAGE = "존재하지 않습니다"
 
 # 명소 상세의 "주변 상권" 조회 설정. 반경 1km 안에서 음식점·카페·관광명소 카테고리를
 # 각각 카카오 카테고리 검색으로 가져와 합친다 (PHASES/PHASE2.md 2-5 "주변 상권 검색 기준", 2026-08-19).
@@ -377,6 +377,7 @@ class RecommendationView(APIView):
         parameters=[
             OpenApiParameter("lat", float, description="현재 위도 (선택)"),
             OpenApiParameter("lng", float, description="현재 경도 (선택)"),
+            OpenApiParameter("lang", str, description="응답 언어 (예: en). 안 주면 로그인 회원의 언어 → 한국어 순"),
         ],
         responses={200: RecommendResponseSerializer},
     )
@@ -392,7 +393,12 @@ class RecommendationView(APIView):
         else:
             places = _random_places(RECOMMEND_COUNT)
 
-        return Response({"places": PlaceSearchSerializer(places, many=True).data})
+        # SearchView·PlaceDetailView와 같은 방식으로 응답 언어를 정한다: ?lang= → 로그인
+        # 회원의 언어 → 한국어 원문. 이걸 안 넘기면 추천 목록만 항상 한국어로 나갔다.
+        language = resolve_language(request)
+        return Response(
+            {"places": PlaceSearchSerializer(places, many=True, context={"language": language}).data}
+        )
 
 
 def _fetch_nearby_places(place):
