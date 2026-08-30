@@ -98,7 +98,7 @@ class CourseDetailView(APIView):
         summary="코스 수정",
         request=CourseWriteSerializer,
         responses={
-            200: CourseSerializer,
+            204: None,
             401: OpenApiResponse(description="로그인 필요"),
             403: OpenApiResponse(description="작성자 아님"),
             404: OpenApiResponse(description="코스 없음"),
@@ -114,7 +114,9 @@ class CourseDetailView(APIView):
         serializer = CourseWriteSerializer(course, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response(CourseSerializer(course).data)
+        # 수정 성공 시 본문 없이 204 (다른 PATCH 엔드포인트와 규약 통일).
+        # 갱신된 코스가 필요하면 GET /api/courses/<id>/로 다시 조회한다.
+        return Response(status=204)
 
     @extend_schema(
         summary="코스 삭제",

@@ -329,7 +329,7 @@ class ReviewEditDeleteTests(TestCase):
             HTTP_AUTHORIZATION="Bearer fake-token",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.review.refresh_from_db()
         self.assertEqual(self.review.content, "고친 글")
 

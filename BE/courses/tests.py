@@ -228,7 +228,7 @@ class CourseEditDeleteTests(TestCase):
             HTTP_AUTHORIZATION="Bearer fake-token",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.course.refresh_from_db()
         self.assertEqual(self.course.title, "새 제목")
 

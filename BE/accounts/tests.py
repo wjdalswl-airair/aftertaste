@@ -493,7 +493,7 @@ class MeNicknamePatchTests(TestCase):
             **self.auth_header,
         )
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         member.refresh_from_db()
         self.assertEqual(member.nickname, "새이름")
 
@@ -512,7 +512,7 @@ class MeNicknamePatchTests(TestCase):
             **self.auth_header,
         )
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         member.refresh_from_db()
         self.assertEqual(member.nickname, exactly_max)
 
@@ -559,7 +559,7 @@ class MeNicknamePatchTests(TestCase):
             **self.auth_header,
         )
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         member.refresh_from_db()
         self.assertEqual(member.nickname, "새이름")
         self.assertEqual(member.nationality, "KR")
@@ -582,7 +582,7 @@ class MeNicknamePatchTests(TestCase):
             **self.auth_header,
         )
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         member.refresh_from_db()
         self.assertEqual(member.profile_image_url, "https://storage.example.com/new.jpg")
 
@@ -600,7 +600,7 @@ class MeNicknamePatchTests(TestCase):
             ME_URL, {"profile_image_url": ""}, format="json", **self.auth_header,
         )
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         member.refresh_from_db()
         self.assertIsNone(member.profile_image_url)
 
@@ -637,7 +637,7 @@ class MeNicknamePatchTests(TestCase):
             ME_URL, {"nickname": "새이름"}, format="json", **self.auth_header,
         )
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         member.refresh_from_db()
         self.assertEqual(member.nickname, "새이름")
         self.assertEqual(member.profile_image_url, "https://keep.example.com/a.jpg")

@@ -168,7 +168,7 @@ class MeView(APIView):
         ),
         request=MemberProfileUpdateSerializer,
         responses={
-            200: None,
+            204: None,
             400: OpenApiResponse(response=ErrorDetailSerializer, description="닉네임 길이 초과 또는 사진 URL 형식 오류"),
             401: OpenApiResponse(response=ErrorDetailSerializer, description="로그인 필요"),
         },
@@ -177,7 +177,9 @@ class MeView(APIView):
         serializer = MemberProfileUpdateSerializer(request.user, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response(status=200)
+        # 수정 성공 시 본문 없이 204. 다른 PATCH 엔드포인트(리뷰·코스 수정)와 규약을 맞춘다.
+        # (예외: PATCH /account/locale/는 여운 API 명세서가 응답을 { language }로 고정, DETAIL_SPEC 6-1 #9)
+        return Response(status=204)
 
     @extend_schema(
         summary="회원 탈퇴",

@@ -83,7 +83,7 @@ class ReviewDetailView(APIView):
     @extend_schema(
         summary="리뷰 수정",
         request=ReviewWriteSerializer,
-        responses={200: None, 401: OpenApiResponse(description="로그인 필요"), 403: OpenApiResponse(description="작성자 아님")},
+        responses={204: None, 401: OpenApiResponse(description="로그인 필요"), 403: OpenApiResponse(description="작성자 아님")},
     )
     def patch(self, request, review_id):
         try:
@@ -95,7 +95,8 @@ class ReviewDetailView(APIView):
         serializer = ReviewWriteSerializer(review, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response(status=200)
+        # 수정 성공 시 본문 없이 204 (다른 PATCH 엔드포인트와 규약 통일).
+        return Response(status=204)
 
     @extend_schema(
         summary="리뷰 삭제",
