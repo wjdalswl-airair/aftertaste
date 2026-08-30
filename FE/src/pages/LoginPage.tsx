@@ -35,7 +35,7 @@ export function LoginPage() {
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-6 px-6 text-center">
-      <h1 className="font-brand text-3xl text-ink">여운</h1>
+      <h1 className="font-brand text-3xl font-bold text-primary">여운</h1>
       <p className="text-ink-secondary">당신의 여운을 위해 지금 바로 로그인 해보세요!</p>
 
       {state?.message && <p className="text-sm text-primary">{state.message}</p>}

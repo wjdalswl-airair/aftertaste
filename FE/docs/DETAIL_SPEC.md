@@ -131,8 +131,8 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 | `--color-ink` / `-secondary` / `-tertiary` | `#2B2320` / `#9C8AB0` / `#C9BAB0` | `text-ink`, `text-ink-secondary` |
 | `--color-divider` | `#F0E4DC` | `border-divider` |
 | `--radius-xs`~`--radius-2xl` | 8~28px | `rounded-lg` 등 |
-| `--font-sans` | Noto Sans KR | 본문 기본값 |
-| `--font-brand` | Gowun Batang | 로고/브랜드 텍스트에만 `font-brand` |
+| `--font-sans` | IBM Plex Sans KR (자체 호스팅) | 본문 기본값. 폰트 파일은 `src/assets/fonts/`, 등록은 `src/index.css`의 `@font-face` (2026-08-30) |
+| `--font-brand` | 푸른숲체 (유한킴벌리, 자체 호스팅) | 로고/브랜드 텍스트에만 `font-brand`. 폰트 파일은 `src/assets/fonts/`, 등록은 `src/index.css`의 `@font-face` (2026-08-30) |
 
 새 색상·radius가 필요하면 Figma가 먼저 바뀌어야 하고, 코드에서 임의로 값을 추가하지 않는다.
 
