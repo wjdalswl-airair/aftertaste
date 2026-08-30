@@ -1,14 +1,22 @@
 {
   "mainPage": {
-    "hallOfFame": {
-      "title": "이달의 명예의 전당",
-      "empty": "아직 명예의 전당이 없어요"
+    "greeting": {
+      "hello": "안녕하세요",
+      "nameSuffix": ", {{name}}님",
+      "subtitle": "오늘은 어떤 장면 속으로 떠나볼까요?"
+    },
+    "hero": {
+      "title": "금주의 명예의 전당",
+      "recommendTitle": "이 장소, 어떠세요?",
+      "empty": "아직 준비 중이에요"
     },
     "topPlaces": {
-      "title": "명소 Top10"
+      "title": "전국 Top 10 촬영지",
+      "empty": "아직 준비 중이에요"
     },
     "recommend": {
-      "title": "이런 곳은 어때요?"
+      "title": "내 주변 명소",
+      "empty": "아직 준비 중이에요"
     }
   }
 }

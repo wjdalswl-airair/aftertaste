@@ -14,3 +14,15 @@ export function getRecommendedSpots(coords?: { lat: number; lng: number }): Prom
     (res) => res.places,
   )
 }
+
+export type PlaceDetail = {
+  id: number
+  name: string
+  // 작품 연결 정보. 정확한 필드 구성은 BE 응답으로 확인 필요 (Hero 캡션 표시용, 없어도 화면은 안 깨짐).
+  works?: { title?: string; category?: 'drama' | 'movie' }[]
+}
+
+// 명예의 전당 리뷰의 명소 id로 이름/작품 정보를 보충할 때만 쓴다 (1건짜리 호출).
+export function getPlaceDetail(placeId: number): Promise<PlaceDetail> {
+  return publicFetch<PlaceDetail>(`/api/places/${placeId}/`)
+}

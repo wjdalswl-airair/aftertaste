@@ -53,7 +53,7 @@
 @theme {
   --color-primary: #f47c5c;
   --color-accent: #f8b08b;
-  --color-background: #fff5f0;
+  --color-background: #ffffff;
   --color-ink: #2b2320;
   --color-ink-secondary: #9c8ab0;
   --color-ink-tertiary: #c9bab0;
@@ -74,6 +74,25 @@ body {
   margin: 0;
   background: var(--color-background);
   color: var(--color-ink);
+}
+
+/* 가로 스크롤 캐러셀에서 스크롤바를 숨긴다 (배너/Top10/추천 카드 등) */
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* 바텀시트가 아래에서 올라오는 애니메이션 (LanguageSheet) */
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
 }
 
 #root {

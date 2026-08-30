@@ -127,7 +127,7 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 |---|---|---|
 | `--color-primary` | `#F47C5C` | `bg-primary`, `text-primary` |
 | `--color-accent` | `#F8B08B` | `bg-accent` |
-| `--color-background` | `#FFF5F0` | `bg-background` |
+| `--color-background` | `#FFFFFF` | `bg-background` (2026-08-30 변경) |
 | `--color-ink` / `-secondary` / `-tertiary` | `#2B2320` / `#9C8AB0` / `#C9BAB0` | `text-ink`, `text-ink-secondary` |
 | `--color-divider` | `#F0E4DC` | `border-divider` |
 | `--radius-xs`~`--radius-2xl` | 8~28px | `rounded-lg` 등 |
@@ -149,15 +149,20 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 - API: `POST /api/account/login/` (확정)
 - 상태: 로그인 성공 시 `useAuthStore` 갱신 후 이전 화면 또는 `/`로 이동
 
-### S-02. 메인 — `pages/MainPage.tsx` (Phase 2, 구현 완료)
-- 컴포넌트: `BannerSlider`, `HallOfFameCard`, `NationalityPicker`, `TopPlacesCarousel`, `RecommendedSpots`
+### S-02. 메인 — `pages/MainPage.tsx` (Phase 2, 구현 완료 — 2026-08-30 Figma 실제 목업에 맞춰 리디자인)
+- 컴포넌트: `Hero`(배너+명예의전당 병합), `LanguageSheet`(국적/언어 바텀시트), `BottomNav`(홈/검색/프로필), `TopPlacesCarousel`, `RecommendedSpots`
 - API (전부 확정, 실제 BE 코드로 확인함 — 2026-08-29):
   - `GET /api/banners/` → `{ banners: [{ id, image_url, link_url, order }] }`
   - `GET /api/main/hall-of-fame/` → `{ review: {...} | null }` (없으면 `null`, 200 정상 응답)
   - `GET /api/main/top-places/` → `{ places: [{ id, name, address, photo_url, favorite_count }] }`
   - `PATCH /api/account/locale/` → `{ nationality?, language? }` 요청, `{ language }` 응답. 로그인 불필요(선택), 비로그인이면 검증만 하고 저장은 프론트가 `useLocaleStore`(localStorage)로 한다.
-- 국적 선택은 PRD상 "미정"이었으나, BE 번역 지원 언어가 영어만으로 결정된 것에 맞춰 **한국(ko) / 해외(en) 2개만** 만들었다 (2026-08-29, 사용자 확인).
+- 국적 선택은 PRD상 "미정"이었으나, BE 번역 지원 언어가 영어만으로 결정된 것에 맞춰 **한국(ko) / 해외(en) 2개만** 만들었다 (2026-08-29, 사용자 확인). UI는 Figma처럼 헤더 지구본 아이콘 → 바텀시트.
 - 명예의전당·Top10은 BE 자체 문서엔 "Phase3 전엔 못 채운다"고 되어 있지만, 실제 코드는 스텁이 아니라 진짜 랭킹 로직이 이미 구현돼 있다. 데이터가 없으면 각각 `null`/`[]`을 정상 응답하므로 그 값 그대로 빈 상태 UI를 보여준다.
+- **Hero(배너+명예의전당 병합, 2026-08-30 캐러셀로 확장)**: "금주의 명예의 전당"(`GET /api/main/hall-of-fame/`)과 "이 장소, 어떠세요?"(`GET /api/places/recommend/`의 첫 번째 결과) 두 슬라이드를 4초마다 자동 전환 + 손가락 스와이프로 넘겨볼 수 있는 캐러셀로 보여준다. 둘 다 없으면 `GET /api/banners/`로 대체하고, 그마저 없으면 아무것도 안 보인다.
+- **BE 데이터가 없어서 생긴 제약 — BE 확인 필요 (2026-08-30)**:
+  1. Top10/추천 카드의 부제(작품명)를 Figma는 보여주지만, 두 API 응답에 작품명이 없어 **`address`로 대신 표시** 중이다.
+  2. 추천 카드의 거리 뱃지(예: "거리 1.2km")도 Figma엔 있지만, API 응답에 좌표가 없어 만들지 못했다.
+  3. Hero 캡션의 명소/작품명은 `review.place`(id)로 `GET /api/places/{id}/`를 한 번 더 호출해서 채운다. 이 상세 응답의 `works` 필드 정확한 구조를 아직 검증 못 해서(`src/api/spots.ts`의 `PlaceDetail` 타입이 추정치), 실제로 작품명이 안 나올 수 있다 — 필드가 없으면 명소 이름만 보인다.
 
 ### S-03. 검색 결과 — `pages/SearchPage.tsx`
 - 컴포넌트: 검색창(자동완성), 드라마/영화 필터, 장소/작품 섹션

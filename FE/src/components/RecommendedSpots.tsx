@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getRecommendedSpots, type RecommendedSpot } from '../api/spots'
 import { useGeolocation } from '../hooks/useGeolocation'
+import { Skeleton } from './Skeleton'
 
 export function RecommendedSpots() {
   const { t } = useTranslation()
   const { status, coords } = useGeolocation()
-  const [spots, setSpots] = useState<RecommendedSpot[]>([])
+  // undefined: 로딩 중, []: 확인 끝났는데 추천 없음
+  const [spots, setSpots] = useState<RecommendedSpot[] | undefined>(undefined)
 
   useEffect(() => {
     if (status === 'pending') {
@@ -17,28 +19,33 @@ export function RecommendedSpots() {
       .catch(() => setSpots([]))
   }, [status, coords])
 
-  if (spots.length === 0) {
-    return null
-  }
-
   return (
-    <section className="px-4">
-      <h2 className="mb-3 text-lg font-bold text-ink">{t('mainPage.recommend.title')}</h2>
-      <div className="flex flex-col gap-3">
-        {spots.map((spot) => (
-          <div key={spot.id} className="flex items-center gap-3 rounded-lg border border-divider p-3">
-            <img
-              src={spot.photo_url}
-              alt=""
-              className="h-16 w-16 flex-shrink-0 rounded-md object-cover"
-            />
-            <div>
-              <p className="text-ink">{spot.name}</p>
-              <p className="text-sm text-ink-secondary">{spot.address}</p>
+    <section>
+      <h2 className="mb-3 px-4 text-lg font-bold text-ink">{t('mainPage.recommend.title')}</h2>
+
+      {(spots === undefined || status === 'pending') && (
+        <div className="flex gap-3 px-4">
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} className="aspect-square w-[110px] flex-shrink-0" />
+          ))}
+        </div>
+      )}
+
+      {spots?.length === 0 && status !== 'pending' && (
+        <p className="px-4 text-sm text-ink-tertiary">{t('mainPage.recommend.empty')}</p>
+      )}
+
+      {spots && spots.length > 0 && (
+        <div className="scrollbar-hide flex snap-x snap-mandatory gap-3 overflow-x-auto px-4">
+          {spots.map((spot) => (
+            <div key={spot.id} className="w-[110px] flex-shrink-0 snap-center">
+              <img src={spot.photo_url} alt="" className="aspect-square w-full rounded-md object-cover" />
+              <p className="mt-1 truncate text-xs text-ink">{spot.name}</p>
+              <p className="truncate text-[11px] text-ink-secondary">{spot.address}</p>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </section>
   )
 }

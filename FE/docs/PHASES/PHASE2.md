@@ -50,10 +50,23 @@
 | `src/store/useLocaleStore.ts` | 국적/언어 상태, `zustand/persist`로 localStorage 저장 |
 | `src/i18n/` | react-i18next 설정, `ko.json`/`en.json` |
 | `src/hooks/useGeolocation.ts` | 위치 권한 훅 |
-| `src/components/BannerSlider.tsx`, `NationalityPicker.tsx`, `RecommendedSpots.tsx`, `TopPlacesCarousel.tsx`, `HallOfFameCard.tsx` | 메인 화면 구성 요소 |
+| `src/components/RecommendedSpots.tsx`, `TopPlacesCarousel.tsx` | 메인 화면 카드 목록 |
 | `src/pages/MainPage.tsx` | 위 컴포넌트 조합, `/` 라우트로 교체 |
 
 국적 선택은 PRD상 "미정"이었으나, BE 번역 지원 언어가 영어만인 것에 맞춰 **한국 / 해외(영어) 2개만** 만들기로 결정 (2026-08-29, 사용자 확인). 자세한 내용은 `docs/DETAIL_SPEC.md` S-02 참고.
+
+**리디자인 (2026-08-30)**: 사용자가 실제 Figma 화면 목업(`node-id=55-325`)을 공유해줘서, 처음 만든 UI 대신 그 목업에 맞춰 다시 만들었다. "여운 Design System" 스타일가이드 프레임은 참고하지 않고 실제 화면 프레임만 기준으로 삼았다 (컬러 팔레트는 예외적으로 그대로 사용 — 값이 실제 목업과 동일해서 문제 없음).
+
+| 파일 | 역할 |
+|---|---|
+| `src/components/Hero.tsx` | `BannerSlider` + `HallOfFameCard` 병합. 명예의전당 있으면 그걸로, 없으면 배너로 대체 |
+| `src/components/LanguageSheet.tsx` | `NationalityPicker` 대체. 헤더 지구본 아이콘 → 바텀시트(한국어/English) |
+| `src/components/BottomNav.tsx` | 홈/검색/프로필 플로팅 네비 (신규, Figma에 있었지만 원래 계획엔 없던 요소) |
+| `src/api/spots.ts`의 `getPlaceDetail()` | Hero 캡션용 명소 이름/작품명 보충 조회 (`GET /api/places/{id}/`, 1건만) |
+
+BE 데이터가 없어서 못 채운 부분 3가지(카드 부제=작품명 대신 주소, 추천 카드 거리 뱃지 없음, Hero 작품명 필드 미검증)는 `docs/DETAIL_SPEC.md` S-02에 "BE 확인 필요"로 기록해뒀다.
+
+**리디자인 브라우저 확인 (2026-08-30)**: 헤더 로고+지구본, 지구본 → 바텀시트(한국어/English) 전환, 카드 레이아웃, 하단 플로팅 네비까지 정상 동작 확인함.
 
 **Commands**
 - `npm run test`: 21개 테스트 통과 (Phase 1 것 포함, Phase 2에서 10개 추가)
