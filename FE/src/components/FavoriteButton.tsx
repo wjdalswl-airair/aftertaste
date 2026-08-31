@@ -1,11 +1,13 @@
 import { Star } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { addFavorite, removeFavorite } from '../api/bookmarks'
+import { addCourseFavorite, addFavorite, removeCourseFavorite, removeFavorite } from '../api/bookmarks'
 import { useAuthStore } from '../store/useAuthStore'
 
 type FavoriteButtonProps = {
   placeId: number
+  // 'course'면 placeId를 코스 id로 넘긴다 (명소/코스 즐겨찾기 API가 서로 달라서 여기서 갈라준다).
+  type?: 'place' | 'course'
   // 목록 API(추천/Top10)는 즐겨찾기 여부를 안 줘서 기본값은 항상 빈 별이다.
   // 명소 상세처럼 실제 값(is_favorited)을 아는 화면에서만 넘겨준다.
   initialFavorited?: boolean
@@ -13,9 +15,10 @@ type FavoriteButtonProps = {
   className?: string
 }
 
-// 명소 카드/상세 화면에 얹는 즐겨찾기 별 버튼.
+// 명소·코스 카드/상세 화면에 얹는 즐겨찾기 별 버튼.
 export function FavoriteButton({
   placeId,
+  type = 'place',
   initialFavorited = false,
   size = 16,
   className = 'absolute right-1 top-1 rounded-full p-1',
@@ -40,7 +43,9 @@ export function FavoriteButton({
     setPending(true)
     const next = !isFavorited
     setIsFavorited(next)
-    const request = next ? addFavorite(placeId) : removeFavorite(placeId)
+    const add = type === 'course' ? addCourseFavorite : addFavorite
+    const remove = type === 'course' ? removeCourseFavorite : removeFavorite
+    const request = next ? add(placeId) : remove(placeId)
     request
       .catch(() => setIsFavorited(!next))
       .finally(() => setPending(false))

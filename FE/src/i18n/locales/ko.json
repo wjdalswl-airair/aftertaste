@@ -114,5 +114,30 @@
     "withdrawConfirmTitle": "정말 탈퇴하시겠어요?",
     "withdrawConfirmButton": "탈퇴하기",
     "withdrawCancelButton": "취소"
+  },
+  "courseCreate": {
+    "title": "주변 코스 추천",
+    "titlePlaceholder": "코스 이름을 입력해주세요",
+    "tabs": {
+      "FOOD_CAFE": "맛집·카페",
+      "EXPERIENCE": "체험·공방",
+      "NEARBY": "주변 명소"
+    },
+    "candidatesEmpty": "주변에 후보가 없어요",
+    "selectedLabel": "코스 구성",
+    "submitButton": "등록"
+  },
+  "courseDetail": {
+    "notFound": "존재하지 않습니다",
+    "placesCountSuffix": "곳",
+    "delete": "삭제하기",
+    "cancel": "취소"
+  },
+  "myCourseList": {
+    "title": "나만의 코스",
+    "placesCountSuffix": "곳",
+    "empty": "아직 만든 코스가 없어요",
+    "delete": "삭제하기",
+    "cancel": "취소"
   }
 }

@@ -71,6 +71,34 @@ describe('src/api/bookmarks.ts', () => {
     })
   })
 
+  describe('addCourseFavorite', () => {
+    it('성공하면 POST로 코스 즐겨찾기를 등록한다', async () => {
+      const { addCourseFavorite } = await import('./bookmarks')
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 204 }))
+
+      await addCourseFavorite(1)
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/courses/1/favorite/'),
+        expect.objectContaining({ method: 'POST' }),
+      )
+    })
+  })
+
+  describe('removeCourseFavorite', () => {
+    it('성공하면 DELETE로 코스 즐겨찾기를 취소한다', async () => {
+      const { removeCourseFavorite } = await import('./bookmarks')
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 204 }))
+
+      await removeCourseFavorite(1)
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/courses/1/favorite/'),
+        expect.objectContaining({ method: 'DELETE' }),
+      )
+    })
+  })
+
   describe('getMyFavorites', () => {
     it('성공하면 즐겨찾기 목록을 반환한다', async () => {
       const { getMyFavorites } = await import('./bookmarks')
@@ -79,6 +107,7 @@ describe('src/api/bookmarks.ts', () => {
           id: 1,
           type: 'PLACE' as const,
           place: { id: 1, name: '경복궁', address: '서울', photo_url: 'https://a.com/1.png' },
+          course: null,
           created_at: '2026-01-01T00:00:00Z',
         },
       ]
