@@ -2,16 +2,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Member } from './auth'
 
 // vi.mock은 파일 최상단으로 끌어올려지므로, 그 안에서 쓸 값은 vi.hoisted로 만든다.
-const { mockAuth, getIdToken } = vi.hoisted(() => {
+const { mockAuth, getIdToken, signOutMock } = vi.hoisted(() => {
   const getIdToken = vi.fn()
+  const signOutMock = vi.fn()
   return {
     mockAuth: { currentUser: null as null | { getIdToken: typeof getIdToken } },
     getIdToken,
+    signOutMock,
   }
 })
 
 vi.mock('../lib/firebase', () => ({
   auth: mockAuth,
+}))
+
+vi.mock('firebase/auth', () => ({
+  signOut: signOutMock,
 }))
 
 const member: Member = {
@@ -23,6 +29,8 @@ const member: Member = {
   nationality: null,
   language: null,
   created_at: '2026-01-01T00:00:00Z',
+  reviewed_places_count: 3,
+  created_courses_count: 2,
 }
 
 describe('src/api/auth.ts', () => {
@@ -104,5 +112,53 @@ describe('src/api/auth.ts', () => {
       expect.stringContaining('/api/account/'),
       expect.objectContaining({ method: 'GET' }),
     )
+  })
+
+  it('updateProfile은 PATCH로 프로필을 수정한다', async () => {
+    const { updateProfile } = await import('./auth')
+    getIdToken.mockResolvedValue('fake-id-token')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 204 }))
+
+    await updateProfile({ nickname: '새닉네임' })
+
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/account/'),
+      expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ nickname: '새닉네임' }) }),
+    )
+  })
+
+  it('updateProfile은 닉네임 길이 초과 시 서버 에러 메시지를 던진다', async () => {
+    const { updateProfile } = await import('./auth')
+    getIdToken.mockResolvedValue('fake-id-token')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 400, json: async () => ({ detail: '닉네임이 너무 길어요' }) }),
+    )
+
+    await expect(updateProfile({ nickname: '아주아주아주아주아주아주아주긴닉네임' })).rejects.toThrow(
+      '닉네임이 너무 길어요',
+    )
+  })
+
+  it('deleteAccount는 DELETE로 탈퇴 처리한다', async () => {
+    const { deleteAccount } = await import('./auth')
+    getIdToken.mockResolvedValue('fake-id-token')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 204 }))
+
+    await deleteAccount()
+
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/account/'),
+      expect.objectContaining({ method: 'DELETE' }),
+    )
+  })
+
+  it('logout은 firebase signOut을 호출한다', async () => {
+    const { logout } = await import('./auth')
+    signOutMock.mockResolvedValue(undefined)
+
+    await logout()
+
+    expect(signOutMock).toHaveBeenCalledWith(mockAuth)
   })
 })

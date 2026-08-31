@@ -11,6 +11,8 @@ const member: Member = {
   nationality: null,
   language: null,
   created_at: '2026-01-01T00:00:00Z',
+  reviewed_places_count: 0,
+  created_courses_count: 0,
 }
 
 describe('useAuthStore', () => {

@@ -1,3 +1,4 @@
+import { signOut } from 'firebase/auth'
 import { auth } from '../lib/firebase'
 import { publicFetch } from './client'
 
@@ -13,6 +14,9 @@ export type Member = {
   nationality: string | null
   language: string | null
   created_at: string
+  // 마이페이지 프로필 요약 (BE MemberSerializer 참고)
+  reviewed_places_count: number
+  created_courses_count: number
 }
 
 type ErrorBody = { detail?: string }
@@ -59,6 +63,25 @@ export function loginWithFirebase(): Promise<Member> {
 // 내 정보 조회 (BE MeView)
 export function getMe(): Promise<Member> {
   return authorizedFetch<Member>('/api/account/', { method: 'GET' })
+}
+
+// 프로필(닉네임·프로필 사진) 수정. 보낸 값만 반영된다 (BE MeView.patch, 204).
+export function updateProfile(payload: {
+  nickname?: string
+  profile_image_url?: string | null
+}): Promise<void> {
+  return authorizedFetch<void>('/api/account/', { method: 'PATCH', body: JSON.stringify(payload) })
+}
+
+// 회원 탈퇴 (BE MeView.delete, 204). 성공하면 호출부에서 logout()까지 이어서 호출한다.
+export function deleteAccount(): Promise<void> {
+  return authorizedFetch<void>('/api/account/', { method: 'DELETE' })
+}
+
+// 로그아웃. Firebase 세션을 지우면 useInitAuth의 onAuthStateChanged가 감지해서
+// useAuthStore의 member를 알아서 null로 정리해준다.
+export function logout(): Promise<void> {
+  return signOut(auth)
 }
 
 // 국적/언어 저장. 로그인 여부와 관계없이 부를 수 있다.
