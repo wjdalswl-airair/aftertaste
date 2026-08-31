@@ -13,8 +13,16 @@ declare global {
     }
 
     class Marker {
-      constructor(options: { position: LatLng; map?: Map; title?: string })
+      constructor(options: { position: LatLng; map?: Map; title?: string; image?: MarkerImage })
       setMap(map: Map | null): void
+    }
+
+    class Size {
+      constructor(width: number, height: number)
+    }
+
+    class MarkerImage {
+      constructor(src: string, size: Size)
     }
 
     class InfoWindow {

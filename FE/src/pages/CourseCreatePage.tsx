@@ -1,11 +1,12 @@
 import { ArrowLeft, Plus, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 import { createCourse, type CoursePlaceInput, type CoursePlaceRole } from '../api/courses'
 import { getPlaceDetail, type NearbyPlace, type PlaceDetail } from '../api/spots'
 import { BottomNav } from '../components/BottomNav'
 import { Skeleton } from '../components/Skeleton'
+import { loadKakaoMaps } from '../lib/kakaoMap'
 import { classifyNearbyPlace, getCoursePlaceRole, type CourseCategoryTab } from '../utils/courseCategory'
 import { getDistanceKm } from '../utils/distance'
 
@@ -16,6 +17,16 @@ const ROLE_LABEL: Record<CoursePlaceRole, string> = {
   OTHER: '주변 명소',
 }
 const TITLE_MAX_LENGTH = 200
+
+// 지도 위 명소(앙커)/후보 마커 색. index.css의 --color-primary, --color-ink-tertiary와 맞춘다.
+const ANCHOR_PIN_COLOR = '#f47c5c'
+const PICKED_PIN_COLOR = '#f47c5c'
+const CANDIDATE_PIN_COLOR = '#c9bab0'
+
+function pinIconDataUrl(color: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="36" viewBox="0 0 28 36"><path d="M14 0C6.3 0 0 6.3 0 14c0 10.5 14 22 14 22s14-11.5 14-22C28 6.3 21.7 0 14 0z" fill="${color}"/><circle cx="14" cy="14" r="5" fill="white"/></svg>`
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
+}
 
 type Pick = { role: CoursePlaceRole; candidate: NearbyPlace }
 
@@ -61,6 +72,27 @@ export function CourseCreatePage() {
   function handleRemove(role: CoursePlaceRole) {
     setPicks((prev) => prev.filter((pick) => pick.role !== role))
   }
+
+  const handleToggle = useCallback(
+    (candidate: NearbyPlace) => {
+      const role = getCoursePlaceRole(candidate.category_name)
+      setPicks((prev) => {
+        const isPicked = prev.some((pick) => pick.role === role && pick.candidate === candidate)
+        if (isPicked) {
+          return prev.filter((pick) => pick.role !== role)
+        }
+        const next: Pick = { role, candidate }
+        const index = prev.findIndex((pick) => pick.role === role)
+        if (index === -1) {
+          return [...prev, next]
+        }
+        const copy = [...prev]
+        copy[index] = next
+        return copy
+      })
+    },
+    [],
+  )
 
   const canSubmit = title.trim().length > 0 && picks.length === 3 && !submitting
 
@@ -112,6 +144,17 @@ export function CourseCreatePage() {
               className="w-full rounded-lg border border-divider px-3 py-2 text-sm text-ink outline-none"
             />
           </div>
+
+          {anchorLat !== null && anchorLng !== null && (
+            <div className="px-4">
+              <CourseCandidateMap
+                anchor={{ name: place.name, latitude: anchorLat, longitude: anchorLng }}
+                candidates={candidates}
+                picks={picks}
+                onToggle={handleToggle}
+              />
+            </div>
+          )}
 
           <div className="flex gap-2 px-4">
             {TABS.map((option) => (
@@ -213,5 +256,89 @@ export function CourseCreatePage() {
 
       <BottomNav />
     </main>
+  )
+}
+
+function CourseCandidateMap({
+  anchor,
+  candidates,
+  picks,
+  onToggle,
+}: {
+  anchor: { name: string; latitude: number; longitude: number }
+  candidates: NearbyPlace[]
+  picks: Pick[]
+  onToggle: (candidate: NearbyPlace) => void
+}) {
+  const { t } = useTranslation()
+  const mapRef = useRef<HTMLDivElement>(null)
+  const mapInstanceRef = useRef<kakao.maps.Map | null>(null)
+  const markersRef = useRef<kakao.maps.Marker[]>([])
+  const [status, setStatus] = useState<'loading' | 'ready' | 'unavailable'>('loading')
+
+  useEffect(() => {
+    const promise = loadKakaoMaps()
+    if (!promise) {
+      setStatus('unavailable')
+      return
+    }
+
+    let cancelled = false
+    promise
+      .then((kakaoSdk) => {
+        if (cancelled || !mapRef.current) {
+          return
+        }
+        const center = new kakaoSdk.maps.LatLng(anchor.latitude, anchor.longitude)
+        const map = new kakaoSdk.maps.Map(mapRef.current, { center, level: 5 })
+        mapInstanceRef.current = map
+        new kakaoSdk.maps.Marker({
+          position: center,
+          map,
+          title: anchor.name,
+          image: new kakaoSdk.maps.MarkerImage(pinIconDataUrl(ANCHOR_PIN_COLOR), new kakaoSdk.maps.Size(28, 36)),
+        })
+        setStatus('ready')
+      })
+      .catch(() => setStatus('unavailable'))
+
+    return () => {
+      cancelled = true
+    }
+  }, [anchor.latitude, anchor.longitude, anchor.name])
+
+  useEffect(() => {
+    const kakaoSdk = window.kakao
+    const map = mapInstanceRef.current
+    if (status !== 'ready' || !kakaoSdk?.maps || !map) {
+      return
+    }
+
+    markersRef.current.forEach((marker) => marker.setMap(null))
+    markersRef.current = candidates.map((candidate) => {
+      const isPicked = picks.some((pick) => pick.candidate === candidate)
+      const marker = new kakaoSdk.maps.Marker({
+        position: new kakaoSdk.maps.LatLng(candidate.latitude, candidate.longitude),
+        map,
+        title: candidate.place_name ?? undefined,
+        image: new kakaoSdk.maps.MarkerImage(
+          pinIconDataUrl(isPicked ? PICKED_PIN_COLOR : CANDIDATE_PIN_COLOR),
+          new kakaoSdk.maps.Size(28, 36),
+        ),
+      })
+      kakaoSdk.maps.event.addListener(marker, 'click', () => onToggle(candidate))
+      return marker
+    })
+  }, [candidates, picks, onToggle, status])
+
+  return (
+    <div className="relative h-[180px] w-full overflow-hidden rounded-2xl bg-accent/15">
+      <div ref={mapRef} className="h-full w-full" />
+      {status !== 'ready' && (
+        <div className="absolute inset-0 flex items-center justify-center bg-accent/15 text-sm text-ink-tertiary">
+          {status === 'loading' ? '' : t('courseCreate.mapUnavailable')}
+        </div>
+      )}
+    </div>
   )
 }

@@ -125,7 +125,8 @@
     },
     "candidatesEmpty": "주변에 후보가 없어요",
     "selectedLabel": "코스 구성",
-    "submitButton": "등록"
+    "submitButton": "등록",
+    "mapUnavailable": "지도를 표시할 수 없어요"
   },
   "courseDetail": {
     "notFound": "존재하지 않습니다",

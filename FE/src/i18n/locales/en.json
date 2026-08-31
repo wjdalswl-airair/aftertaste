@@ -125,7 +125,8 @@
     },
     "candidatesEmpty": "No candidates nearby",
     "selectedLabel": "Course lineup",
-    "submitButton": "Submit"
+    "submitButton": "Submit",
+    "mapUnavailable": "Map unavailable"
   },
   "courseDetail": {
     "notFound": "Not found",
