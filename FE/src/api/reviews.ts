@@ -32,6 +32,11 @@ export function getPlaceReviews(placeId: number): Promise<ReviewItem[]> {
   return publicFetch<{ reviews: ReviewItem[] }>(`/api/places/${placeId}/reviews/`).then((res) => res.reviews)
 }
 
+// 내가 쓴 리뷰 모아보기 (마이페이지). place는 ID로만 온다(장소명·썸네일 없음).
+export function getMyReviews(): Promise<ReviewItem[]> {
+  return authorizedFetch<{ reviews: ReviewItem[] }>('/api/account/reviews/').then((res) => res.reviews)
+}
+
 export function createReview(placeId: number, input: ReviewInput): Promise<{ reviewId: number }> {
   return authorizedFetch<{ reviewId: number }>(`/api/places/${placeId}/reviews/`, {
     method: 'POST',

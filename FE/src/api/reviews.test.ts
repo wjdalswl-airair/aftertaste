@@ -73,6 +73,34 @@ describe('src/api/reviews.ts', () => {
     })
   })
 
+  describe('getMyReviews', () => {
+    it('성공하면 내가 쓴 리뷰 목록을 반환한다', async () => {
+      const { getMyReviews } = await import('./reviews')
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ reviews: [review] }) }),
+      )
+
+      const result = await getMyReviews()
+
+      expect(result).toEqual([review])
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/account/reviews/'),
+        expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer fake-id-token' }) }),
+      )
+    })
+
+    it('로그인 안 되어 있으면 에러를 던진다', async () => {
+      const { getMyReviews } = await import('./reviews')
+      mockAuth.currentUser = null
+      const fetchSpy = vi.fn()
+      vi.stubGlobal('fetch', fetchSpy)
+
+      await expect(getMyReviews()).rejects.toThrow('로그인이 필요합니다')
+      expect(fetchSpy).not.toHaveBeenCalled()
+    })
+  })
+
   describe('createReview', () => {
     it('성공하면 생성된 리뷰 id를 반환한다', async () => {
       const { createReview } = await import('./reviews')

@@ -243,12 +243,20 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 ### S-09. 공유 — 명소 상세/코스 화면 내부 기능
 - 링크 복사만 구현 (PRD 5장)
 
-### S-10. 마이페이지 — `pages/MyPage.tsx`
-- 컴포넌트: 프로필, 즐겨찾기 목록, 내가 쓴 리뷰, 국적/언어 설정
-- API: `GET /api/account/` (확정), `GET /account/reviews` (계획), `PATCH /api/account/`(프로필 수정, 계획)
+### S-10. 마이페이지 — `pages/MyPage.tsx` (Phase 7, 구현 완료 — 2026-08-31)
+- API (전부 확정, 실제 BE 코드로 확인함 — `accounts/views.py`, `reviews/views.py`):
+  - `GET /api/account/` — 내 정보(프로필, `reviewed_places_count`, `created_courses_count` 포함).
+  - `PATCH /api/account/` — 닉네임·프로필 사진 수정, 204. 닉네임 20자 제한은 서버가 자동 검증(400).
+  - `GET /api/account/reviews/` — 내가 쓴 리뷰 목록. `GET /api/account/favorites/`(Phase5에서 이미 구현)와 같은 방식으로 재사용.
+- Figma 목업(node 102-1323, 102-1477) 기준으로 프로필/즐겨찾기/내 리뷰/나만의 코스/로그아웃 섹션 구성.
+- **"내가 쓴 리뷰" 카드에 장소명을 보여준다.** `GET /api/account/reviews/`가 `ReviewSerializer`를 그대로 쓰는데, `place`가 ID로만 온다(이름·썸네일 없음, S-07 갭과 동일) — 처음엔 이름 없이 리뷰 내용만 보여주기로 했다가(2026-08-31 오전), 사용자가 장소명도 같이 보고 싶다고 해서 리뷰에 쓰인 장소들만 중복 제거해서 `getPlaceDetail`로 따로 조회하는 방식으로 바꿨다(2026-08-31 오후). 장소당 한 번만 호출되긴 하지만, `getPlaceDetail`이 명소 상세 전체(주변 상권·리뷰 목록 포함)를 돌려주는 무거운 API라 이름 하나 얻으려고 쓰기엔 과하다 — BE에 "장소 이름만" 주는 가벼운 API나, `ReviewSerializer`에 `place_name` 필드 추가를 요청하면 더 나아질 수 있다. 클릭하면 `/spots/{place}/reviews/{id}`(이미 있는 라우트)로 이동한다.
+- **"나만의 코스" 섹션은 빈 자리만 만들었다.** 실제로는 `GET /api/account/courses/`(`MyCourseListView`)가 이미 구현돼 있고 Figma도 실제 데이터를 보여주지만, PHASE7.md 원안 스코프(코스는 Phase8)를 그대로 따르기로 사용자가 확인했다(2026-08-31). Phase8에서 연동한다.
+- 프로필 사진은 리뷰 사진과 동일하게 Firebase Storage에 먼저 업로드(`src/lib/profilePhotoUpload.ts`, `profile/{uid}/{timestamp}-{filename}` 경로)한 뒤 URL을 `profile_image_url`로 보낸다.
+- Figma의 언어 선택 시트엔 5개 언어(한국어/English/日本語/简体中文/繁體中文)가 보이지만, 기존 `LanguageSheet`(Phase1/2)는 ko/en 2개만 지원한다. 이번 Phase 범위가 아니라 손대지 않았다 — 다국어 지원 언어 확장은 별도로 논의 필요.
 
-### S-11. 회원탈퇴 — 마이페이지 내부 기능
-- API: `DELETE /account` (계획)
+### S-11. 회원탈퇴 — 마이페이지 내부 기능 (Phase 7, 구현 완료 — 2026-08-31)
+- API: `DELETE /api/account/` (확정, `MeView.delete`) — 204. 회원 row는 안 지우고 개인정보만 비우는 방식(BE 처리, FE는 신경쓸 필요 없음).
+- Figma 목업엔 탈퇴 버튼/화면이 없어서, 로그아웃 버튼 아래 작은 텍스트 링크("탈퇴하기")로 최소한만 추가했다. 클릭하면 `ReviewDetailPage`의 삭제 확인 바텀시트와 동일한 스타일의 확인 시트가 뜨고, 확인 시 탈퇴 처리 후 로그아웃하고 메인으로 이동한다.
 
 ---
 

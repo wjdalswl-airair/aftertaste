@@ -96,5 +96,23 @@
     "edit": "Edit",
     "delete": "Delete",
     "cancel": "Cancel"
+  },
+  "myPage": {
+    "profileEditButton": "Edit profile",
+    "profileSaveButton": "Save profile",
+    "reviewedPlacesLabel": "Verified spots: {{count}}",
+    "createdCoursesLabel": "Courses suggested: {{count}}",
+    "favoritesTitle": "My saved spots",
+    "favoritesMore": "See more",
+    "favoritesEmpty": "No saved spots yet",
+    "myReviewsTitle": "My reviews",
+    "myReviewsEmpty": "No reviews yet",
+    "myCoursesTitle": "My courses",
+    "myCoursesEmpty": "No courses yet",
+    "logoutButton": "Log out",
+    "withdrawLink": "Delete account",
+    "withdrawConfirmTitle": "Are you sure you want to delete your account?",
+    "withdrawConfirmButton": "Delete account",
+    "withdrawCancelButton": "Cancel"
   }
 }

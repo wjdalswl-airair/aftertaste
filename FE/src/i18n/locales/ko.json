@@ -96,5 +96,23 @@
     "edit": "수정하기",
     "delete": "삭제하기",
     "cancel": "취소"
+  },
+  "myPage": {
+    "profileEditButton": "프로필 편집",
+    "profileSaveButton": "프로필 저장",
+    "reviewedPlacesLabel": "방문 인증한 촬영지 : {{count}}",
+    "createdCoursesLabel": "제안한 코스 : {{count}}",
+    "favoritesTitle": "내가 저장한 명소",
+    "favoritesMore": "더보기",
+    "favoritesEmpty": "아직 저장한 명소가 없어요",
+    "myReviewsTitle": "내가 쓴 리뷰",
+    "myReviewsEmpty": "아직 작성한 리뷰가 없어요",
+    "myCoursesTitle": "나만의 코스",
+    "myCoursesEmpty": "아직 만든 코스가 없어요",
+    "logoutButton": "로그아웃",
+    "withdrawLink": "탈퇴하기",
+    "withdrawConfirmTitle": "정말 탈퇴하시겠어요?",
+    "withdrawConfirmButton": "탈퇴하기",
+    "withdrawCancelButton": "취소"
   }
 }
