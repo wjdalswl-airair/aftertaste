@@ -163,6 +163,17 @@ KAKAO_API_KEY = os.environ.get("KAKAO_API_KEY", "")
 # Google Cloud Translation API (v2) 키. 명소·작품 번역에 쓴다 (docs/DETAIL_SPEC.md 6-1 #13).
 GOOGLE_TRANSLATE_API_KEY = os.environ.get("GOOGLE_TRANSLATE_API_KEY", "")
 
+# TMDB(The Movie Database) API 읽기 액세스 토큰(v4). 작품(영화·드라마)의 줄거리·감독·
+# 방영일자·포스터를 보강하는 데 쓴다. KOBIS는 포스터를 안 주고, 한국영상자료원(KMDB)은
+# 드라마를 거의 안 담고 있어서 영화·드라마를 한 곳에서 처리할 수 있는 TMDB를 쓴다.
+# "Bearer <토큰>" 헤더로 호출한다 (짧은 v3 api_key 문자열이 아니다).
+TMDB_API_KEY = os.environ.get("TMDB_API_KEY", "")
+
+# TMDB 포스터 이미지 CDN. poster_path 앞에 붙여서 완전한 URL을 만든다.
+# 크기 목록: w92 / w154 / w185 / w342 / w500 / w780 / original.
+TMDB_IMAGE_BASE_URL = os.environ.get("TMDB_IMAGE_BASE_URL", "https://image.tmdb.org/t/p")
+TMDB_POSTER_SIZE = os.environ.get("TMDB_POSTER_SIZE", "w500")
+
 
 # Firebase Authentication
 # 서비스 계정 키 파일 경로. 아직 준비되지 않았다면 파일이 없어도 서버는 정상 부팅되고,
