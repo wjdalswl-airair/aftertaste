@@ -13,6 +13,7 @@ SERVICE_KEY_IS_NOT_REGISTERED_ERROR가 난다.
 예외를 그대로 올린다 (호출하는 커맨드가 건별로 잡아서 계속 돈다).
 """
 
+import time
 from urllib.parse import unquote
 
 import requests
@@ -20,6 +21,13 @@ from django.conf import settings
 
 _BASE_URL = "https://apis.data.go.kr/B551011/KorService2/searchKeyword2"
 _TIMEOUT_SECONDS = 10
+
+# data.go.kr은 초당 요청 수가 몰리면 HTTP 429(Too Many Requests)를 준다 — 일일 한도와는
+# 별개다. 명소 수천 건을 이어서 호출하면 반드시 걸리므로, 429·5xx·타임아웃은 잠깐 쉬고
+# 다시 시도한다. 그래도 안 되면 예외를 올려서 커맨드가 그 명소만 건너뛰게 한다.
+_MAX_RETRIES = 4
+_RETRY_BACKOFF_SECONDS = (2, 5, 10, 20)
+_RETRY_STATUS_CODES = {429, 500, 502, 503, 504}
 
 # arrange=O : 대표이미지가 있는 항목을 먼저, 그 안에서 제목순. 우리는 이미지가 목적이라
 # 이미지 없는 항목을 뒤로 미뤄서 numOfRows 안에 이미지 있는 후보가 최대한 들어오게 한다.
@@ -71,8 +79,7 @@ def search_keyword(keyword):
         "keyword": keyword,
     }
 
-    response = requests.get(_BASE_URL, params=params, timeout=_TIMEOUT_SECONDS)
-    response.raise_for_status()
+    response = _get_with_retry(params)
 
     try:
         data = response.json()
@@ -100,6 +107,42 @@ def search_keyword(keyword):
         rows = [rows]
 
     return [_normalize_item(row) for row in rows]
+
+
+def _get_with_retry(params):
+    """searchKeyword2를 호출한다. 429·5xx·타임아웃이면 잠깐 쉬고 다시 시도한다.
+
+    Retry-After 헤더가 있으면 그 값을, 없으면 _RETRY_BACKOFF_SECONDS를 따른다.
+    재시도를 모두 소진하면 마지막 예외를 그대로 올린다.
+    """
+    last_exc = None
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            response = requests.get(_BASE_URL, params=params, timeout=_TIMEOUT_SECONDS)
+            response.raise_for_status()
+            return response
+        except (requests.HTTPError, requests.ConnectionError, requests.Timeout) as exc:
+            last_exc = exc
+            status = getattr(exc.response, "status_code", None)
+            retryable = status in _RETRY_STATUS_CODES or isinstance(
+                exc, (requests.ConnectionError, requests.Timeout)
+            )
+            if not retryable or attempt == _MAX_RETRIES:
+                raise
+            wait = _retry_after_seconds(exc) or _RETRY_BACKOFF_SECONDS[attempt]
+            time.sleep(wait)
+    raise last_exc  # 도달하지 않지만 방어적으로 둔다
+
+
+def _retry_after_seconds(exc):
+    """HTTPError의 응답에 Retry-After 헤더(초 단위)가 있으면 float로, 없으면 None."""
+    response = getattr(exc, "response", None)
+    if response is None:
+        return None
+    try:
+        return float(response.headers.get("Retry-After", ""))
+    except ValueError:
+        return None
 
 
 def _normalize_item(row):
