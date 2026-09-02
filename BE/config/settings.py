@@ -163,6 +163,9 @@ KAKAO_API_KEY = os.environ.get("KAKAO_API_KEY", "")
 # Google Cloud Translation API (v2) 키. 명소·작품 번역에 쓴다 (docs/DETAIL_SPEC.md 6-1 #13).
 GOOGLE_TRANSLATE_API_KEY = os.environ.get("GOOGLE_TRANSLATE_API_KEY", "")
 
+# 한국영상자료원 KMDB(한국영화데이터베이스) Open API 키. 영화(Work) 정보를 채운다 (docs/DETAIL_SPEC.md 6-1 #28).
+KMDB_API_KEY = os.environ.get("KMDB_API_KEY", "")
+
 
 # Firebase Authentication
 # 서비스 계정 키 파일 경로. 아직 준비되지 않았다면 파일이 없어도 서버는 정상 부팅되고,
