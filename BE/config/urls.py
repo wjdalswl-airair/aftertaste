@@ -25,6 +25,7 @@ from rest_framework.response import Response
 from courses.views import MyCourseListView
 from favorites.views import MyFavoriteListView
 from main.views import HallOfFameView, TopPlacesView
+from places.dev_views import place_work_verify_page
 from places.views import PopularKeywordsView
 from reviews.views import MyReviewListView
 
@@ -59,6 +60,8 @@ urlpatterns = [
     path("api/places/", include("places.urls")),
     path("api/reviews/", include("reviews.urls")),
     path("api/courses/", include("courses.urls")),
+    # 개발용 확인 페이지(제품 기능 아님). settings.DEBUG일 때만 열린다 (places/dev_views.py).
+    path("dev/verify-place-work/", place_work_verify_page, name="dev-verify-place-work"),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path(
         "api/docs/",
