@@ -156,6 +156,11 @@ KOBIS_API_KEY = os.environ.get("KOBIS_API_KEY", "")
 GYEONGGI_DATA_DREAM_API_KEY = os.environ.get("GYEONGGI_DATA_DREAM_API_KEY", "")
 KCISA_API_KEY = os.environ.get("KCISA_API_KEY", "")
 
+# 한국관광공사 TourAPI(국문 관광정보 서비스_GW) 서비스 키. 등록된 관광지·음식점의
+# 대표 이미지(firstimage)를 명소(Place.photo_url)에 채우는 데 쓴다 (import_place_photos).
+# 공공데이터포털에서 받은 "디코딩된 일반 인증키"를 넣는다 (URL 인코딩된 키가 아니다).
+TOUR_API_KEY = os.environ.get("TOUR_API_KEY", "")
+
 # 카카오맵 지오코딩용 REST API 키. 좌표가 없는 출처(경기 데이터 드림)의 장소명을
 # 좌표로 바꿔서, 좌표가 있는 다른 출처(한국문화정보원)와 같은 명소인지 비교하는 데 쓴다.
 KAKAO_API_KEY = os.environ.get("KAKAO_API_KEY", "")
