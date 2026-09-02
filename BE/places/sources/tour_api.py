@@ -13,6 +13,8 @@ SERVICE_KEY_IS_NOT_REGISTERED_ERROR가 난다.
 예외를 그대로 올린다 (호출하는 커맨드가 건별로 잡아서 계속 돈다).
 """
 
+from urllib.parse import unquote
+
 import requests
 from django.conf import settings
 
@@ -35,6 +37,11 @@ def _get_service_key():
     service_key = settings.TOUR_API_KEY
     if not service_key:
         raise RuntimeError("TOUR_API_KEY가 설정되지 않았습니다 (.env 확인).")
+    # 공공데이터포털은 "인코딩된 인증키"와 "디코딩된 인증키" 두 가지를 준다. 인코딩된 키
+    # (%2B, %2F, %3D 포함)를 그대로 넣으면 requests가 %를 다시 인코딩(%252B)해서 403이 난다.
+    # 어느 쪽을 넣든 동작하도록, 이미 인코딩돼 보이면 원래 값으로 되돌린다.
+    if "%" in service_key:
+        return unquote(service_key)
     return service_key
 
 
@@ -60,7 +67,6 @@ def search_keyword(keyword):
         "MobileOS": _MOBILE_OS,
         "MobileApp": _MOBILE_APP,
         "_type": "json",
-        "listYN": "Y",
         "arrange": _ARRANGE_IMAGE_FIRST,
         "keyword": keyword,
     }
@@ -73,6 +79,10 @@ def search_keyword(keyword):
     except ValueError:
         # 인증키 오류 등은 _type=json이어도 XML 에러 문서로 돌아온다.
         raise RuntimeError(f"TourAPI 응답을 JSON으로 읽을 수 없습니다: {response.text[:300]}")
+
+    # 파라미터·인증 오류는 {"resultCode": "10", "resultMsg": "..."}처럼 평평한 문서로 온다.
+    if "response" not in data:
+        raise RuntimeError(f"TourAPI 오류: {data.get('resultCode')} {data.get('resultMsg', data)}")
 
     header = data.get("response", {}).get("header", {})
     if header.get("resultCode") not in ("0000", None):
