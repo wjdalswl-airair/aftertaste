@@ -81,7 +81,7 @@ class Command(BaseCommand):
                 status, filled = enrich_work(work, overwrite=overwrite, require_korean=require_korean)
             except Exception as exc:  # 한 건 실패해도 나머지는 계속 처리한다
                 counts["error"] += 1
-                self.stderr.write(f"[{work.id}] {work.title} — 오류: {exc}")
+                self.stderr.write(f"[{work.id}] {work.title} - 오류: {exc}")
                 continue
 
             counts[status] += 1
@@ -89,7 +89,7 @@ class Command(BaseCommand):
                 filled_field_counts[field] += 1
 
             if status == "matched":
-                self.stdout.write(f"[{work.id}] {work.title} — 채움: {', '.join(filled)}")
+                self.stdout.write(f"[{work.id}] {work.title} - 채움: {', '.join(filled)}")
 
             if sleep_seconds and index < total:
                 time.sleep(sleep_seconds)

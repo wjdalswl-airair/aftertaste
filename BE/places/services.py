@@ -1,4 +1,5 @@
 import math
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
 from django.db import transaction
@@ -35,6 +36,19 @@ def to_decimal(value):
     try:
         return Decimal(str(value)), True
     except InvalidOperation:
+        return None, False
+
+
+def parse_yyyymmdd(value):
+    """"20190530"처럼 8자리 숫자로 된 날짜 문자열을 date로 바꾼다. (바뀐 값, 성공 여부)를 돌려준다.
+
+    값이 없으면(None/빈 문자열) 성공으로 치고 None을 돌려준다. 형식이 다르면 실패로 치고 None을 돌려준다.
+    """
+    if not value:
+        return None, True
+    try:
+        return datetime.strptime(value, "%Y%m%d").date(), True
+    except ValueError:
         return None, False
 
 
@@ -82,6 +96,27 @@ def link_place_to_work(place, *, title, media_type):
     work, _ = Work.objects.get_or_create(title=normalized_title, category=category)
     _, linked = PlaceWork.objects.get_or_create(place=place, work=work)
     return work, linked
+
+
+def get_or_create_work(title, category, *, create_only_fields=None):
+    """제목+구분(category)으로 Work를 찾거나 만든다. link_place_to_work와 같은 매칭 원칙이다 —
+
+    공백을 정리한 제목 문자열이 같으면 같은 작품으로 본다(DETAIL_SPEC 6-1 #27·#28). Work엔
+    PlaceSource 같은 출처·원본번호 테이블이 없어서 제목 문자열 매칭만 쓴다.
+    create_only_fields는 작품을 새로 만들 때만 채우고, 이미 있는 작품은 절대 덮어쓰지 않는다 —
+    business_hours/scene_description 보존과 같은 원칙(관리자가 고친 값을 지킨다).
+
+    반환값: (work, created)
+    """
+    from places.models import Work
+
+    normalized_title = " ".join((title or "").split())[:_WORK_TITLE_MAX_LENGTH]
+    if not normalized_title:
+        return None, False
+
+    create_only_fields = create_only_fields or {}
+    defaults = {field: value for field, value in create_only_fields.items() if value not in (None, "")}
+    return Work.objects.get_or_create(title=normalized_title, category=category, defaults=defaults)
 
 
 def build_composite_source_id(*parts, delimiter="|"):

@@ -163,9 +163,12 @@ KAKAO_API_KEY = os.environ.get("KAKAO_API_KEY", "")
 # Google Cloud Translation API (v2) 키. 명소·작품 번역에 쓴다 (docs/DETAIL_SPEC.md 6-1 #13).
 GOOGLE_TRANSLATE_API_KEY = os.environ.get("GOOGLE_TRANSLATE_API_KEY", "")
 
-# TMDB(The Movie Database) API 읽기 액세스 토큰(v4). 작품(영화·드라마)의 줄거리·감독·
-# 방영일자·포스터를 보강하는 데 쓴다. KOBIS는 포스터를 안 주고, 한국영상자료원(KMDB)은
-# 드라마를 거의 안 담고 있어서 영화·드라마를 한 곳에서 처리할 수 있는 TMDB를 쓴다.
+# 한국영상자료원 KMDB(한국영화데이터베이스) Open API 키. 영화(Work) 정보를 채운다 (docs/DETAIL_SPEC.md 6-1 #28).
+KMDB_API_KEY = os.environ.get("KMDB_API_KEY", "")
+
+# TMDB(The Movie Database) API 읽기 액세스 토큰(v4). 드라마를 비롯해 KMDB로 못 채운
+# 작품의 줄거리·감독·방영일자·포스터를 보강하는 데 쓴다. KMDB는 드라마를 거의 안 담고
+# KOBIS는 포스터를 안 줘서, 드라마는 TMDB로 보강한다 (docs/DETAIL_SPEC.md 6-1 #29).
 # "Bearer <토큰>" 헤더로 호출한다 (짧은 v3 api_key 문자열이 아니다).
 TMDB_API_KEY = os.environ.get("TMDB_API_KEY", "")
 

@@ -2690,3 +2690,161 @@ class WorkTranslationInPlaceDetailTest(TestCase):
 
         work_entry = response.data["works"][0]["work"]
         self.assertEqual(work_entry["title"], "사랑비")
+
+
+# ---------------------------------------------------------------------------
+# KMDB로 영화(Work) 정보 채우기. See docs/DETAIL_SPEC.md 6-1 #28.
+# ---------------------------------------------------------------------------
+
+from places.sources import kmdb  # noqa: E402
+
+
+def _fake_kmdb_raw_movie(**overrides):
+    """KMDB search_json2.jsp 응답 중 Result 배열 안 영화 하나 (실제 키로 호출해 확인한 형태)."""
+    movie = {
+        "DOCID": "K17748",
+        "title": "  !HS 기생충 !HE ",
+        "directors": {"director": [{"directorNm": "봉준호", "directorEnNm": "Bong Joon-ho"}]},
+        "actors": {
+            "actor": [
+                {"actorNm": name}
+                for name in ["송강호", "이선균", "조여정", "최우식", "박소담", "이정은", "장혜진", "박명훈"]
+            ]
+        },
+        "plots": {
+            "plot": [
+                {"plotLang": "한국어", "plotText": "전원백수인 기택 가족 이야기"},
+                {"plotLang": "영어", "plotText": "Ki-taek's family"},
+            ]
+        },
+        "repRlsDate": "20190530",
+        "posters": "http://file.koreafilm.or.kr/a.jpg|http://file.koreafilm.or.kr/b.jpg",
+    }
+    movie.update(overrides)
+    return movie
+
+
+def _fake_kmdb_search_response(*movies):
+    return {"Data": [{"Result": list(movies)}]}
+
+
+class KmdbModuleTest(TestCase):
+    """저수준 API 호출 모듈. requests를 mock해서 실제 네트워크를 타지 않는다."""
+
+    @patch("places.sources.kmdb.requests.get")
+    def test_search_movies_parses_response(self, mock_get):
+        mock_get.return_value.json.return_value = _fake_kmdb_search_response(_fake_kmdb_raw_movie())
+        mock_get.return_value.raise_for_status.return_value = None
+
+        with override_settings(KMDB_API_KEY="fake-key"):
+            results = kmdb.search_movies(title="기생충")
+
+        self.assertEqual(len(results), 1)
+        movie = results[0]
+        self.assertEqual(movie["docid"], "K17748")
+        self.assertEqual(movie["title"], "기생충")  # !HS/!HE 태그와 앞뒤 공백이 걷어내진다
+        self.assertEqual(movie["director"], "봉준호")
+        # 배우 8명 중 상위 6명만 main_cast에 담긴다.
+        self.assertEqual(movie["main_cast"], "송강호, 이선균, 조여정, 최우식, 박소담, 이정은")
+        self.assertEqual(movie["release_date"], "20190530")
+        self.assertEqual(movie["poster_url"], "http://file.koreafilm.or.kr/a.jpg")  # 첫 번째 포스터만
+        self.assertEqual(movie["description"], "전원백수인 기택 가족 이야기")  # 한국어 줄거리만
+
+    def test_search_movies_without_api_key_raises(self):
+        with override_settings(KMDB_API_KEY=""):
+            with self.assertRaises(RuntimeError):
+                kmdb.search_movies(title="기생충")
+
+    def test_search_movies_without_any_filter_raises(self):
+        with override_settings(KMDB_API_KEY="fake-key"):
+            with self.assertRaises(ValueError):
+                kmdb.search_movies()
+
+    @patch("places.sources.kmdb.requests.get")
+    def test_search_movies_propagates_http_error(self, mock_get):
+        mock_get.return_value.raise_for_status.side_effect = requests_module.HTTPError("500")
+
+        with override_settings(KMDB_API_KEY="fake-key"):
+            with self.assertRaises(requests_module.HTTPError):
+                kmdb.search_movies(title="기생충")
+
+
+def _fake_kmdb_parsed_movie(**overrides):
+    """kmdb.search_movies()가 돌려주는 파싱된 형태 (import_kmdb 커맨드가 받는 입력)."""
+    movie = {
+        "docid": "K17748",
+        "title": "기생충",
+        "director": "봉준호",
+        "main_cast": "송강호, 이선균",
+        "release_date": "20190530",
+        "poster_url": "http://file.koreafilm.or.kr/a.jpg",
+        "description": "전원백수인 기택 가족 이야기",
+    }
+    movie.update(overrides)
+    return movie
+
+
+class ImportKmdbCommandTest(TestCase):
+    """KMDB 검색 커맨드: 작품 필드는 새로 만들 때만 채워지고 그 뒤로는 보존된다."""
+
+    def _run(self, **options):
+        options.setdefault("title", "기생충")
+        out = io.StringIO()
+        call_command("import_kmdb", stdout=out, **options)
+        return out.getvalue()
+
+    @patch("places.management.commands.import_kmdb.kmdb.search_movies")
+    def test_creates_work_from_kmdb_result(self, mock_search):
+        mock_search.return_value = [_fake_kmdb_parsed_movie()]
+
+        output = self._run()
+
+        self.assertIn("새로 만듦 1건", output)
+        work = Work.objects.get(title="기생충")
+        self.assertEqual(work.category, Work.Category.MOVIE)
+        self.assertEqual(work.director, "봉준호")
+        self.assertEqual(work.main_cast, "송강호, 이선균")
+        self.assertEqual(work.release_date.isoformat(), "2019-05-30")
+        self.assertEqual(work.poster_url, "http://file.koreafilm.or.kr/a.jpg")
+        self.assertEqual(work.description, "전원백수인 기택 가족 이야기")
+
+    @patch("places.management.commands.import_kmdb.kmdb.search_movies")
+    def test_reimport_does_not_overwrite_existing_work(self, mock_search):
+        mock_search.return_value = [_fake_kmdb_parsed_movie()]
+        self._run()
+
+        mock_search.return_value = [_fake_kmdb_parsed_movie(description="다른 줄거리")]
+        output = self._run()
+
+        self.assertIn("이미 있어서 건너뜀 1건", output)
+        work = Work.objects.get(title="기생충")
+        self.assertEqual(work.description, "전원백수인 기택 가족 이야기")
+
+    @patch("places.management.commands.import_kmdb.kmdb.search_movies")
+    def test_admin_edit_survives_reimport(self, mock_search):
+        mock_search.return_value = [_fake_kmdb_parsed_movie()]
+        self._run()
+
+        work = Work.objects.get(title="기생충")
+        work.description = "관리자가 다시 쓴 감성적인 소개"
+        work.save()
+
+        self._run()
+
+        work.refresh_from_db()
+        self.assertEqual(work.description, "관리자가 다시 쓴 감성적인 소개")
+
+    @patch("places.management.commands.import_kmdb.kmdb.search_movies")
+    def test_skips_movie_without_title(self, mock_search):
+        mock_search.return_value = [_fake_kmdb_parsed_movie(title="")]
+
+        output = self._run()
+
+        self.assertIn("제목 없어서 건너뜀 1건", output)
+        self.assertEqual(Work.objects.count(), 0)
+
+    def test_missing_all_filters_raises_command_error(self):
+        from django.core.management.base import CommandError
+
+        with self.assertRaises(CommandError):
+            call_command("import_kmdb")
