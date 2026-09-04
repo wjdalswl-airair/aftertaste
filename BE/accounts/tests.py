@@ -13,6 +13,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from accounts.firebase import InvalidFirebaseToken
+from accounts.kakao import InvalidKakaoToken
 from accounts.models import Member
 
 LOGIN_URL = "/api/account/login/"
@@ -76,16 +77,32 @@ class LoginViewTests(TestCase):
 
     @patch("accounts.authentication.verify_id_token")
     @patch("accounts.views.verify_id_token")
-    def test_apple_login_creates_new_member(self, mock_verify, mock_verify_auth):
-        decoded = make_decoded_token("apple-uid-1", provider="apple.com")
+    def test_kakao_login_creates_new_member(self, mock_verify, mock_verify_auth):
+        """카카오는 커스텀 토큰을 거쳐서 온다 — sign_in_provider가 "custom"이고,
+        KakaoCustomTokenView가 심어둔 "provider" claim으로 카카오인지 구분한다."""
+        decoded = make_decoded_token("kakao-uid-1", provider="custom")
+        decoded["provider"] = Member.Provider.KAKAO
         mock_verify.return_value = decoded
         mock_verify_auth.return_value = decoded
 
         response = self.client.post(LOGIN_URL, {"agree_terms": True}, format="json", **self.auth_header)
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        member = Member.objects.get(firebase_uid="apple-uid-1")
-        self.assertEqual(member.provider, Member.Provider.APPLE)
+        member = Member.objects.get(firebase_uid="kakao-uid-1")
+        self.assertEqual(member.provider, Member.Provider.KAKAO)
+
+    @patch("accounts.authentication.verify_id_token")
+    @patch("accounts.views.verify_id_token")
+    def test_custom_token_without_kakao_claim_is_rejected(self, mock_verify, mock_verify_auth):
+        """커스텀 토큰인데 "provider" claim이 카카오가 아니면(또는 없으면) 거부한다."""
+        decoded = make_decoded_token("custom-uid-unknown", provider="custom")
+        mock_verify.return_value = decoded
+        mock_verify_auth.return_value = decoded
+
+        response = self.client.post(LOGIN_URL, {"agree_terms": True}, format="json", **self.auth_header)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["detail"], "지원하지 않는 로그인 방식입니다")
 
     @patch("accounts.authentication.verify_id_token")
     @patch("accounts.views.verify_id_token")
@@ -149,6 +166,59 @@ class LoginViewTests(TestCase):
         )
         # 토큰이 없으므로 이메일/비밀번호를 보내도 그냥 인증 실패로 처리된다.
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class KakaoCustomTokenViewTests(TestCase):
+    """POST /api/account/kakao/token/
+
+    카카오 access token을 검증해서 Firebase 커스텀 토큰을 돌려주는 단계만 확인한다.
+    실제 회원 조회/가입은 그 토큰으로 다시 /api/account/login/을 호출해야 일어나므로
+    (LoginViewTests의 test_kakao_login_creates_new_member 참고) 여기서는 만들지 않는다.
+    """
+
+    KAKAO_TOKEN_URL = "/api/account/kakao/token/"
+
+    def setUp(self):
+        self.client = APIClient()
+
+    @patch("accounts.views.create_custom_token")
+    @patch("accounts.views.get_kakao_user")
+    def test_valid_kakao_token_returns_firebase_custom_token(self, mock_get_kakao_user, mock_create_custom_token):
+        mock_get_kakao_user.return_value = {
+            "kakao_id": 12345,
+            "email": "kakao@example.com",
+            "nickname": "카카오테스터",
+            "profile_image_url": "http://example.com/kakao.jpg",
+        }
+        mock_create_custom_token.return_value = "fake-custom-token"
+
+        response = self.client.post(
+            self.KAKAO_TOKEN_URL, {"access_token": "fake-kakao-access-token"}, format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["firebase_custom_token"], "fake-custom-token")
+
+        uid, claims = mock_create_custom_token.call_args[0]
+        self.assertEqual(uid, "kakao:12345")
+        self.assertEqual(claims["provider"], Member.Provider.KAKAO)
+        self.assertEqual(claims["email"], "kakao@example.com")
+
+    @patch("accounts.views.get_kakao_user")
+    def test_invalid_kakao_token_is_rejected(self, mock_get_kakao_user):
+        mock_get_kakao_user.side_effect = InvalidKakaoToken("expired")
+
+        response = self.client.post(
+            self.KAKAO_TOKEN_URL, {"access_token": "expired-token"}, format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.data["detail"], "다시 로그인하세요")
+
+    def test_missing_access_token_is_rejected(self):
+        response = self.client.post(self.KAKAO_TOKEN_URL, {}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
 
 class MeViewTests(TestCase):
@@ -590,7 +660,7 @@ class MeNicknamePatchTests(TestCase):
     def test_blank_profile_image_url_clears_it(self, mock_verify):
         member = Member.objects.create(
             firebase_uid="profile-img-clear-uid",
-            provider=Member.Provider.APPLE,
+            provider=Member.Provider.KAKAO,
             profile_image_url="https://old.example.com/a.jpg",
             agreed_terms_at="2026-01-01T00:00:00Z",
         )

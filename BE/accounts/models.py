@@ -10,7 +10,7 @@ NICKNAME_MAX_LENGTH = 20
 class Member(models.Model):
     class Provider(models.TextChoices):
         GOOGLE = "GOOGLE", "Google"
-        APPLE = "APPLE", "Apple"
+        KAKAO = "KAKAO", "Kakao"
 
     firebase_uid = models.CharField(max_length=128, unique=True)
     provider = models.CharField(max_length=10, choices=Provider.choices)

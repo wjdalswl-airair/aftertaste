@@ -66,7 +66,7 @@ class MemberProfileUpdateSerializer(serializers.ModelSerializer):
 
     프로필 사진은 서버가 파일을 받지 않는다. 리뷰 사진과 똑같이 프론트엔드가
     Firebase Storage에 올린 뒤 그 URL만 보내준다 (docs/DETAIL_SPEC.md 6-1 #2·#25).
-    빈 문자열이나 null을 보내면 사진을 지운다(Apple 로그인처럼 원래 사진이 없을 수도 있다).
+    빈 문자열이나 null을 보내면 사진을 지운다(사진 제공에 동의하지 않은 소셜 계정처럼 원래 사진이 없을 수도 있다).
     """
 
     profile_image_url = serializers.URLField(required=False, allow_null=True, allow_blank=True)
@@ -99,3 +99,17 @@ class ErrorDetailSerializer(serializers.Serializer):
     """에러 응답 공통 형식."""
 
     detail = serializers.CharField()
+
+
+class KakaoTokenRequestSerializer(serializers.Serializer):
+    """카카오 로그인 요청 body (POST /account/kakao/token/)."""
+
+    access_token = serializers.CharField(help_text="카카오 SDK 로그인으로 받은 access token")
+
+
+class KakaoTokenResponseSerializer(serializers.Serializer):
+    """카카오 access token을 Firebase 커스텀 토큰으로 교환한 응답."""
+
+    firebase_custom_token = serializers.CharField(
+        help_text="이 토큰으로 signInWithCustomToken을 호출하면 Firebase 로그인이 끝난다."
+    )

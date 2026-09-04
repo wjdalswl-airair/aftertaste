@@ -34,3 +34,17 @@ def verify_id_token(token):
         return firebase_auth.verify_id_token(token, app=app)
     except Exception as exc:
         raise InvalidFirebaseToken(str(exc)) from exc
+
+
+def create_custom_token(uid, claims=None):
+    """이 uid로 Firebase 커스텀 토큰을 만든다.
+
+    Firebase가 기본으로 지원하지 않는 로그인 방식(카카오)을 위한 것이다. 서버가
+    다른 방법으로 "이 사람이 맞다"를 확인한 뒤 이 함수로 토큰을 만들어 클라이언트에
+    주면, 클라이언트는 signInWithCustomToken으로 Firebase에 로그인한다. claims에
+    넣은 값(email/name/picture 등)은 이후 발급되는 Firebase ID 토큰에 그대로
+    실려서, 기존 LoginView가 소셜 로그인 때와 같은 방식으로 읽어갈 수 있다.
+    """
+    app = _get_firebase_app()
+    token_bytes = firebase_auth.create_custom_token(uid, developer_claims=claims, app=app)
+    return token_bytes.decode("utf-8")
