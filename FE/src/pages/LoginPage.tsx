@@ -1,15 +1,19 @@
-import { signInWithPopup } from 'firebase/auth'
+import { signInWithCustomToken, signInWithPopup } from 'firebase/auth'
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import appleIcon from '../assets/icons/apple.svg'
+import { kakaoLogin } from '../api/auth'
 import googleIcon from '../assets/icons/google.svg'
 import kakaoIcon from '../assets/icons/kakao.svg'
 import { BottomNav } from '../components/BottomNav'
 import { Modal } from '../components/Modal'
-import { appleProvider, auth, googleProvider } from '../lib/firebase'
+import { auth, googleProvider } from '../lib/firebase'
+import { loadKakaoAuth } from '../lib/kakaoAuth'
 import { useAuthStore } from '../store/useAuthStore'
 
 type LocationState = { from?: string; message?: string } | null
+
+// 카카오는 리다이렉트 방식(Kakao.Auth.authorize())이라, 로그인 화면 자기 자신을 돌아올 주소로 쓴다.
+const KAKAO_REDIRECT_URI = `${window.location.origin}/login`
 
 export function LoginPage() {
   const member = useAuthStore((state) => state.member)
@@ -29,14 +33,41 @@ export function LoginPage() {
     }
   }, [isLoading, member, navigate, from])
 
-  async function handleLogin(provider: typeof googleProvider | typeof appleProvider) {
+  // 카카오 로그인 2단계: authorize()가 이 화면으로 ?code=...를 붙여 돌려보내면 여기서 이어받는다.
+  useEffect(() => {
+    const code = new URLSearchParams(location.search).get('code')
+    if (!code) {
+      return
+    }
+    // 같은 code로 다시 시도하지 않도록(새로고침 등) 주소에서 code를 바로 지운다.
+    navigate('/login', { replace: true, state })
+
+    kakaoLogin(code, KAKAO_REDIRECT_URI)
+      .then(({ firebase_custom_token }) => signInWithCustomToken(auth, firebase_custom_token))
+      // 로그인 성공 후 회원 조회/가입 처리는 useInitAuth의 onAuthStateChanged가 담당한다.
+      .catch(() => setError('로그인에 실패했어요. 다시 시도해주세요.'))
+    // 페이지 진입 시(주소에 code가 있을 때) 딱 한 번만 처리한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function handleGoogleLogin() {
     setError(null)
     try {
-      await signInWithPopup(auth, provider)
+      await signInWithPopup(auth, googleProvider)
       // 로그인 성공 후 회원 조회/가입 처리는 useInitAuth의 onAuthStateChanged가 담당한다.
     } catch {
       setError('로그인에 실패했어요. 다시 시도해주세요.')
     }
+  }
+
+  async function handleKakaoLogin() {
+    setError(null)
+    const kakao = await loadKakaoAuth()
+    if (!kakao) {
+      setError('로그인에 실패했어요. 다시 시도해주세요.')
+      return
+    }
+    kakao.Auth.authorize({ redirectUri: KAKAO_REDIRECT_URI })
   }
 
   return (
@@ -55,7 +86,7 @@ export function LoginPage() {
         <div className="flex w-full max-w-xs flex-col gap-4">
           <button
             type="button"
-            onClick={() => handleLogin(googleProvider)}
+            onClick={handleGoogleLogin}
             className="flex h-14 items-center justify-center gap-2 rounded-lg bg-[#F2F2F2] px-4 font-medium text-ink"
           >
             <span className="flex w-10 items-center justify-center">
@@ -65,17 +96,7 @@ export function LoginPage() {
           </button>
           <button
             type="button"
-            onClick={() => handleLogin(appleProvider)}
-            className="flex h-14 items-center justify-center gap-2 rounded-lg bg-[#000000] px-4 font-medium text-white"
-          >
-            <span className="flex w-10 items-center justify-center">
-              <img src={appleIcon} alt="" className="h-6 w-6" />
-            </span>
-            Apple로 시작하기
-          </button>
-          <button
-            type="button"
-            onClick={() => setError('카카오 로그인은 아직 준비 중이에요')}
+            onClick={handleKakaoLogin}
             className="flex h-14 items-center justify-center gap-2 rounded-lg bg-[#ffe812] px-4  font-medium text-ink"
           >
             <span className="flex w-10 items-center justify-center">

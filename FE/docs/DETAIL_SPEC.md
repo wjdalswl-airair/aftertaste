@@ -97,14 +97,17 @@ React Router로 화면 단위 페이지를 분리한다 (PRD 6장 결정).
   - 이미 있는 회원: `agree_terms` 없이 호출, 200 응답.
   - 처음 온 회원: `{ agree_terms: true }` 와 함께 호출, 201 응답. 약관 동의 없이 호출하면 400.
   - 토큰이 없거나 잘못됨: 401 → "다시 로그인하세요" 안내 후 `/login`으로.
-- 로그인 흐름 (Kakao, Phase 11 — 2026-09-04): Firebase 기본 제공자가 아니라서 한 단계를 더 거친다.
-  1. Kakao JS SDK로 로그인해 Kakao access_token을 받는다.
-  2. `POST /api/account/kakao/token/`에 `{ access_token }`을 보내 Firebase 커스텀 토큰(`firebase_custom_token`)을 받는다 (BE가 카카오 API로 본인 확인 후 발급, 회원은 아직 안 만듦).
-  3. `signInWithCustomToken(auth, firebase_custom_token)`으로 Firebase 로그인.
-  4. 그 결과 idToken으로 위 `POST /api/account/login/`을 그대로 호출 — 여기서부터 Google과 같은 절차.
-  - BE 구현은 `feature/be/kakao-login` 브랜치에 있음(2026-09-04 기준 master 미머지) — 착수 전 머지 여부 확인.
+- 로그인 흐름 (Kakao, Phase 11 — 2026-09-04, `src/pages/LoginPage.tsx`): Firebase 기본 제공자가 아니라서 한 단계를 더 거친다. Kakao JS SDK 공식 문서 확인 결과 `Kakao.Auth.login()`(팝업으로 access_token을 바로 받는 방식)은 더 이상 문서에 없고, **`Kakao.Auth.authorize()`(리다이렉트 + 인가 코드) 방식만 제공**된다 (2026-09-04 확인, 영문/국문 문서 둘 다 동일) — 사용자 확인 후 이 방식으로 구현했다.
+  1. `Kakao.Auth.authorize({ redirectUri })` 호출 → 카카오 로그인 동의 화면으로 이동 (`redirectUri`는 로그인 화면 자기 자신, `${origin}/login`).
+  2. 로그인 성공 시 카카오가 `redirectUri`로 `?code=...`를 붙여 돌려보낸다. `LoginPage`가 마운트 시 이 `code`를 읽어 이어받는다.
+  3. `POST /api/account/kakao/token/`에 `{ code, redirect_uri }`를 보내 Firebase 커스텀 토큰(`firebase_custom_token`)을 받는다.
+  4. `signInWithCustomToken(auth, firebase_custom_token)`으로 Firebase 로그인.
+  5. Firebase가 내려준 idToken으로 위 `POST /api/account/login/`을 그대로 호출 — 여기서부터 Google과 같은 절차 (`useInitAuth`의 `onAuthStateChanged`가 자동으로 처리).
+  - **⚠️ BE 의존성 미해결 (2026-09-04)**: 현재 master의 `KakaoCustomTokenView`는 이미 발급된 `access_token`을 받는 구조라(`{ access_token }` 요구), FE가 보내는 `{ code, redirect_uri }`를 받으면 400이 난다. **BE에 다음을 요청해야 한다**: `code`(+ `redirect_uri`)를 받아 카카오 REST API(`POST https://kauth.kakao.com/oauth/token`, `grant_type=authorization_code`, BE의 카카오 REST API 키 사용)로 `access_token`을 직접 교환한 뒤, 기존 로직(`get_kakao_user` 이하)을 그대로 잇는 방식으로 바꿔달라고. 그때까지 FE 카카오 로그인 버튼은 동작하지 않는다.
+  - 카카오 개발자 콘솔에 이 `redirectUri`(로컬 `http://localhost:5173/login`, 배포 도메인의 `/login`)를 "카카오 로그인 > Redirect URI"에 등록해야 한다.
+  - Kakao JS SDK는 지도 SDK와 별개(`https://t1.kakaocdn.net/kakao_js_sdk/2.8.3/kakao.min.js`, `window.Kakao`)라 `index.html`에 별도 `<script>`로 추가했다. 로더는 `src/lib/kakaoAuth.ts`(`kakaoMap.ts`와 동일한 패턴).
 - 내 정보 조회: `GET /api/account/` (`MeView`). 응답 필드: `id, email, nickname, profile_image_url, provider, nationality, language, created_at`.
-- Apple 로그인은 만들지 않는다 (2026-09-04, BE PRD 결정 변경에 맞춰 Kakao로 대체).
+- Apple 로그인은 만들지 않는다 (2026-09-04, BE PRD 결정 변경에 맞춰 Kakao로 대체). `appleProvider`(`src/lib/firebase.ts`), `apple.svg` 에셋 제거함.
 
 ---
 
