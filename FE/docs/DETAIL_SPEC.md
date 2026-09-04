@@ -83,7 +83,7 @@ React Router로 화면 단위 페이지를 분리한다 (PRD 6장 결정).
 | 스토어 | 담는 것 | 채워지는 시점 |
 |---|---|---|
 | `useAuthStore` | 로그인한 회원 정보 (`GET /account` 응답), 로그인 여부 | Firebase `onAuthStateChanged` 콜백에서 |
-| `useLocaleStore` | 선택한 국적/언어 (Phase 2 구현 완료) | 메인 화면 국적 선택 시. `zustand/persist`로 항상 localStorage에 저장하고, 로그인 상태면 `PATCH /api/account/locale/`도 함께 호출 |
+| `useLocaleStore` | 선택한 언어 (Phase 2 구현, 2026-09-04 국적→언어 직접 선택으로 변경) | 메인/마이페이지 언어 선택 시. `zustand/persist`로 항상 localStorage에 저장하고, 로그인 상태면 `PATCH /api/account/locale/`도 함께 호출 |
 
 화면별로만 쓰는 상태(검색어 입력값, 폼 값 등)는 전역 스토어에 넣지 않고 해당 페이지 컴포넌트 안에 둔다 (불필요한 전역화 금지, karpathy-guidlines 2번).
 
@@ -93,12 +93,18 @@ React Router로 화면 단위 페이지를 분리한다 (PRD 6장 결정).
 
 - Firebase Auth SDK가 로그인 상태와 토큰을 자체 관리한다 (`onAuthStateChanged`). FE는 토큰을 직접 저장하지 않는다 (PRD 6장 결정).
 - API 호출 시 `firebase.auth().currentUser.getIdToken()`으로 현재 idToken을 꺼내 `Authorization: Bearer <token>` 헤더에 붙인다.
-- 로그인 흐름: Google/Apple 소셜 로그인 → Firebase idToken 발급 → `POST /api/account/login/` 호출.
+- 로그인 흐름 (Google): Google 소셜 로그인 → Firebase idToken 발급 → `POST /api/account/login/` 호출.
   - 이미 있는 회원: `agree_terms` 없이 호출, 200 응답.
   - 처음 온 회원: `{ agree_terms: true }` 와 함께 호출, 201 응답. 약관 동의 없이 호출하면 400.
   - 토큰이 없거나 잘못됨: 401 → "다시 로그인하세요" 안내 후 `/login`으로.
+- 로그인 흐름 (Kakao, Phase 11 — 2026-09-04): Firebase 기본 제공자가 아니라서 한 단계를 더 거친다.
+  1. Kakao JS SDK로 로그인해 Kakao access_token을 받는다.
+  2. `POST /api/account/kakao/token/`에 `{ access_token }`을 보내 Firebase 커스텀 토큰(`firebase_custom_token`)을 받는다 (BE가 카카오 API로 본인 확인 후 발급, 회원은 아직 안 만듦).
+  3. `signInWithCustomToken(auth, firebase_custom_token)`으로 Firebase 로그인.
+  4. 그 결과 idToken으로 위 `POST /api/account/login/`을 그대로 호출 — 여기서부터 Google과 같은 절차.
+  - BE 구현은 `feature/be/kakao-login` 브랜치에 있음(2026-09-04 기준 master 미머지) — 착수 전 머지 여부 확인.
 - 내 정보 조회: `GET /api/account/` (`MeView`). 응답 필드: `id, email, nickname, profile_image_url, provider, nationality, language, created_at`.
-- Kakao 로그인은 이번 범위에서 만들지 않는다 (PRD 결정, Google/Apple만).
+- Apple 로그인은 만들지 않는다 (2026-09-04, BE PRD 결정 변경에 맞춰 Kakao로 대체).
 
 ---
 
@@ -113,10 +119,14 @@ React Router로 화면 단위 페이지를 분리한다 (PRD 6장 결정).
 
 ## 7. 다국어 처리 (react-i18next)
 
-- UI 고정 문구(버튼, 라벨 등)는 `src/i18n/`의 언어별 리소스 파일로 관리하고 `react-i18next`로 렌더링한다.
+- 지원 언어: **ko(한국어) / en(English) / ja(日本語) / zh-CN(简体中文) / zh-TW(繁體中文)** — 5개 (2026-09-04 확정, BE 합의로 영어 하나에서 확장).
+- UI 고정 문구(버튼, 라벨 등)는 `src/i18n/locales/{ko,en,ja,zh-CN,zh-TW}.json`으로 관리하고 `react-i18next`로 렌더링한다 (`src/i18n/index.ts`에 5개 모두 등록).
+  - **ja/zh-CN/zh-TW는 Claude가 en.json 기준으로 기계번역한 초안이다 (2026-09-04).** 사용자 검토·수정 전이라 표현이 어색하거나 부정확할 수 있음 — 정식 배포 전에 검수 필요.
 - 명소·작품 설명, 리뷰처럼 **서버에서 오는 콘텐츠 번역**은 UI 문구와 다르다. 이건 리소스 파일이 아니라 BE 응답 자체가 이미 번역된 텍스트로 온다 (BE DETAIL_SPEC 4장 — 서버가 언어별로 번역해서 내려줌). FE는 그 값을 그대로 표시하면 된다.
-- 국적 선택(S-02)과 화면 언어는 하나로 묶인다 (PRD N-01). 국적을 선택하면 `useLocaleStore`가 바뀌고, `i18next.changeLanguage()`를 호출해 UI 문구도 함께 바뀐다.
+- **화면 언어는 국적이 아니라 직접 선택한다 (2026-09-04 변경, PRD 3장 S-02 참고).** 헤더의 지구본 아이콘(`LanguageSheet`)에서 5개 언어 중 하나를 고르면 `useLocaleStore`가 바뀌고, `i18next.changeLanguage()`를 호출해 UI 문구도 함께 바뀐다. `useLocaleStore`엔 더 이상 `nationality` 필드가 없다 — BE `Member.nationality`는 선택 필드라 안 보내도 문제없다(BE DETAIL_SPEC 6-1 #10).
 - 언어를 고르지 않은 사용자는 한국어가 기본값이다.
+- **명소·작품 콘텐츠의 실제 언어 결정**: BE `places/translation.py`의 `resolve_language()`가 `쿼리파라미터 lang → 로그인 회원의 언어 → 한국어(None)` 순서로 정한다. FE는 `spots.ts`/`works.ts`/`search.ts`의 API 호출마다 `useLocaleStore`의 현재 언어를 `?lang=`으로 항상 붙인다 (Phase 11, 2026-09-04 연동 완료) — 비로그인 사용자도 언어를 바꾸면 명소·작품 콘텐츠가 바뀐다.
+- **리뷰 번역은 아직 BE에 연결 안 됨 (2026-09-04 확인)**: `ReviewTranslation` 모델은 있지만 `reviews/views.py`가 이를 조회/반환하지 않는다. PRD 4장의 "사용자가 작성한 리뷰도 번역 대상" 요구사항은 BE 작업이 선행되어야 한다.
 
 ---
 
@@ -146,20 +156,22 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 각 화면은 PRD `docs/PRD.md` 3장의 사용자 행동 요구사항을 그대로 구현 대상으로 삼는다. API 열의 `(계획)` 표시는 노션 API 명세 기준으로 BE가 아직 구현하지 않은 것이다.
 
 ### S-01. 온보딩 / 로그인 — `pages/LoginPage.tsx`
-- 컴포넌트: 소셜 로그인 버튼(Google, Apple), 약관 동의 텍스트
-- API: `POST /api/account/login/` (확정)
+- 컴포넌트: 로고, 소셜 로그인 버튼(Google, Kakao), 약관 동의 텍스트
+- API: `POST /api/account/login/` (확정), Kakao는 `POST /api/account/kakao/token/` 선행 (5장 참고)
 - 상태: 로그인 성공 시 `useAuthStore` 갱신 후 이전 화면 또는 `/`로 이동
+- Apple 버튼은 Phase 11(2026-09-04)에서 제거, Kakao 버튼으로 교체했다 (5장 참고).
 
 ### S-02. 메인 — `pages/MainPage.tsx` (Phase 2, 구현 완료 — 2026-08-30 Figma 실제 목업에 맞춰 리디자인)
-- 컴포넌트: `Hero`(배너+명예의전당 병합), `LanguageSheet`(국적/언어 바텀시트), `BottomNav`(홈/검색/프로필), `TopPlacesCarousel`, `RecommendedSpots`
+- 컴포넌트: `Hero`(배너+명예의전당 병합), `LanguageSheet`(언어 선택 바텀시트), `BottomNav`(홈/검색/프로필), `TopPlacesCarousel`, `RecommendedSpots`
 - API (전부 확정, 실제 BE 코드로 확인함 — 2026-08-29):
   - `GET /api/banners/` → `{ banners: [{ id, image_url, link_url, order }] }`
   - `GET /api/main/hall-of-fame/` → `{ review: {...} | null }` (없으면 `null`, 200 정상 응답)
   - `GET /api/main/top-places/` → `{ places: [{ id, name, address, photo_url, favorite_count }] }`
   - `PATCH /api/account/locale/` → `{ nationality?, language? }` 요청, `{ language }` 응답. 로그인 불필요(선택), 비로그인이면 검증만 하고 저장은 프론트가 `useLocaleStore`(localStorage)로 한다.
-- 국적 선택은 PRD상 "미정"이었으나, BE 번역 지원 언어가 영어만으로 결정된 것에 맞춰 **한국(ko) / 해외(en) 2개만** 만들었다 (2026-08-29, 사용자 확인). UI는 Figma처럼 헤더 지구본 아이콘 → 바텀시트.
+- 처음엔 BE 번역 지원 언어가 영어만으로 결정된 것에 맞춰 국적 선택(한국(ko)/해외(en) 2개)으로 만들었으나(2026-08-29), **2026-09-04부터 국적이 아니라 화면 언어를 직접 고르는 방식**으로 바꿨다 — 지원 언어가 5개(ko/en/ja/zh-CN/zh-TW)로 늘면서 국적↔언어 1:1 매핑이 안 맞아서다 (BE 합의, 7장 참고). UI는 Figma처럼 헤더 지구본 아이콘 → 바텀시트, 이제 5개 언어 목록이 뜬다.
 - 명예의전당·Top10은 BE 자체 문서엔 "Phase3 전엔 못 채운다"고 되어 있지만, 실제 코드는 스텁이 아니라 진짜 랭킹 로직이 이미 구현돼 있다. 데이터가 없으면 각각 `null`/`[]`을 정상 응답하므로 그 값 그대로 빈 상태 UI를 보여준다.
 - **Hero(배너+명예의전당 병합, 2026-08-30 캐러셀로 확장)**: "금주의 명예의 전당"(`GET /api/main/hall-of-fame/`)과 "이 장소, 어떠세요?"(`GET /api/places/recommend/`의 첫 번째 결과) 두 슬라이드를 4초마다 자동 전환 + 손가락 스와이프로 넘겨볼 수 있는 캐러셀로 보여준다. 둘 다 없으면 `GET /api/banners/`로 대체하고, 그마저 없으면 아무것도 안 보인다.
+- **배너 데이터 연동은 FE 쪽엔 이미 완성돼 있다 (2026-09-04 재확인)**. 배포 서버(`/api/banners/`)가 빈 배열을 돌려주는 건 코드 문제가 아니라 배포 DB에 배너 데이터(관리자 등록)가 아직 없어서다 — FE에서 추가로 할 일 없음, BE/운영 쪽에서 데이터만 채우면 된다.
 - **즐겨찾기 (2026-08-30 추가, `src/api/bookmarks.ts`)**: Top10·추천 카드 썸네일 위에 별 아이콘. `POST/DELETE /api/places/{id}/favorite/` 연동, 로그인 필요(`authorizedFetch` 재사용, `auth.ts`에서 export). 비로그인 상태로 누르면 `/login`으로 이동하며 "로그인이 필요한 기능입니다" 안내.
   - **제약**: 목록 API(추천/Top10) 응답에 즐겨찾기 여부(`is_favorited`)가 없어서, 카드 별은 항상 빈 별로 시작한다. 이미 즐겨찾기한 명소를 다시 봐도 화면상으론 빈 별로 보임 — BE가 목록 응답에 `is_favorited`를 추가해주면 고칠 것.
 - **BE 데이터가 없어서 생긴 제약 — BE 확인 필요 (2026-08-30)**:
@@ -173,7 +185,7 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
   - `GET /api/places/search/?q=&type=&lang=` → `{ places: [{id,name,address,photo_url}], works: [{id,title,category,poster_url}], message? }`. `q` 없으면 400, `type`(`WORK`/`DRAMA`/`MOVIE`)이 잘못돼도 400. 로그인 상태면 BE가 자동으로 검색 기록을 남긴다.
   - `GET /api/places/search/autocomplete/?q=` → `{ suggestions: string[] }`
   - `GET /api/search/popular/` (라우팅이 `/api/places/` 밑이 아니라 루트 바로 밑, `config/urls.py` 참고) → `{ keywords: string[] }`, 최근 30일 집계 상위 5개. PHASE3.md 원안엔 없었지만 이미 BE에 구현돼 있어 함께 넣기로 함(2026-08-30, 사용자 확인).
-- `lang` 파라미터는 다른 API들(추천 등)과 동일하게 FE가 보내지 않는다. 안 보내면 BE가 로그인 회원의 언어 → 한국어 순으로 알아서 고른다.
+- `lang` 파라미터는 `useLocaleStore`의 현재 언어를 항상 붙인다 (Phase 11, 2026-09-04 변경 — 이전엔 안 보냈으나, 그러면 비로그인 사용자는 언어를 바꿔도 검색 결과가 계속 한국어로 왔다).
 - **최근 검색어는 로그인 여부와 상관없이 localStorage에만 저장한다.** PRD엔 "비로그인 사용자만 기기 저장"이라고 되어 있었지만, BE에 로그인 사용자의 검색 기록을 다시 조회하는 API가 없다(`SearchHistory`는 인기 검색어 집계·개인화 추천에만 쓰임) — 그래서 로그인해도 동일하게 기기 저장으로 처리했다(2026-08-30, 사용자 확인).
 - 필터 칩(전체/드라마/영화) UI는 Figma 목업(node-id `102:1265`)에 없어서 직접 구성했다. 스타일은 `LanguageSheet.tsx`의 선택 표시(`font-bold text-primary`)와 동일하게 맞춤. 위치는 "작품에서 검색됨" 타이틀 바로 아래(2026-08-30, 사용자 확인).
 - **필터는 API를 다시 안 부르고 FE에서만 걸러 보여준다.** 검색 API에 `type`을 넘기면 BE가 명소 결과를 아예 비워버려서(`SearchView`), 필터를 누를 때마다 "명소에서 검색됨" 섹션까지 같이 사라지는 문제가 있었다. 그래서 검색은 항상 `type` 없이(통합검색) 한 번만 부르고, 필터 클릭 시엔 이미 받아온 `works` 배열을 화면에서 `category`로 걸러서 보여준다. `places`는 필터와 무관하게 항상 그대로 보인다(2026-08-30, 사용자 확인).
@@ -183,8 +195,10 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 ### S-04. 추천 (위치 기반) — 메인 화면(S-02) 내부 기능, Phase 2 구현 완료
 - API: `GET /api/places/recommend/` (확정, `src/api/spots.ts`의 `getRecommendedSpots`)
   - `lat`, `lng` 쿼리 파라미터(선택). 없거나 잘못되면 BE가 랜덤 3곳을 돌려준다.
+  - `lang` 쿼리 파라미터는 항상 붙인다 (Phase 11, 2026-09-04 — 7장 참고).
   - 항상 3개, `{ places: [{ id, name, address, photo_url }] }`
 - 위치 권한 허용/거부는 `src/hooks/useGeolocation.ts`가 판단. 거부해도 재요청하지 않는다.
+- **위치 권한 커스텀 모달 (Phase 11, 2026-09-04)**: 지금까지는 브라우저 네이티브 권한 팝업에만 의존했다. Figma 디자인 기준으로, 네이티브 팝업을 띄우기 전에 "왜 위치 정보가 필요한지" 설명하는 앱 자체 모달을 추가한다.
 
 ### S-05. 명소 상세 — `pages/SpotDetailPage.tsx` (Phase 4, 구현 완료 — 2026-08-30)
 - 컴포넌트: 카카오맵(+주변 상권 마커), 명소 정보, 작품 정보, 리뷰 목록, 즐겨찾기 버튼(`FavoriteButton` 재사용)
@@ -227,7 +241,8 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
   - `GET/POST /api/places/{place_id}/reviews/` — 목록(로그인 불필요)/작성(로그인 필요, `rating` 1~5·`content` 필수 최대 500자·`language`·`photo_urls`).
   - `PATCH/DELETE /api/reviews/{id}/` — 수정/삭제, 작성자 본인만(403). 삭제는 이미 없는 리뷰도 204(조용히 성공).
   - `POST/DELETE /api/reviews/{id}/like/` — 좋아요/취소.
-- **좋아요 UI를 이번 Phase에 포함시켰다.** `PHASE6.md` 원안엔 "좋아요·신고 버튼은 화면에 없다"고 돼 있었지만, Figma 목업(리뷰 더보기/상세 화면)에 하트가 있고 BE API도 이미 구현돼 있어서 사용자 확인 후 포함했다(2026-08-30). 신고는 목업에도 없어서 계속 범위 밖.
+  - `POST /api/reviews/{id}/report/` — 신고, 로그인 필요. 같은 사람이 여러 번 신고해도 1건만 접수(새 접수 201, 중복 200). 서로 다른 5명이 신고하면 자동 숨김 (Phase 11, 2026-09-04 연동).
+- **좋아요 UI를 이번 Phase에 포함시켰다.** `PHASE6.md` 원안엔 "좋아요·신고 버튼은 화면에 없다"고 돼 있었지만, Figma 목업(리뷰 더보기/상세 화면)에 하트가 있고 BE API도 이미 구현돼 있어서 사용자 확인 후 포함했다(2026-08-30). 신고 버튼은 Phase 11에서 추가.
 - `content`가 BE 모델에서 필수(빈 값 불가)라 **별점만 단독으로 등록하는 API 자체가 없다.** 그래서 "별점 등록" 모달(`RatingModal.tsx`)은 서버에 아무것도 안 보내고 고른 별점 값만 들고 리뷰 작성 화면으로 이동하며, 거기서 텍스트까지 채워야 최종 등록(POST)된다.
 - Figma "리뷰 등록" 목업엔 별점 UI가 안 보였지만, `rating`이 없으면 제출 자체가 불가능해서 작성 화면에도 별점 줄을 추가했다(모달에서 값 넘어오면 미리 선택됨, 직접 바꿀 수도 있음). 같은 화면에 명확한 "등록" 버튼도 캡처에 안 잡혀서 하단에 직접 추가했다.
 - **`GET /api/reviews/{id}/`(리뷰 단건 조회)가 없다.** "리뷰 더보기"/"리뷰 상세" 화면은 명소별 목록(`GET /api/places/{id}/reviews/`)에서 해당 id를 찾아 쓰는 방식으로 우회했다 — 그래서 라우트를 `/spots/:placeId/reviews`, `/spots/:placeId/reviews/:reviewId`처럼 명소 하위로 중첩했다.
@@ -252,7 +267,7 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 - **"내가 쓴 리뷰" 카드에 장소명을 보여준다.** `GET /api/account/reviews/`가 `ReviewSerializer`를 그대로 쓰는데, `place`가 ID로만 온다(이름·썸네일 없음, S-07 갭과 동일) — 처음엔 이름 없이 리뷰 내용만 보여주기로 했다가(2026-08-31 오전), 사용자가 장소명도 같이 보고 싶다고 해서 리뷰에 쓰인 장소들만 중복 제거해서 `getPlaceDetail`로 따로 조회하는 방식으로 바꿨다(2026-08-31 오후). 장소당 한 번만 호출되긴 하지만, `getPlaceDetail`이 명소 상세 전체(주변 상권·리뷰 목록 포함)를 돌려주는 무거운 API라 이름 하나 얻으려고 쓰기엔 과하다 — BE에 "장소 이름만" 주는 가벼운 API나, `ReviewSerializer`에 `place_name` 필드 추가를 요청하면 더 나아질 수 있다. 클릭하면 `/spots/{place}/reviews/{id}`(이미 있는 라우트)로 이동한다.
 - **"나만의 코스" 섹션은 빈 자리만 만들었다.** 실제로는 `GET /api/account/courses/`(`MyCourseListView`)가 이미 구현돼 있고 Figma도 실제 데이터를 보여주지만, PHASE7.md 원안 스코프(코스는 Phase8)를 그대로 따르기로 사용자가 확인했다(2026-08-31). Phase8에서 연동한다.
 - 프로필 사진은 리뷰 사진과 동일하게 Firebase Storage에 먼저 업로드(`src/lib/profilePhotoUpload.ts`, `profile/{uid}/{timestamp}-{filename}` 경로)한 뒤 URL을 `profile_image_url`로 보낸다.
-- Figma의 언어 선택 시트엔 5개 언어(한국어/English/日本語/简体中文/繁體中文)가 보이지만, 기존 `LanguageSheet`(Phase1/2)는 ko/en 2개만 지원한다. 이번 Phase 범위가 아니라 손대지 않았다 — 다국어 지원 언어 확장은 별도로 논의 필요.
+- **`LanguageSheet`이 Figma대로 5개 언어(한국어/English/日本語/简体中文/繁體中文)를 지원하도록 확장했다 (2026-09-04, BE 합의)** — 자세한 내용은 7장 참고.
 
 ### S-11. 회원탈퇴 — 마이페이지 내부 기능 (Phase 7, 구현 완료 — 2026-08-31)
 - API: `DELETE /api/account/` (확정, `MeView.delete`) — 204. 회원 row는 안 지우고 개인정보만 비우는 방식(BE 처리, FE는 신경쓸 필요 없음).
