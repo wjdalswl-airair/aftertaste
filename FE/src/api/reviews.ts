@@ -63,3 +63,11 @@ export function likeReview(reviewId: number): Promise<void> {
 export function unlikeReview(reviewId: number): Promise<void> {
   return authorizedFetch<void>(`/api/reviews/${reviewId}/like/`, { method: 'DELETE' })
 }
+
+// 신고 사유는 선택 입력. 같은 사람이 여러 번 신고해도 서버가 1건으로 처리한다(멱등).
+export function reportReview(reviewId: number, reason?: string): Promise<void> {
+  return authorizedFetch<void>(`/api/reviews/${reviewId}/report/`, {
+    method: 'POST',
+    body: JSON.stringify({ reason: reason ?? '' }),
+  })
+}
