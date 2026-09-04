@@ -1,0 +1,119 @@
+{
+  "mainPage": {
+    "greeting": {
+      "hello": "こんにちは",
+      "nameSuffix": "、{{name}}さん",
+      "subtitle": "今日はどんなシーンへ旅してみましょうか？"
+    },
+    "hero": {
+      "title": "今週の殿堂入り",
+      "recommendTitle": "この場所はいかがですか？",
+      "empty": "近日公開予定です"
+    },
+    "topPlaces": {
+      "title": "全国撮影地Top10",
+      "empty": "近日公開予定です"
+    },
+    "recommend": {
+      "title": "近くの名所",
+      "empty": "近日公開予定です"
+    }
+  },
+  "searchPage": {
+    "title": "何を\nお探しですか？",
+    "placeholder": "撮影地や作品を検索",
+    "searchButton": "検索",
+    "clearButton": "クリア",
+    "popularKeywordsTitle": "人気検索語",
+    "recentSearchesTitle": "最近の検索",
+    "recentSearchesClear": "すべて削除",
+    "resultsTitle": "「{{query}}」の検索結果",
+    "placesFoundTitle": "名所で見つかりました",
+    "worksFoundTitle": "作品で見つかりました",
+    "noResults": "検索結果がありません",
+    "filters": {
+      "all": "すべて",
+      "drama": "ドラマ",
+      "movie": "映画"
+    }
+  },
+  "spotDetail": {
+    "notFound": "見つかりません",
+    "shareCopied": "リンクをコピーしました",
+    "location": "位置",
+    "mainWorks": "主な出演作品",
+    "photoTips": "撮影のヒント",
+    "businessHours": "営業時間",
+    "recommendedTime": "おすすめの訪問時間",
+    "etiquette": "注意事項",
+    "rateButton": "評価する",
+    "reviewButton": "レビューを書く",
+    "reviewsTitle": "訪問者レビュー",
+    "reviewsEmpty": "まだレビューがありません",
+    "reviewsMore": "もっと見る",
+    "courseCta": "この場所からAIコースを受け取る",
+    "mapTitle": "地図",
+    "mapUnavailable": "地図を表示できません",
+    "noCoordinates": "位置情報がありません",
+    "directions": "道案内"
+  },
+  "workDetail": {
+    "notFound": "見つかりません",
+    "mainCast": "出演",
+    "director": "監督",
+    "releaseDate": "公開日",
+    "storyTitle": "この作品のストーリー",
+    "detailButton": "詳しく見る",
+    "placesTitle": "「{{title}}」の撮影地",
+    "placesEmpty": "まだ登録された撮影地がありません"
+  },
+  "bookmarksPage": {
+    "title": "保存した名所",
+    "empty": "まだ保存した名所がありません"
+  },
+  "ratingModal": {
+    "question": "ここはいかがでしたか？",
+    "submitButton": "評価する",
+    "hint": "写真と一緒にレビューも残してみましょう！"
+  },
+  "reviewForm": {
+    "title": "レビューを書く",
+    "editTitle": "レビューを編集",
+    "ratingLabel": "評価",
+    "photoLabel": "写真添付",
+    "photoUploadError": "写真のアップロードに失敗しました。もう一度お試しください。",
+    "contentLabel": "訪問レビュー",
+    "contentPlaceholder": "ここでの体験を書いてください",
+    "submitButton": "登録"
+  },
+  "reviewList": {
+    "sortLatest": "最新順",
+    "sortPopular": "人気順",
+    "empty": "まだレビューがありません"
+  },
+  "reviewDetail": {
+    "notFound": "見つかりません",
+    "edit": "編集",
+    "delete": "削除",
+    "report": "通報",
+    "cancel": "キャンセル"
+  },
+  "myPage": {
+    "profileEditButton": "プロフィール編集",
+    "profileSaveButton": "プロフィール保存",
+    "reviewedPlacesLabel": "訪問認証した撮影地：{{count}}",
+    "createdCoursesLabel": "提案したコース：{{count}}",
+    "favoritesTitle": "保存した名所",
+    "favoritesMore": "もっと見る",
+    "favoritesEmpty": "まだ保存した名所がありません",
+    "myReviewsTitle": "自分のレビュー",
+    "myReviewsEmpty": "まだ作成したレビューがありません",
+    "myCoursesTitle": "マイコース",
+    "myCoursesEmpty": "まだ作成したコースがありません",
+    "logoutButton": "ログアウト",
+    "withdrawLink": "退会する",
+    "withdrawConfirmTitle": "本当に退会しますか？",
+    "withdrawConfirmButton": "退会する",
+    "withdrawCancelButton": "キャンセル"
+  }
+}

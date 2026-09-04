@@ -47,6 +47,68 @@
 }
 
 /*
+  CJK 폰트 (일본어/중국어 본문용, 2026-09-04 추가).
+  한자는 한국어·일본어·중국어(간체/번체)가 유니코드 코드값을 공유하지만 지역마다 정식 글자
+  모양이 다르다(한자 유니코드 통합 문제) — 그래서 unicode-range로는 자동 구분이 안 되고,
+  실제 문서 언어(:lang())에 맞는 폰트를 명시해야 한다. <html lang>은 src/i18n/index.ts가
+  화면 언어 바뀔 때마다 갱신한다.
+*/
+@font-face {
+  font-family: 'NotoSansJP';
+  src: url('./assets/fonts/NotoSansJP-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'NotoSansJP';
+  src: url('./assets/fonts/NotoSansJP-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'NotoSansJP';
+  src: url('./assets/fonts/NotoSansJP-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'NotoSansSC';
+  src: url('./assets/fonts/NotoSansSC-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'NotoSansSC';
+  src: url('./assets/fonts/NotoSansSC-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'NotoSansSC';
+  src: url('./assets/fonts/NotoSansSC-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'NotoSansTC';
+  src: url('./assets/fonts/NotoSansTC-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'NotoSansTC';
+  src: url('./assets/fonts/NotoSansTC-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'NotoSansTC';
+  src: url('./assets/fonts/NotoSansTC-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+
+/*
   여운 Design System 토큰 (Figma "Yeoun Design System" 프레임 기준)
   값을 바꿔야 하면 Figma가 먼저 바뀌어야 한다. 여기서 임의로 값만 고치지 않는다.
 */
@@ -74,6 +136,18 @@ body {
   margin: 0;
   background: var(--color-background);
   color: var(--color-ink);
+}
+
+/* 현재 문서 언어(<html lang>)에 맞는 CJK 폰트로 전환한다. font-family는 상속되므로 body 등
+   하위 요소는 따로 안 건드려도 된다. */
+:root:lang(ja) {
+  font-family: 'NotoSansJP', var(--font-sans);
+}
+:root:lang(zh-CN) {
+  font-family: 'NotoSansSC', var(--font-sans);
+}
+:root:lang(zh-TW) {
+  font-family: 'NotoSansTC', var(--font-sans);
 }
 
 /* 가로 스크롤 캐러셀에서 스크롤바를 숨긴다 (배너/Top10/추천 카드 등) */

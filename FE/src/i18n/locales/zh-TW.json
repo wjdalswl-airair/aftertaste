@@ -1,0 +1,119 @@
+{
+  "mainPage": {
+    "greeting": {
+      "hello": "你好",
+      "nameSuffix": "，{{name}}",
+      "subtitle": "今天想去探索哪個場景呢？"
+    },
+    "hero": {
+      "title": "本週名人堂",
+      "recommendTitle": "這個地方如何？",
+      "empty": "敬請期待"
+    },
+    "topPlaces": {
+      "title": "全國拍攝地Top10",
+      "empty": "敬請期待"
+    },
+    "recommend": {
+      "title": "附近的景點",
+      "empty": "敬請期待"
+    }
+  },
+  "searchPage": {
+    "title": "您在\n尋找什麼？",
+    "placeholder": "搜尋拍攝地或作品",
+    "searchButton": "搜尋",
+    "clearButton": "清除",
+    "popularKeywordsTitle": "熱門搜尋詞",
+    "recentSearchesTitle": "最近搜尋",
+    "recentSearchesClear": "全部刪除",
+    "resultsTitle": "「{{query}}」的搜尋結果",
+    "placesFoundTitle": "在景點中找到",
+    "worksFoundTitle": "在作品中找到",
+    "noResults": "沒有搜尋結果",
+    "filters": {
+      "all": "全部",
+      "drama": "戲劇",
+      "movie": "電影"
+    }
+  },
+  "spotDetail": {
+    "notFound": "不存在",
+    "shareCopied": "連結已複製",
+    "location": "位置",
+    "mainWorks": "主要出演作品",
+    "photoTips": "拍照小提示",
+    "businessHours": "營業時間",
+    "recommendedTime": "推薦造訪時間",
+    "etiquette": "注意事項",
+    "rateButton": "評分",
+    "reviewButton": "撰寫評論",
+    "reviewsTitle": "訪客評論",
+    "reviewsEmpty": "尚無評論",
+    "reviewsMore": "查看更多",
+    "courseCta": "取得此地點的AI路線推薦",
+    "mapTitle": "地圖",
+    "mapUnavailable": "無法顯示地圖",
+    "noCoordinates": "沒有位置資訊",
+    "directions": "路線指引"
+  },
+  "workDetail": {
+    "notFound": "不存在",
+    "mainCast": "主演",
+    "director": "導演",
+    "releaseDate": "上映日期",
+    "storyTitle": "這部作品的故事",
+    "detailButton": "查看詳情",
+    "placesTitle": "《{{title}}》拍攝地",
+    "placesEmpty": "尚無登記的拍攝地"
+  },
+  "bookmarksPage": {
+    "title": "我收藏的景點",
+    "empty": "尚無收藏的景點"
+  },
+  "ratingModal": {
+    "question": "這個地方如何？",
+    "submitButton": "評分",
+    "hint": "也一起留下附照片的評論吧！"
+  },
+  "reviewForm": {
+    "title": "撰寫評論",
+    "editTitle": "編輯評論",
+    "ratingLabel": "評分",
+    "photoLabel": "新增照片",
+    "photoUploadError": "照片上傳失敗，請再試一次。",
+    "contentLabel": "造訪心得",
+    "contentPlaceholder": "請分享您在這裡的體驗",
+    "submitButton": "送出"
+  },
+  "reviewList": {
+    "sortLatest": "最新",
+    "sortPopular": "最熱門",
+    "empty": "尚無評論"
+  },
+  "reviewDetail": {
+    "notFound": "不存在",
+    "edit": "編輯",
+    "delete": "刪除",
+    "report": "檢舉",
+    "cancel": "取消"
+  },
+  "myPage": {
+    "profileEditButton": "編輯個人資料",
+    "profileSaveButton": "儲存個人資料",
+    "reviewedPlacesLabel": "已認證造訪的拍攝地：{{count}}",
+    "createdCoursesLabel": "已提議的路線：{{count}}",
+    "favoritesTitle": "我收藏的景點",
+    "favoritesMore": "查看更多",
+    "favoritesEmpty": "尚無收藏的景點",
+    "myReviewsTitle": "我的評論",
+    "myReviewsEmpty": "尚未撰寫評論",
+    "myCoursesTitle": "我的路線",
+    "myCoursesEmpty": "尚無建立的路線",
+    "logoutButton": "登出",
+    "withdrawLink": "刪除帳號",
+    "withdrawConfirmTitle": "確定要刪除帳號嗎？",
+    "withdrawConfirmButton": "刪除帳號",
+    "withdrawCancelButton": "取消"
+  }
+}

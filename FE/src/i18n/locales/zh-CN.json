@@ -1,0 +1,119 @@
+{
+  "mainPage": {
+    "greeting": {
+      "hello": "你好",
+      "nameSuffix": "，{{name}}",
+      "subtitle": "今天想去探索哪个场景呢？"
+    },
+    "hero": {
+      "title": "本周名人堂",
+      "recommendTitle": "这个地方怎么样？",
+      "empty": "敬请期待"
+    },
+    "topPlaces": {
+      "title": "全国拍摄地Top10",
+      "empty": "敬请期待"
+    },
+    "recommend": {
+      "title": "附近的景点",
+      "empty": "敬请期待"
+    }
+  },
+  "searchPage": {
+    "title": "您在\n寻找什么？",
+    "placeholder": "搜索拍摄地或作品",
+    "searchButton": "搜索",
+    "clearButton": "清除",
+    "popularKeywordsTitle": "热门搜索词",
+    "recentSearchesTitle": "最近搜索",
+    "recentSearchesClear": "全部删除",
+    "resultsTitle": "\"{{query}}\"的搜索结果",
+    "placesFoundTitle": "在景点中找到",
+    "worksFoundTitle": "在作品中找到",
+    "noResults": "没有搜索结果",
+    "filters": {
+      "all": "全部",
+      "drama": "电视剧",
+      "movie": "电影"
+    }
+  },
+  "spotDetail": {
+    "notFound": "不存在",
+    "shareCopied": "链接已复制",
+    "location": "位置",
+    "mainWorks": "主要出演作品",
+    "photoTips": "拍照小贴士",
+    "businessHours": "营业时间",
+    "recommendedTime": "推荐访问时间",
+    "etiquette": "注意事项",
+    "rateButton": "评分",
+    "reviewButton": "写评论",
+    "reviewsTitle": "访客评论",
+    "reviewsEmpty": "还没有评论",
+    "reviewsMore": "查看更多",
+    "courseCta": "获取此地点的AI路线推荐",
+    "mapTitle": "地图",
+    "mapUnavailable": "无法显示地图",
+    "noCoordinates": "没有位置信息",
+    "directions": "路线"
+  },
+  "workDetail": {
+    "notFound": "不存在",
+    "mainCast": "主演",
+    "director": "导演",
+    "releaseDate": "上映日期",
+    "storyTitle": "该作品的故事",
+    "detailButton": "查看详情",
+    "placesTitle": "《{{title}}》拍摄地",
+    "placesEmpty": "还没有登记的拍摄地"
+  },
+  "bookmarksPage": {
+    "title": "我保存的景点",
+    "empty": "还没有保存的景点"
+  },
+  "ratingModal": {
+    "question": "这个地方怎么样？",
+    "submitButton": "评分",
+    "hint": "也一起留下带照片的评论吧！"
+  },
+  "reviewForm": {
+    "title": "写评论",
+    "editTitle": "编辑评论",
+    "ratingLabel": "评分",
+    "photoLabel": "添加照片",
+    "photoUploadError": "照片上传失败，请重试。",
+    "contentLabel": "访问感受",
+    "contentPlaceholder": "请分享您在这里的体验",
+    "submitButton": "提交"
+  },
+  "reviewList": {
+    "sortLatest": "最新",
+    "sortPopular": "最热",
+    "empty": "还没有评论"
+  },
+  "reviewDetail": {
+    "notFound": "不存在",
+    "edit": "编辑",
+    "delete": "删除",
+    "report": "举报",
+    "cancel": "取消"
+  },
+  "myPage": {
+    "profileEditButton": "编辑资料",
+    "profileSaveButton": "保存资料",
+    "reviewedPlacesLabel": "已认证访问的拍摄地：{{count}}",
+    "createdCoursesLabel": "已提议的路线：{{count}}",
+    "favoritesTitle": "我保存的景点",
+    "favoritesMore": "查看更多",
+    "favoritesEmpty": "还没有保存的景点",
+    "myReviewsTitle": "我的评论",
+    "myReviewsEmpty": "还没有写过评论",
+    "myCoursesTitle": "我的路线",
+    "myCoursesEmpty": "还没有创建的路线",
+    "logoutButton": "退出登录",
+    "withdrawLink": "注销账号",
+    "withdrawConfirmTitle": "确定要注销账号吗？",
+    "withdrawConfirmButton": "注销账号",
+    "withdrawCancelButton": "取消"
+  }
+}
