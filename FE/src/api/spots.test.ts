@@ -27,7 +27,7 @@ describe('getRecommendedSpots', () => {
     )
   })
 
-  it('좌표가 없으면 쿼리스트링 없이 호출한다(BE가 랜덤 추천)', async () => {
+  it('좌표가 없으면 lat/lng 없이 lang만 붙여 호출한다(BE가 랜덤 추천)', async () => {
     const { getRecommendedSpots } = await import('./spots')
     vi.stubGlobal(
       'fetch',
@@ -37,7 +37,8 @@ describe('getRecommendedSpots', () => {
     await getRecommendedSpots()
 
     const calledUrl = vi.mocked(fetch).mock.calls[0][0] as string
-    expect(calledUrl.endsWith('/api/places/recommend/')).toBe(true)
+    expect(calledUrl).not.toContain('lat=')
+    expect(calledUrl).toContain('/api/places/recommend/?lang=')
   })
 
   it('실패하면 에러를 던진다', async () => {
