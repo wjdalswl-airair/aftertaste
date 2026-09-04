@@ -19,6 +19,14 @@
       "empty": "Coming soon"
     }
   },
+  "locationConsent": {
+    "body": "여운 needs your consent to its location-based service terms, in accordance with laws on the protection and use of location information, to provide services like checking your current location and finding nearby attractions. If you don't agree, use of location-based services may be limited.",
+    "howTo": "How to use location services",
+    "terms": "View location-based service terms",
+    "privacy": "View personal location information policy",
+    "deny": "Deny",
+    "allow": "Allow"
+  },
   "searchPage": {
     "title": "What are you\nlooking for?",
     "placeholder": "Search filming spots or works",

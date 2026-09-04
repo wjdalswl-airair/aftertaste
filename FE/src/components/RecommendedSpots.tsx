@@ -4,11 +4,12 @@ import { Link } from 'react-router-dom'
 import { getRecommendedSpots, type RecommendedSpot } from '../api/spots'
 import { useGeolocation } from '../hooks/useGeolocation'
 import { FavoriteButton } from './FavoriteButton'
+import { LocationPermissionModal } from './LocationPermissionModal'
 import { Skeleton } from './Skeleton'
 
 export function RecommendedSpots() {
   const { t } = useTranslation()
-  const { status, coords } = useGeolocation()
+  const { status, coords, showConsentModal, handleAllow, handleDeny } = useGeolocation()
   // undefined: 로딩 중, []: 확인 끝났는데 추천 없음
   const [spots, setSpots] = useState<RecommendedSpot[] | undefined>(undefined)
 
@@ -55,6 +56,8 @@ export function RecommendedSpots() {
           ))}
         </div>
       )}
+
+      {showConsentModal && <LocationPermissionModal onAllow={handleAllow} onDeny={handleDeny} />}
     </section>
   )
 }

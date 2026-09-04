@@ -201,7 +201,7 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
   - `lang` 쿼리 파라미터는 항상 붙인다 (Phase 11, 2026-09-04 — 7장 참고).
   - 항상 3개, `{ places: [{ id, name, address, photo_url }] }`
 - 위치 권한 허용/거부는 `src/hooks/useGeolocation.ts`가 판단. 거부해도 재요청하지 않는다.
-- **위치 권한 커스텀 모달 (Phase 11, 2026-09-04)**: 지금까지는 브라우저 네이티브 권한 팝업에만 의존했다. Figma 디자인 기준으로, 네이티브 팝업을 띄우기 전에 "왜 위치 정보가 필요한지" 설명하는 앱 자체 모달을 추가한다.
+- **위치 권한 커스텀 모달 (Phase 11, 2026-09-04 구현 완료)**: Figma node-id `102:702` 기준. `src/components/LocationPermissionModal.tsx` — "허용"을 눌러야 그때 `useGeolocation`이 브라우저 네이티브 권한 팝업(`getCurrentPosition`)을 띄운다. 응답(허용/거부)은 `localStorage`(`location-permission-consent`)에 저장해 다음 방문부터는 모달을 다시 안 띄운다. 안내/약관/처리방침 3줄 텍스트는 Figma 목업에 실제 이동 경로가 없어서(연결된 페이지 없음) 텍스트로만 두고 링크는 안 걸었다 — 필요해지면 별도 논의.
 
 ### S-05. 명소 상세 — `pages/SpotDetailPage.tsx` (Phase 4, 구현 완료 — 2026-08-30)
 - 컴포넌트: 카카오맵(+주변 상권 마커), 명소 정보, 작품 정보, 리뷰 목록, 즐겨찾기 버튼(`FavoriteButton` 재사용)
