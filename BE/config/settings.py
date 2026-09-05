@@ -57,6 +57,20 @@ CSRF_TRUSTED_ORIGINS: list[str] = []
 if _render_host:
     CSRF_TRUSTED_ORIGINS.append(f"https://{_render_host}")
 
+# 운영(DEBUG=False)에서만 켜는 HTTPS 보안 설정.
+# 로컬 개발은 http라서 켜면 접속이 막히므로 DEBUG일 때는 건드리지 않는다.
+if not DEBUG:
+    # http로 들어온 요청을 https로 자동 리다이렉트한다.
+    SECURE_SSL_REDIRECT = True
+    # 세션 쿠키(주로 admin 로그인)를 https 연결에서만 주고받는다.
+    SESSION_COOKIE_SECURE = True
+    # CSRF 쿠키도 https 전용으로 제한한다.
+    CSRF_COOKIE_SECURE = True
+    # 브라우저에게 "앞으로 이 도메인은 https로만 접속하라"고 기억시킨다(HSTS).
+    # 처음엔 1시간(3600초)으로 짧게 두고, 문제 없으면 나중에 늘린다.
+    SECURE_HSTS_SECONDS = 3600
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+
 
 # Application definition
 
