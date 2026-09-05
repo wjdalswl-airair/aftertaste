@@ -10,7 +10,7 @@ export type Member = {
   email: string
   nickname: string
   profile_image_url: string | null
-  provider: 'google' | 'apple'
+  provider: 'google' | 'kakao'
   nationality: string | null
   language: string | null
   created_at: string
@@ -63,6 +63,19 @@ export function loginWithFirebase(): Promise<Member> {
 // 내 정보 조회 (BE MeView)
 export function getMe(): Promise<Member> {
   return authorizedFetch<Member>('/api/account/', { method: 'GET' })
+}
+
+// 카카오 로그인 1단계: Kakao.Auth.authorize()가 돌려준 인가 코드를 Firebase 커스텀 토큰으로 바꾼다.
+// 아직 로그인 전(idToken이 없는) 상태에서 부르는 API라 publicFetch를 쓴다.
+// ⚠️ BE 의존성 미해결(2026-09-04): 지금 BE `KakaoCustomTokenView`는 이미 발급된 access_token을
+// 받는 구조라 { code, redirect_uri }를 보내면 400이 난다. code → access_token 교환을 BE가
+// 하도록(카카오 REST API 키로 https://kauth.kakao.com/oauth/token 호출) BE 쪽에 요청해야
+// 이 함수가 실제로 동작한다 — DETAIL_SPEC 5장 참고.
+export function kakaoLogin(code: string, redirectUri: string): Promise<{ firebase_custom_token: string }> {
+  return publicFetch<{ firebase_custom_token: string }>('/api/account/kakao/token/', {
+    method: 'POST',
+    body: JSON.stringify({ code, redirect_uri: redirectUri }),
+  })
 }
 
 // 프로필(닉네임·프로필 사진) 수정. 보낸 값만 반영된다 (BE MeView.patch, 204).

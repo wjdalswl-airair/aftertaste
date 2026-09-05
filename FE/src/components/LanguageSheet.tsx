@@ -3,25 +3,30 @@ import { Globe } from 'lucide-react'
 import { useState } from 'react'
 import { updateLocale } from '../api/auth'
 import { useAuthStore } from '../store/useAuthStore'
-import { useLocaleStore, type Nationality } from '../store/useLocaleStore'
+import { useLocaleStore, type Language } from '../store/useLocaleStore'
 
-const OPTIONS: { nationality: Nationality; language: 'ko' | 'en'; label: string }[] = [
-  { nationality: 'KR', language: 'ko', label: '한국어' },
-  { nationality: 'OTHER', language: 'en', label: 'English' },
+// 국적이 아니라 언어를 직접 고른다 (2026-09-04). nationality는 더 이상 UI에서 안 받는다 —
+// BE Member.nationality는 선택 필드라 안 보내도 문제없다 (BE DETAIL_SPEC 6-1 #10).
+const OPTIONS: { language: Language; label: string }[] = [
+  { language: 'ko', label: '한국어' },
+  { language: 'en', label: 'English' },
+  { language: 'ja', label: '日本語' },
+  { language: 'zh-CN', label: '简体中文' },
+  { language: 'zh-TW', label: '繁體中文' },
 ]
 
 export function LanguageSheet() {
   const [open, setOpen] = useState(false)
-  const nationality = useLocaleStore((state) => state.nationality)
+  const language = useLocaleStore((state) => state.language)
   const setLocale = useLocaleStore((state) => state.setLocale)
   const member = useAuthStore((state) => state.member)
 
   function handleSelect(option: (typeof OPTIONS)[number]) {
-    setLocale(option.nationality, option.language)
+    setLocale(option.language)
     i18next.changeLanguage(option.language)
 
     if (member) {
-      updateLocale({ nationality: option.nationality, language: option.language }).catch(() => {
+      updateLocale({ language: option.language }).catch(() => {
         // 저장 실패해도 화면 언어 전환 자체는 그대로 유지한다.
       })
     }
@@ -46,11 +51,11 @@ export function LanguageSheet() {
             <div className="w-full animate-[sheet-up_0.2s_ease-out] rounded-t-2xl bg-white p-4 pb-8">
               {OPTIONS.map((option) => (
                 <button
-                  key={option.nationality}
+                  key={option.language}
                   type="button"
                   onClick={() => handleSelect(option)}
                   className={`block w-full rounded-lg px-4 py-3 text-center ${
-                    option.nationality === nationality ? 'font-bold text-primary' : 'text-ink'
+                    option.language === language ? 'font-bold text-primary' : 'text-ink'
                   }`}
                 >
                   {option.label}

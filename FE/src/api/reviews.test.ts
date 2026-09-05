@@ -216,4 +216,35 @@ describe('src/api/reviews.ts', () => {
       await expect(likeReview(1)).rejects.toThrow('서버 오류')
     })
   })
+
+  describe('reportReview', () => {
+    it('새로 신고하면 201로 요청한다', async () => {
+      const { reportReview } = await import('./reviews')
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 201, json: async () => null }))
+
+      await reportReview(1, '스팸이에요')
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/reviews/1/report/'),
+        expect.objectContaining({ method: 'POST', body: JSON.stringify({ reason: '스팸이에요' }) }),
+      )
+    })
+
+    it('이미 신고한 리뷰를 또 신고해도(200) 에러가 아니다', async () => {
+      const { reportReview } = await import('./reviews')
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => null }))
+
+      await expect(reportReview(1)).resolves.toBeNull()
+    })
+
+    it('로그인 안 되어 있으면 에러를 던진다', async () => {
+      const { reportReview } = await import('./reviews')
+      mockAuth.currentUser = null
+      const fetchSpy = vi.fn()
+      vi.stubGlobal('fetch', fetchSpy)
+
+      await expect(reportReview(1)).rejects.toThrow('로그인이 필요합니다')
+      expect(fetchSpy).not.toHaveBeenCalled()
+    })
+  })
 })

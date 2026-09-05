@@ -9,8 +9,10 @@
     <link rel="preload" as="font" type="font/woff2" href="/src/assets/fonts/IBMPlexSansKR-Regular.woff2" crossorigin />
     <link rel="preload" as="font" type="font/woff2" href="/src/assets/fonts/IBMPlexSansKR-Bold.woff2" crossorigin />
     <title>여운</title>
-    <!-- 명소 상세 화면 지도용 카카오맵 JS SDK. 키는 .env의 VITE_KAKAO_JS_KEY를 Vite가 빌드 시 치환한다 -->
-    <script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=%VITE_KAKAO_JS_KEY%&autoload=false" defer></script>
+    <!-- 명소 상세 화면 지도 + 좌표→동 이름 변환(services)용 카카오맵 JS SDK. 키는 .env의 VITE_KAKAO_JS_KEY를 Vite가 빌드 시 치환한다 -->
+    <script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=%VITE_KAKAO_JS_KEY%&autoload=false&libraries=services" defer></script>
+    <!-- 카카오 로그인용 JS SDK (지도 SDK와 별개). window.Kakao로 노출된다 -->
+    <script src="https://t1.kakaocdn.net/kakao_js_sdk/2.8.3/kakao.min.js" crossorigin="anonymous" defer></script>
   </head>
   <body>
     <div id="root"></div>
