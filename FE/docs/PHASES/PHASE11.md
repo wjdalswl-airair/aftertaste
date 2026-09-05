@@ -53,6 +53,13 @@
 - `src/hooks/useGeolocation.ts`가 더 이상 마운트 즉시 브라우저 네이티브 팝업을 안 띄우고, 모달에서 "허용"을 눌러야(`handleAllow`) `getCurrentPosition`을 호출한다. "거부"(`handleDeny`)는 브라우저 API를 아예 안 부르고 바로 `denied` 처리.
 - 응답은 `localStorage`(`location-permission-consent`)에 저장 — 거부 시 재요청하지 않는 기존 규칙(PHASE2.md)을 모달 단계까지 확장했다.
 
+### 5-1. 추천 타이틀에 동 이름 표시 (완료 — 2026-09-05)
+
+- 위치 권한을 허용해서 좌표를 받으면, 메인 화면 추천 명소 타이틀을 "내 주변 명소" 대신 "역삼동 근처 명소"처럼 실제 행정동 이름으로 보여준다(사용자 요청, 2026-09-05).
+- 좌표 → 동 이름 변환(역지오코딩)은 카카오맵 JS SDK의 `services` 라이브러리(`coord2RegionCode`)를 클라이언트에서 바로 사용한다 — BE 변경 없음.
+- `index.html`의 카카오맵 SDK 스크립트에 `&libraries=services` 추가, `src/types/kakao.d.ts`에 `kakao.maps.services` 타입 추가, `src/lib/kakaoMap.ts`에 `getDongName(lat, lng)` 함수 추가.
+- `src/components/RecommendedSpots.tsx`가 좌표를 받으면 `getDongName`을 호출해 타이틀을 갱신한다. 동 이름을 못 가져오면(SDK 미로딩, API 실패 등) 기존 "내 주변 명소" 문구로 폴백한다.
+
 ### 6. 명소·작품 콘텐츠 언어(`lang`) 파라미터 연동
 
 - BE `resolve_language()`는 `쿼리파라미터 lang → 로그인 회원의 언어 → 한국어` 순으로 응답 언어를 정한다 (DETAIL_SPEC 7장).
@@ -74,6 +81,7 @@
 - [ ] 로그인 화면에 로고 이미지가 보인다 (더 이상 회색 placeholder 아님)
 - [x] 배너 데이터 연동 상태 확인 완료 (FE 코드 변경 없음 확인)
 - [x] 위치 정보 요청 전 커스텀 설명 모달이 뜨고, 동의해야 네이티브 권한 팝업이 뜬다
+- [x] 위치 허용 시 추천 타이틀에 실제 동 이름이 보이고, 못 가져오면 "내 주변 명소"로 폴백한다
 - [x] 비로그인 상태에서 언어를 바꾸면 명소·작품 콘텐츠(설명 등)가 해당 언어로 보인다
 - [x] 리뷰에 신고 버튼이 있고, 신고가 정상 접수된다
 - [x] 관련 유닛 테스트(카카오 로그인 API 함수, 리뷰 신고 API 함수 성공/실패 처리) 통과 (Vitest)

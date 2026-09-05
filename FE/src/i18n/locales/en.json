@@ -16,6 +16,7 @@
     },
     "recommend": {
       "title": "Nearby Spots",
+      "titleNearby": "Spots near \"{{dong}}\"",
       "empty": "Coming soon"
     }
   },

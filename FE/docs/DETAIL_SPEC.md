@@ -202,6 +202,7 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
   - 항상 3개, `{ places: [{ id, name, address, photo_url }] }`
 - 위치 권한 허용/거부는 `src/hooks/useGeolocation.ts`가 판단. 거부해도 재요청하지 않는다.
 - **위치 권한 커스텀 모달 (Phase 11, 2026-09-04 구현 완료)**: Figma node-id `102:702` 기준. `src/components/LocationPermissionModal.tsx` — "허용"을 눌러야 그때 `useGeolocation`이 브라우저 네이티브 권한 팝업(`getCurrentPosition`)을 띄운다. 응답(허용/거부)은 `localStorage`(`location-permission-consent`)에 저장해 다음 방문부터는 모달을 다시 안 띄운다. 안내/약관/처리방침 3줄 텍스트는 Figma 목업에 실제 이동 경로가 없어서(연결된 페이지 없음) 텍스트로만 두고 링크는 안 걸었다 — 필요해지면 별도 논의.
+- **추천 타이틀 동 이름 표시 (Phase 11, 2026-09-05 구현 완료)**: 좌표를 받으면 카카오맵 JS SDK `services` 라이브러리의 `coord2RegionCode`로 행정동 이름을 구해(`src/lib/kakaoMap.ts`의 `getDongName`) 타이틀을 "역삼동 근처 명소"처럼 보여준다(BE 변경 없음, 클라이언트에서만 처리). 동 이름을 못 가져오면(SDK 미로딩, API 실패 등) 기존 "내 주변 명소" 문구로 폴백한다.
 
 ### S-05. 명소 상세 — `pages/SpotDetailPage.tsx` (Phase 4, 구현 완료 — 2026-08-30)
 - 컴포넌트: 카카오맵(+주변 상권 마커), 명소 정보, 작품 정보, 리뷰 목록, 즐겨찾기 버튼(`FavoriteButton` 재사용)

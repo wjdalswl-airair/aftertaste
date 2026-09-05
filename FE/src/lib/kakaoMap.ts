@@ -30,3 +30,26 @@ export function loadKakaoMaps(): Promise<typeof window.kakao> | null {
 
   return loadPromise
 }
+
+// 위도/경도를 "역삼동" 같은 행정동 이름으로 바꾼다. SDK가 없거나(키 미설정) 변환에
+// 실패하면 null을 돌려줘서, 호출부가 "내 주변 명소" 같은 기존 문구로 대체할 수 있게 한다.
+export async function getDongName(lat: number, lng: number): Promise<string | null> {
+  const loadResult = loadKakaoMaps()
+  if (!loadResult) {
+    return null
+  }
+
+  const kakao = await loadResult
+  return new Promise((resolve) => {
+    const geocoder = new kakao.maps.services.Geocoder()
+    // coord2RegionCode는 (경도, 위도) 순서로 받는다.
+    geocoder.coord2RegionCode(lng, lat, (result, status) => {
+      if (status !== kakao.maps.services.Status.OK || result.length === 0) {
+        resolve(null)
+        return
+      }
+      const dong = result.find((r) => r.region_type === 'H') ?? result[0]
+      resolve(dong.region_3depth_name || null)
+    })
+  })
+}

@@ -6,12 +6,15 @@ import { useGeolocation } from '../hooks/useGeolocation'
 import { FavoriteButton } from './FavoriteButton'
 import { LocationPermissionModal } from './LocationPermissionModal'
 import { Skeleton } from './Skeleton'
+import { getDongName } from '../lib/kakaoMap'
 
 export function RecommendedSpots() {
   const { t } = useTranslation()
   const { status, coords, showConsentModal, handleAllow, handleDeny } = useGeolocation()
   // undefined: 로딩 중, []: 확인 끝났는데 추천 없음
   const [spots, setSpots] = useState<RecommendedSpot[] | undefined>(undefined)
+  // 좌표를 "역삼동" 같은 동 이름으로 바꾼 값. 못 가져오면 null(기존 "내 주변 명소" 문구로 대체).
+  const [dongName, setDongName] = useState<string | null>(null)
 
   useEffect(() => {
     if (status === 'pending') {
@@ -22,9 +25,19 @@ export function RecommendedSpots() {
       .catch(() => setSpots([]))
   }, [status, coords])
 
+  useEffect(() => {
+    if (status !== 'granted' || !coords) {
+      setDongName(null)
+      return
+    }
+    getDongName(coords.lat, coords.lng).then(setDongName)
+  }, [status, coords])
+
   return (
     <section>
-      <h2 className="mb-3 px-4 text-lg font-bold text-ink">{t('mainPage.recommend.title')}</h2>
+      <h2 className="mb-3 px-4 text-lg font-bold text-ink">
+        {dongName ? t('mainPage.recommend.titleNearby', { dong: dongName }) : t('mainPage.recommend.title')}
+      </h2>
 
       {(spots === undefined || status === 'pending') && (
         <div className="flex gap-3 px-4">

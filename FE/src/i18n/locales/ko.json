@@ -16,6 +16,7 @@
     },
     "recommend": {
       "title": "내 주변 명소",
+      "titleNearby": "\"{{dong}}\" 근처 명소",
       "empty": "아직 준비 중이에요"
     }
   },

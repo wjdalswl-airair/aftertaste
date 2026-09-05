@@ -16,6 +16,7 @@
     },
     "recommend": {
       "title": "附近的景點",
+      "titleNearby": "\"{{dong}}\"附近的景點",
       "empty": "敬請期待"
     }
   },

@@ -16,6 +16,7 @@
     },
     "recommend": {
       "title": "近くの名所",
+      "titleNearby": "\"{{dong}}\"周辺のスポット",
       "empty": "近日公開予定です"
     }
   },
