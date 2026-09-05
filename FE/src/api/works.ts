@@ -1,3 +1,4 @@
+import { useLocaleStore } from '../store/useLocaleStore'
 import { publicFetch } from './client'
 
 export type WorkPlace = {
@@ -22,5 +23,6 @@ export type WorkDetail = {
 // BE에 아직 없는 엔드포인트 스펙대로 만들어둔 함수. BE가 GET /api/works/{id}/를
 // 구현하면 이 함수는 그대로 동작한다 (2026-08-30, 사용자 확인 후 API 스펙만 먼저 정리해 전달).
 export function getWorkDetail(workId: number): Promise<WorkDetail> {
-  return publicFetch<WorkDetail>(`/api/works/${workId}/`)
+  const lang = useLocaleStore.getState().language
+  return publicFetch<WorkDetail>(`/api/works/${workId}/?lang=${lang}`)
 }

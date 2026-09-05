@@ -2,7 +2,7 @@ import { ArrowLeft, Heart, MoreHorizontal } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { deleteReview, getPlaceReviews, likeReview, unlikeReview, type ReviewItem } from '../api/reviews'
+import { deleteReview, getPlaceReviews, likeReview, reportReview, unlikeReview, type ReviewItem } from '../api/reviews'
 import { getPlaceDetail, type PlaceDetail } from '../api/spots'
 import { BottomNav } from '../components/BottomNav'
 import { Skeleton } from '../components/Skeleton'
@@ -58,6 +58,22 @@ export function ReviewDetailPage() {
     navigate(`/spots/${placeId}/reviews`, { replace: true })
   }
 
+  function handleReport() {
+    if (!review) {
+      return
+    }
+    setMenuOpen(false)
+    reportReview(review.id).catch(() => {})
+  }
+
+  function handleOpenMenu() {
+    if (!member) {
+      navigate('/login', { state: { message: '로그인이 필요한 기능입니다' } })
+      return
+    }
+    setMenuOpen(true)
+  }
+
   // BE 응답에 "내가 쓴 글인지" 여부가 없어서(is_mine 같은 필드 없음), 닉네임 비교로 임시 판단한다.
   // 닉네임이 겹치면 오작동할 수 있어 정확한 방법은 아니다 (docs/DETAIL_SPEC.md S-07 참고).
   const isMine = Boolean(member && review && member.nickname === review.author_nickname)
@@ -111,11 +127,9 @@ export function ReviewDetailPage() {
               <div className="h-[40px] w-[40px] rounded-full bg-divider" />
               <p className="font-medium text-ink">{review.author_nickname}</p>
             </div>
-            {isMine && (
-              <button type="button" onClick={() => setMenuOpen(true)} aria-label="더보기">
-                <MoreHorizontal size={22} className="text-ink" />
-              </button>
-            )}
+            <button type="button" onClick={handleOpenMenu} aria-label="더보기">
+              <MoreHorizontal size={22} className="text-ink" />
+            </button>
           </div>
 
           {review.photos[0] ? (
@@ -153,19 +167,31 @@ export function ReviewDetailPage() {
           <div className="absolute inset-x-0 bottom-0 flex flex-col">
             <div className="w-full animate-[sheet-up_0.2s_ease-out] rounded-t-2xl bg-white pb-8 pt-2">
               <div className="mx-auto mt-1.5 h-[3px] w-[46px] rounded-full bg-divider" />
-              <Link
-                to={`/spots/${placeId}/reviews/${review.id}/edit`}
-                className="block w-full py-4 text-center text-[15px] font-medium text-ink"
-              >
-                {t('reviewDetail.edit')}
-              </Link>
-              <button
-                type="button"
-                onClick={handleDelete}
-                className="block w-full py-4 text-center text-[15px] font-medium text-[#e0574a]"
-              >
-                {t('reviewDetail.delete')}
-              </button>
+              {isMine ? (
+                <>
+                  <Link
+                    to={`/spots/${placeId}/reviews/${review.id}/edit`}
+                    className="block w-full py-4 text-center text-[15px] font-medium text-ink"
+                  >
+                    {t('reviewDetail.edit')}
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={handleDelete}
+                    className="block w-full py-4 text-center text-[15px] font-medium text-[#e0574a]"
+                  >
+                    {t('reviewDetail.delete')}
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleReport}
+                  className="block w-full py-4 text-center text-[15px] font-medium text-[#e0574a]"
+                >
+                  {t('reviewDetail.report')}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setMenuOpen(false)}

@@ -1,3 +1,4 @@
+import { useLocaleStore } from '../store/useLocaleStore'
 import { publicFetch } from './client'
 
 export type PlaceSearchResult = {
@@ -29,11 +30,13 @@ export function searchPlaces(keyword: string, type?: SearchType): Promise<Search
   if (type) {
     params.set('type', type)
   }
+  params.set('lang', useLocaleStore.getState().language)
   return publicFetch<SearchResult>(`/api/places/search/?${params.toString()}`)
 }
 
 export function getAutocomplete(keyword: string): Promise<string[]> {
   const params = new URLSearchParams({ q: keyword })
+  params.set('lang', useLocaleStore.getState().language)
   return publicFetch<{ suggestions: string[] }>(`/api/places/search/autocomplete/?${params.toString()}`).then(
     (res) => res.suggestions,
   )

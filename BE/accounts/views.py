@@ -9,10 +9,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.authentication import FirebaseAuthentication, _extract_bearer_token
-from accounts.firebase import InvalidFirebaseToken, verify_id_token
+from accounts.firebase import InvalidFirebaseToken, create_custom_token, verify_id_token
+from accounts.kakao import InvalidKakaoToken, get_kakao_user
 from accounts.models import NICKNAME_MAX_LENGTH, Member
 from accounts.serializers import (
     ErrorDetailSerializer,
+    KakaoTokenRequestSerializer,
+    KakaoTokenResponseSerializer,
     LocaleResponseSerializer,
     LoginRequestSerializer,
     MemberProfileUpdateSerializer,
@@ -20,10 +23,17 @@ from accounts.serializers import (
     MemberUpdateSerializer,
 )
 
+# Firebase가 기본으로 인식하는 로그인 방식. 구글은 Firebase가 직접 로그인을 처리해서
+# sign_in_provider가 "google.com"으로 온다.
 PROVIDER_BY_SIGN_IN_PROVIDER = {
     "google.com": Member.Provider.GOOGLE,
-    "apple.com": Member.Provider.APPLE,
 }
+
+# 카카오는 Firebase 기본 제공자가 아니라 커스텀 토큰을 거친다(KakaoCustomTokenView 참고).
+# 커스텀 토큰으로 로그인하면 sign_in_provider가 항상 "custom"이라 어느 소셜인지 알 수
+# 없다. 그래서 토큰을 만들 때 "provider" claim을 같이 심어 두고 여기서 구분한다.
+_CUSTOM_SIGN_IN_PROVIDER = "custom"
+_KAKAO_UID_PREFIX = "kakao:"
 
 
 class FirebaseAuthenticationScheme(OpenApiAuthenticationExtension):
@@ -47,7 +57,10 @@ class LoginView(APIView):
     @extend_schema(
         summary="소셜 로그인 / 자동 회원가입",
         description=(
-            "Firebase ID 토큰(Google·Apple 로그인 결과)을 검증해서 회원을 찾거나 새로 만든다.\n\n"
+            "Firebase ID 토큰을 검증해서 회원을 찾거나 새로 만든다. Google은 Firebase가 "
+            "직접 로그인을 처리한 결과 토큰을 그대로 쓴다. 카카오는 Firebase 기본 제공자가 "
+            "아니라서, 먼저 `POST /api/account/kakao/token/`로 Firebase 커스텀 토큰을 받아 "
+            "`signInWithCustomToken`으로 로그인한 뒤 그 결과 ID 토큰으로 이 API를 호출한다.\n\n"
             "- 이미 있는 회원이면 body 없이도 200을 반환한다.\n"
             "- 처음 오는 회원이면 body에 `agree_terms: true`가 있어야 가입이 완료된다."
         ),
@@ -112,7 +125,11 @@ class LoginView(APIView):
             return Response({"detail": "약관 동의가 필요합니다"}, status=400)
 
         sign_in_provider = decoded_token.get("firebase", {}).get("sign_in_provider")
-        provider = PROVIDER_BY_SIGN_IN_PROVIDER.get(sign_in_provider)
+        if sign_in_provider == _CUSTOM_SIGN_IN_PROVIDER:
+            # 커스텀 토큰 로그인 — 지금은 카카오만 이 경로를 쓴다(KakaoCustomTokenView 참고).
+            provider = Member.Provider.KAKAO if decoded_token.get("provider") == Member.Provider.KAKAO else None
+        else:
+            provider = PROVIDER_BY_SIGN_IN_PROVIDER.get(sign_in_provider)
         if provider is None:
             return Response({"detail": "지원하지 않는 로그인 방식입니다"}, status=400)
 
@@ -130,6 +147,64 @@ class LoginView(APIView):
             agreed_terms_at=timezone.now(),
         )
         return Response(MemberSerializer(member).data, status=201)
+
+
+class KakaoCustomTokenView(APIView):
+    """카카오 access token을 Firebase 커스텀 토큰으로 바꿔준다.
+
+    Firebase는 카카오를 기본 로그인 제공자로 지원하지 않는다. 그래서 카카오는 다른
+    소셜(Google)과 로그인 절차가 다르다:
+
+    1. 프론트엔드가 카카오 SDK로 로그인해 카카오 access token을 받는다.
+    2. 그 토큰으로 이 API를 호출한다. 서버가 카카오 API로 본인 확인 후
+       Firebase 커스텀 토큰을 만들어 돌려준다(회원을 만들지는 않는다).
+    3. 프론트엔드가 그 토큰으로 `signInWithCustomToken`을 호출해 Firebase에 로그인한다.
+    4. Firebase가 내려준 ID 토큰으로 평소처럼 `POST /api/account/login/`을 호출하면
+       회원 조회/가입이 완료된다 — 여기서부터는 Google 로그인과 같은 절차다.
+    """
+
+    @extend_schema(
+        summary="카카오 로그인 - Firebase 커스텀 토큰 발급",
+        description=(
+            "카카오 access token을 검증하고 Firebase 커스텀 토큰을 돌려준다. "
+            "이 토큰 자체로는 로그인이 끝나지 않는다 — 프론트엔드가 `signInWithCustomToken`으로 "
+            "Firebase 로그인을 마친 뒤, 그 결과 ID 토큰으로 `POST /api/account/login/`을 "
+            "호출해야 회원 조회/가입까지 끝난다."
+        ),
+        request=KakaoTokenRequestSerializer,
+        responses={
+            200: KakaoTokenResponseSerializer,
+            400: OpenApiResponse(response=ErrorDetailSerializer, description="access_token 누락"),
+            401: OpenApiResponse(response=ErrorDetailSerializer, description="카카오 토큰 무효/만료"),
+        },
+        examples=[
+            OpenApiExample(
+                "다시 로그인하세요",
+                value={"detail": "다시 로그인하세요"},
+                response_only=True,
+                status_codes=["401"],
+            ),
+        ],
+    )
+    def post(self, request):
+        access_token = request.data.get("access_token")
+        if not access_token:
+            return Response({"detail": "access_token이 필요합니다"}, status=400)
+
+        try:
+            kakao_user = get_kakao_user(access_token)
+        except InvalidKakaoToken:
+            raise AuthenticationFailed("다시 로그인하세요")
+
+        uid = f"{_KAKAO_UID_PREFIX}{kakao_user['kakao_id']}"
+        claims = {
+            "provider": Member.Provider.KAKAO,
+            "email": kakao_user["email"],
+            "name": kakao_user["nickname"],
+            "picture": kakao_user["profile_image_url"],
+        }
+        custom_token = create_custom_token(uid, claims)
+        return Response({"firebase_custom_token": custom_token})
 
 
 class MeView(APIView):

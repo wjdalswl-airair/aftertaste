@@ -161,4 +161,42 @@ describe('src/api/auth.ts', () => {
 
     expect(signOutMock).toHaveBeenCalledWith(mockAuth)
   })
+
+  it('kakaoLogin은 인가 코드로 Firebase 커스텀 토큰을 요청한다(로그인 전이라 idToken 없이 호출)', async () => {
+    const { kakaoLogin } = await import('./auth')
+    mockAuth.currentUser = null
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ firebase_custom_token: 'fake-custom-token' }),
+      }),
+    )
+
+    const result = await kakaoLogin('fake-code', 'https://example.com/login')
+
+    expect(result).toEqual({ firebase_custom_token: 'fake-custom-token' })
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/account/kakao/token/'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ code: 'fake-code', redirect_uri: 'https://example.com/login' }),
+      }),
+    )
+  })
+
+  it('kakaoLogin이 실패하면 에러를 던진다', async () => {
+    const { kakaoLogin } = await import('./auth')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: async () => ({ detail: '다시 로그인하세요' }),
+      }),
+    )
+
+    await expect(kakaoLogin('bad-code', 'https://example.com/login')).rejects.toThrow('다시 로그인하세요')
+  })
 })

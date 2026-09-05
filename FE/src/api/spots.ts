@@ -1,3 +1,4 @@
+import { useLocaleStore } from '../store/useLocaleStore'
 import { publicFetch } from './client'
 
 export type RecommendedSpot = {
@@ -8,9 +9,15 @@ export type RecommendedSpot = {
 }
 
 // 위치 좌표가 있으면 근처 명소, 없으면(권한 거부 등) BE가 랜덤으로 3곳을 준다.
+// lang은 항상 붙인다 — 안 보내면 비로그인 사용자는 언어를 바꿔도 명소 콘텐츠가 계속 한국어로 온다 (DETAIL_SPEC 7장).
 export function getRecommendedSpots(coords?: { lat: number; lng: number }): Promise<RecommendedSpot[]> {
-  const query = coords ? `?lat=${coords.lat}&lng=${coords.lng}` : ''
-  return publicFetch<{ places: RecommendedSpot[] }>(`/api/places/recommend/${query}`).then(
+  const params = new URLSearchParams()
+  if (coords) {
+    params.set('lat', String(coords.lat))
+    params.set('lng', String(coords.lng))
+  }
+  params.set('lang', useLocaleStore.getState().language)
+  return publicFetch<{ places: RecommendedSpot[] }>(`/api/places/recommend/?${params.toString()}`).then(
     (res) => res.places,
   )
 }
@@ -84,5 +91,6 @@ export type PlaceDetail = {
 // 명소 상세 (명소 정보 + 등장 작품 + 주변 상권 + 리뷰를 한 번에 받는다).
 // Hero의 명예의 전당 캡션 보충용으로도 재사용한다 (1건짜리 호출, 없어도 화면은 안 깨짐).
 export function getPlaceDetail(placeId: number): Promise<PlaceDetail> {
-  return publicFetch<PlaceDetail>(`/api/places/${placeId}/`)
+  const lang = useLocaleStore.getState().language
+  return publicFetch<PlaceDetail>(`/api/places/${placeId}/?lang=${lang}`)
 }

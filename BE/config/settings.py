@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 import os
 from pathlib import Path
 
+import dj_database_url
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -26,12 +27,35 @@ load_dotenv(BASE_DIR / ".env")
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-6z_d3ch2my5^7ef)+(4eznx!z@mjl^1q7d0m0=oh4tb)29hmd2"
+# 운영에서는 Render 환경변수 DJANGO_SECRET_KEY로 넣는다. 없으면 로컬 개발용 기본값을 쓴다.
+SECRET_KEY = os.environ.get(
+    "DJANGO_SECRET_KEY",
+    "django-insecure-6z_d3ch2my5^7ef)+(4eznx!z@mjl^1q7d0m0=oh4tb)29hmd2",
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# 운영에서는 Render 환경변수 DJANGO_DEBUG=False로 끈다. 기본값은 로컬 개발용 True.
+DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() == "true"
 
-ALLOWED_HOSTS = []
+# 접속을 허용할 호스트(도메인) 목록.
+# Render는 배포된 주소를 RENDER_EXTERNAL_HOSTNAME 환경변수로 자동으로 넣어준다.
+# 그 외에 더 허용할 도메인이 있으면 DJANGO_ALLOWED_HOSTS에 쉼표로 구분해 넣는다.
+ALLOWED_HOSTS: list[str] = []
+_render_host = os.environ.get("RENDER_EXTERNAL_HOSTNAME")
+if _render_host:
+    ALLOWED_HOSTS.append(_render_host)
+_extra_hosts = os.environ.get("DJANGO_ALLOWED_HOSTS", "")
+if _extra_hosts:
+    ALLOWED_HOSTS += [h.strip() for h in _extra_hosts.split(",") if h.strip()]
+
+# Render는 HTTPS를 앞단 프록시에서 끝내고 뒤로는 http로 전달한다.
+# 이 헤더를 봐야 Django가 원래 HTTPS 요청이었음을 알 수 있다.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# 관리자 로그인 등 POST 요청의 CSRF 검증에서 신뢰할 출처(운영 도메인).
+CSRF_TRUSTED_ORIGINS: list[str] = []
+if _render_host:
+    CSRF_TRUSTED_ORIGINS.append(f"https://{_render_host}")
 
 
 # Application definition
@@ -58,6 +82,8 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    # 정적 파일(admin CSS 등)을 Django가 직접 서빙하게 해준다. SecurityMiddleware 바로 뒤에 둔다.
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -101,6 +127,15 @@ DATABASES = {
     }
 }
 
+# Render의 PostgreSQL은 접속정보를 DATABASE_URL 하나로 준다.
+# 이 값이 있으면 위 개별 설정 대신 그걸 파싱해서 쓴다(로컬은 그대로 개별 설정 사용).
+if os.environ.get("DATABASE_URL"):
+    DATABASES["default"] = dj_database_url.config(
+        default=os.environ["DATABASE_URL"],
+        conn_max_age=600,
+        ssl_require=True,
+    )
+
 
 # Password validation
 # https://docs.djangoproject.com/en/6.1/ref/settings/#auth-password-validators
@@ -137,6 +172,18 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = "static/"
+# collectstatic이 정적 파일을 한곳에 모으는 위치. Render 빌드 단계에서 collectstatic을 실행한다.
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# whitenoise: 정적 파일을 압축하고 파일명에 해시를 붙여 저장한다(캐싱에 유리).
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 
 # CORS
@@ -146,6 +193,10 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:5173",
 ]
+# 배포된 프론트엔드 주소는 CORS_ALLOWED_ORIGINS 환경변수에 쉼표로 구분해 넣는다.
+_extra_cors = os.environ.get("CORS_ALLOWED_ORIGINS", "")
+if _extra_cors:
+    CORS_ALLOWED_ORIGINS += [o.strip() for o in _extra_cors.split(",") if o.strip()]
 
 
 # 외부 공공데이터 API 키
@@ -162,6 +213,20 @@ KAKAO_API_KEY = os.environ.get("KAKAO_API_KEY", "")
 
 # Google Cloud Translation API (v2) 키. 명소·작품 번역에 쓴다 (docs/DETAIL_SPEC.md 6-1 #13).
 GOOGLE_TRANSLATE_API_KEY = os.environ.get("GOOGLE_TRANSLATE_API_KEY", "")
+
+# 한국영상자료원 KMDB(한국영화데이터베이스) Open API 키. 영화(Work) 정보를 채운다 (docs/DETAIL_SPEC.md 6-1 #28).
+KMDB_API_KEY = os.environ.get("KMDB_API_KEY", "")
+
+# TMDB(The Movie Database) API 읽기 액세스 토큰(v4). 드라마를 비롯해 KMDB로 못 채운
+# 작품의 줄거리·감독·방영일자·포스터를 보강하는 데 쓴다. KMDB는 드라마를 거의 안 담고
+# KOBIS는 포스터를 안 줘서, 드라마는 TMDB로 보강한다 (docs/DETAIL_SPEC.md 6-1 #29).
+# "Bearer <토큰>" 헤더로 호출한다 (짧은 v3 api_key 문자열이 아니다).
+TMDB_API_KEY = os.environ.get("TMDB_API_KEY", "")
+
+# TMDB 포스터 이미지 CDN. poster_path 앞에 붙여서 완전한 URL을 만든다.
+# 크기 목록: w92 / w154 / w185 / w342 / w500 / w780 / original.
+TMDB_IMAGE_BASE_URL = os.environ.get("TMDB_IMAGE_BASE_URL", "https://image.tmdb.org/t/p")
+TMDB_POSTER_SIZE = os.environ.get("TMDB_POSTER_SIZE", "w500")
 
 
 # Firebase Authentication
