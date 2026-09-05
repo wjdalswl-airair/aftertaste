@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from 'react-router-dom'
 import { deleteAccount, getMe, logout, updateProfile, type Member } from '../api/auth'
 import { getMyFavorites, type Favorite } from '../api/bookmarks'
+import { getMyCourses, type Course } from '../api/courses'
 import { getMyReviews, type ReviewItem } from '../api/reviews'
 import { getPlaceDetail } from '../api/spots'
 import { BottomNav } from '../components/BottomNav'
@@ -20,6 +21,7 @@ export function MyPage() {
   const [me, setMe] = useState<Member | undefined>(undefined)
   const [favorites, setFavorites] = useState<Favorite[] | undefined>(undefined)
   const [myReviews, setMyReviews] = useState<ReviewItem[] | undefined>(undefined)
+  const [myCourses, setMyCourses] = useState<Course[] | undefined>(undefined)
   // 리뷰 API(GET /api/account/reviews/)엔 장소 이름이 없이 ID만 와서, 카드에 이름을 보여주려면
   // 리뷰에 쓰인 장소들만 따로(중복 제거) 조회해야 한다 (docs/DETAIL_SPEC.md S-10 참고).
   const [placeNames, setPlaceNames] = useState<Record<number, string>>({})
@@ -43,6 +45,9 @@ export function MyPage() {
     getMyReviews()
       .then(setMyReviews)
       .catch(() => setMyReviews([]))
+    getMyCourses()
+      .then(setMyCourses)
+      .catch(() => setMyCourses([]))
   }, [])
 
   useEffect(() => {
@@ -56,11 +61,6 @@ export function MyPage() {
         .catch(() => {})
     })
   }, [myReviews])
-
-  const places = favorites?.filter(
-    (favorite): favorite is Favorite & { place: NonNullable<Favorite['place']> } =>
-      favorite.type === 'PLACE' && favorite.place !== null,
-  )
 
   function startEditing() {
     if (!me) {
@@ -208,27 +208,35 @@ export function MyPage() {
       <section className="px-4">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-bold text-ink">{t('myPage.favoritesTitle')}</h2>
-          {places && places.length > 0 && (
+          {favorites && favorites.length > 0 && (
             <Link to="/bookmarks" className="text-sm text-ink-tertiary">
               {t('myPage.favoritesMore')}
             </Link>
           )}
         </div>
-        {places === undefined ? (
+        {favorites === undefined ? (
           <HorizontalCardSkeleton />
-        ) : places.length > 0 ? (
+        ) : favorites.length > 0 ? (
           <div className="scrollbar-hide flex gap-3 overflow-x-auto">
-            {places.map((favorite) => (
-              <Link key={favorite.id} to={`/spots/${favorite.place.id}`} className="w-[110px] flex-shrink-0">
-                <img
-                  src={favorite.place.photo_url}
-                  alt=""
-                  className="h-[110px] w-full rounded-xl object-cover"
-                />
-                <p className="mt-2 truncate text-xs text-ink">{favorite.place.name}</p>
-                <p className="truncate text-xs text-ink-secondary">{favorite.place.address}</p>
-              </Link>
-            ))}
+            {favorites.map((favorite) =>
+              favorite.type === 'PLACE' && favorite.place ? (
+                <Link key={favorite.id} to={`/spots/${favorite.place.id}`} className="w-[110px] flex-shrink-0">
+                  <img
+                    src={favorite.place.photo_url}
+                    alt=""
+                    className="h-[110px] w-full rounded-xl object-cover"
+                  />
+                  <p className="mt-2 truncate text-xs text-ink">{favorite.place.name}</p>
+                  <p className="truncate text-xs text-ink-secondary">{favorite.place.address}</p>
+                </Link>
+              ) : favorite.course ? (
+                <Link key={favorite.id} to={`/courses/${favorite.course.id}`} className="w-[110px] flex-shrink-0">
+                  <div className="h-[110px] w-full rounded-xl bg-accent/15" />
+                  <p className="mt-2 truncate text-xs text-ink">{favorite.course.title}</p>
+                  <p className="truncate text-xs text-ink-secondary">{favorite.course.place_name}</p>
+                </Link>
+              ) : null,
+            )}
           </div>
         ) : (
           <p className="text-sm text-ink-tertiary">{t('myPage.favoritesEmpty')}</p>
@@ -267,8 +275,29 @@ export function MyPage() {
       </section>
 
       <section className="px-4">
-        <h2 className="mb-3 text-lg font-bold text-ink">{t('myPage.myCoursesTitle')}</h2>
-        <p className="text-sm text-ink-tertiary">{t('myPage.myCoursesEmpty')}</p>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-lg font-bold text-ink">{t('myPage.myCoursesTitle')}</h2>
+          {myCourses && myCourses.length > 0 && (
+            <Link to="/mycourses" className="text-sm text-ink-tertiary">
+              {t('myPage.favoritesMore')}
+            </Link>
+          )}
+        </div>
+        {myCourses === undefined ? (
+          <HorizontalCardSkeleton />
+        ) : myCourses.length > 0 ? (
+          <div className="scrollbar-hide flex gap-3 overflow-x-auto">
+            {myCourses.map((course) => (
+              <Link key={course.id} to={`/courses/${course.id}`} className="w-[110px] flex-shrink-0">
+                <div className="h-[110px] w-full rounded-xl bg-accent/15" />
+                <p className="mt-2 truncate text-xs text-ink">{course.title}</p>
+                <p className="truncate text-xs text-ink-secondary">{course.place_name}</p>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-ink-tertiary">{t('myPage.myCoursesEmpty')}</p>
+        )}
       </section>
 
       <section className="px-4">

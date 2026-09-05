@@ -12,6 +12,7 @@ import {
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { getPlaceCourses } from '../api/courses'
 import { getPlaceDetail, type PlaceDetail } from '../api/spots'
 import { BottomNav } from '../components/BottomNav'
 import { FavoriteButton } from '../components/FavoriteButton'
@@ -54,6 +55,19 @@ export function SpotDetailPage() {
   function handleReviewClick() {
     if (requireLogin()) {
       setShowRatingModal(true)
+    }
+  }
+
+  // 이 명소를 기준으로 한 코스가 이미 있으면(로그인 불필요) 그중 첫 번째를 보여주고,
+  // 없으면 로그인 확인 후 코스 생성 화면으로 보낸다.
+  async function handleCourseClick() {
+    const courses = await getPlaceCourses(Number(placeId)).catch(() => [])
+    if (courses.length > 0) {
+      navigate(`/courses/${courses[0].id}`)
+      return
+    }
+    if (requireLogin()) {
+      navigate(`/spots/${placeId}/courses/new`)
     }
   }
 
@@ -190,7 +204,7 @@ export function SpotDetailPage() {
           <div className="px-4">
             <button
               type="button"
-              disabled
+              onClick={handleCourseClick}
               className="w-full rounded-2xl bg-primary py-4 text-sm font-medium text-white"
             >
               {t('spotDetail.courseCta')}

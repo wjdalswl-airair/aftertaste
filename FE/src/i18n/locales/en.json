@@ -124,5 +124,31 @@
     "withdrawConfirmTitle": "Are you sure you want to delete your account?",
     "withdrawConfirmButton": "Delete account",
     "withdrawCancelButton": "Cancel"
+  },
+  "courseCreate": {
+    "title": "Suggest a course",
+    "titlePlaceholder": "Give your course a name",
+    "tabs": {
+      "FOOD_CAFE": "Food & Cafes",
+      "EXPERIENCE": "Experiences",
+      "NEARBY": "Nearby spots"
+    },
+    "candidatesEmpty": "No candidates nearby",
+    "selectedLabel": "Course lineup",
+    "submitButton": "Submit",
+    "mapUnavailable": "Map unavailable"
+  },
+  "courseDetail": {
+    "notFound": "Not found",
+    "placesCountSuffix": " spots",
+    "delete": "Delete",
+    "cancel": "Cancel"
+  },
+  "myCourseList": {
+    "title": "My courses",
+    "placesCountSuffix": " spots",
+    "empty": "No courses yet",
+    "delete": "Delete",
+    "cancel": "Cancel"
   }
 }

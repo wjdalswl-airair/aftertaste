@@ -240,7 +240,7 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 ### S-06. 즐겨찾기 목록 — `pages/BookmarksPage.tsx` (Phase 5, 구현 완료 — 2026-08-30)
 - 저장/취소는 Phase2에서 이미 구현됨(`FavoriteButton`, `POST/DELETE /api/places/{id}/favorite/`) — 이번 Phase에서 새로 만든 건 목록 화면뿐.
 - API: `GET /api/account/favorites/`(확정, 실제 BE 코드로 확인함 — `favorites/views.py` `MyFavoriteListView`) → `{ favorites: [{ id, type: 'PLACE'|'COURSE', place: {id,name,address,photo_url}|null, course: {...}|null, created_at }] }`. 문서엔 `GET /account/bookmarks`로 돼 있었는데 실제 경로가 다르다.
-- 명소·코스 즐겨찾기가 한 응답에 섞여서 온다. 이번 Phase는 명소만 다루므로(코스는 Phase8) `type === 'PLACE'`인 것만 걸러서 보여준다.
+- 명소·코스 즐겨찾기가 한 응답에 섞여서 온다. 이번 Phase는 명소만 다루므로(코스는 Phase8) `type === 'PLACE'`인 것만 걸러서 보여준다. **(2026-08-31, Phase8) 코스 즐겨찾기(`type === 'COURSE'`)도 같이 보여주도록 확장했다** — 코스는 사진이 없어서 플레이스홀더 박스 + 코스명 + `place_name`으로 표시.
 - Figma 목업 없어서 기존 명소 카드 스타일(썸네일+이름+주소, `SearchPage.tsx`의 명소 `ResultRow`와 동일한 마크업)로 만들었다. 각 항목 오른쪽에 `FavoriteButton`을 얹어서 목록에서 바로 취소도 가능하다(단, 취소해도 목록에서 즉시 안 사라짐 — 다시 들어오면 반영됨. 실시간 제거는 이번 범위 밖).
 - `/mypage`(진짜 마이페이지, Phase7)에 진입 링크를 아직 안 넣었다 — 사용자 확인 후 이번엔 화면/로직만 먼저 만들고 진입 동선은 나중에 연결하기로 함(2026-08-30).
 - 예외: 비로그인 시도 → `RequireAuth`가 "로그인이 필요한 기능입니다" 안내 후 `/login`으로. 저장한 게 없으면 빈 상태(오류 아님).
@@ -260,12 +260,24 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 - 사진은 Firebase Storage에 먼저 업로드(`src/lib/reviewPhotoUpload.ts`, `reviews/{uid}/{timestamp}-{filename}` 경로)한 뒤 URL을 `photo_urls`로 보낸다. `src/lib/firebase.ts`에 `storage` export를 새로 추가했다.
 - 명소 상세의 "방문자 리뷰" 섹션에 "더보기" 링크와 카드별 상세 링크를 추가했다(목업엔 명시된 진입 동선이 없어서 직접 추가).
 
-### S-08. 코스 — `pages/CoursePage.tsx`
-- API: `GET /spots/{spotId}/courses` (계획), `GET /courses/{courseId}/share` (계획)
-- 이번 범위에서 코스 생성 UI는 만들지 않는다 (PRD 5장, MVP 아님)
+### S-08. 코스 — `pages/CourseDetailPage.tsx`, `CourseCreatePage.tsx`, `MyCourseListPage.tsx` (Phase 8, 구현 완료 — 2026-08-31)
+- (2026-08-31 변경) 원래 "코스 생성 UI는 안 만든다"(PRD 5장)였으나, 사용자가 이번 Phase에서 생성 화면까지 포함하기로 결정했다. `docs/PRD.md` 5장에 이 결정 기록해둠.
+- API (전부 확정, 실제 BE 코드로 확인함 — `courses/views.py`, `favorites/views.py`):
+  - `GET/POST /api/places/{place_id}/courses/` — 명소 기준 코스 목록(로그인 불필요)/생성(로그인 필요). 생성 시 `course_places`가 정확히 식당(RESTAURANT) 1 + 카페(CAFE) 1 + 그 외(OTHER) 1이어야 한다.
+  - `GET/PATCH/DELETE /api/courses/{id}/` — 상세(로그인 불필요)/수정(안 만듦)/삭제(작성자만).
+  - `GET /api/account/courses/` — 내가 만든 코스 목록 (`MyCourseListPage.tsx`, `/mycourses`). Phase7에서 마이페이지에 빈 자리로만 뒀던 걸 이번에 연동.
+  - `POST/DELETE /api/courses/{id}/favorite/` — 코스 즐겨찾기. 명소 즐겨찾기와 같은 멱등 규칙, `FavoriteButton`에 `type="course"` prop을 추가해서 재사용.
+- **후보 장소는 카카오 API를 FE가 직접 안 부른다.** 명소 상세(`GET /api/places/{id}/`)가 서버에서 이미 받아온 `nearby_places`를 그대로 코스 생성 후보 목록으로 재사용한다. 이 값엔 거리·카카오place_id가 없어서, 거리는 `src/utils/distance.ts`(haversine)로 직접 계산하고 `kakao_place_id`는 항상 `null`로 보낸다.
+- **카테고리 탭(맛집·카페/체험·공방/주변명소) 분류는 대략적인 추정이다** (`src/utils/courseCategory.ts`). 카카오 `category_name` 문자열에 "음식점"/"카페"/"체험"/"공방"/"교육" 포함 여부로 나눈 것 — 정확한 카카오 카테고리 코드 기준이 아니라서 잘못 분류될 수 있다.
+- **드래그로 순서 바꾸기는 안 만들었다.** Figma엔 있지만, 후보를 뺐다 다시 추가하는 것만으로 3개 구성을 바꿀 수 있어서 별도 드래그 라이브러리 없이 MVP로 갔다.
+- `CourseSerializer`엔 사진 필드가 없다 — 코스 카드/썸네일은 전부 색 배경 플레이스홀더(`bg-accent/15`)다.
+- `CoursePlace`에도 거리·anchor place 좌표가 없어서, 코스 상세 화면은 `getCourseDetail`과 별개로 `getPlaceDetail(course.place_id)`를 추가로 불러서 anchor 좌표·주소·작품명을 채운다.
+- 코스 상세의 "지역" 표시(예: "경기 수원")는 anchor place `address`의 앞 두 토큰을 자른 임시 값이다 — BE에 지역명 필드가 따로 없다. `MyCourseListPage`(내가 만든 코스 목록)는 이 추가 조회(N+1)까지는 안 하고 대신 `place_name`을 보여준다(Phase7 "내가 쓴 리뷰" 갭과 같은 타협).
+- "내가 만든 코스인지" 판단은 리뷰와 동일하게 닉네임 비교로 임시 처리했다(`creator_nickname === member.nickname`) — 정확한 방법 아님, 기존 갭과 동일.
+- 명소 상세(Phase4)의 "이 장소로 AI 코스 추천받기" 버튼을 활성화했다: 이 명소에 이미 코스가 있으면(로그인 불필요) 첫 번째 코스 상세로, 없으면 로그인 확인 후 생성 화면으로 보낸다.
 
-### S-09. 공유 — 명소 상세/코스 화면 내부 기능
-- 링크 복사만 구현 (PRD 5장)
+### S-09. 공유 — 명소 상세/코스 화면 내부 기능 (Phase 4·8에서 이미 구현됨, Phase9은 확인만)
+- 링크 복사만 구현 (PRD 5장). 별도 공유 API 없음 — `navigator.clipboard.writeText(location.href)`.
 
 ### S-10. 마이페이지 — `pages/MyPage.tsx` (Phase 7, 구현 완료 — 2026-08-31)
 - API (전부 확정, 실제 BE 코드로 확인함 — `accounts/views.py`, `reviews/views.py`):
@@ -274,7 +286,7 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
   - `GET /api/account/reviews/` — 내가 쓴 리뷰 목록. `GET /api/account/favorites/`(Phase5에서 이미 구현)와 같은 방식으로 재사용.
 - Figma 목업(node 102-1323, 102-1477) 기준으로 프로필/즐겨찾기/내 리뷰/나만의 코스/로그아웃 섹션 구성.
 - **"내가 쓴 리뷰" 카드에 장소명을 보여준다.** `GET /api/account/reviews/`가 `ReviewSerializer`를 그대로 쓰는데, `place`가 ID로만 온다(이름·썸네일 없음, S-07 갭과 동일) — 처음엔 이름 없이 리뷰 내용만 보여주기로 했다가(2026-08-31 오전), 사용자가 장소명도 같이 보고 싶다고 해서 리뷰에 쓰인 장소들만 중복 제거해서 `getPlaceDetail`로 따로 조회하는 방식으로 바꿨다(2026-08-31 오후). 장소당 한 번만 호출되긴 하지만, `getPlaceDetail`이 명소 상세 전체(주변 상권·리뷰 목록 포함)를 돌려주는 무거운 API라 이름 하나 얻으려고 쓰기엔 과하다 — BE에 "장소 이름만" 주는 가벼운 API나, `ReviewSerializer`에 `place_name` 필드 추가를 요청하면 더 나아질 수 있다. 클릭하면 `/spots/{place}/reviews/{id}`(이미 있는 라우트)로 이동한다.
-- **"나만의 코스" 섹션은 빈 자리만 만들었다.** 실제로는 `GET /api/account/courses/`(`MyCourseListView`)가 이미 구현돼 있고 Figma도 실제 데이터를 보여주지만, PHASE7.md 원안 스코프(코스는 Phase8)를 그대로 따르기로 사용자가 확인했다(2026-08-31). Phase8에서 연동한다.
+- **"나만의 코스" 섹션은 Phase7 당시엔 빈 자리만 만들었다가, Phase8에서 `GET /api/account/courses/`로 실제 연동했다** — 즐겨찾기/내 리뷰 섹션과 동일한 가로 스크롤 미리보기 + "더보기"(`/mycourses`, S-08 참고). "내가 저장한 명소" 섹션도 Phase8에서 코스 즐겨찾기까지 같이 보여주도록 확장됨(S-06 참고).
 - 프로필 사진은 리뷰 사진과 동일하게 Firebase Storage에 먼저 업로드(`src/lib/profilePhotoUpload.ts`, `profile/{uid}/{timestamp}-{filename}` 경로)한 뒤 URL을 `profile_image_url`로 보낸다.
 - **`LanguageSheet`이 Figma대로 5개 언어(한국어/English/日本語/简体中文/繁體中文)를 지원하도록 확장했다 (2026-09-04, BE 합의)** — 자세한 내용은 7장 참고.
 

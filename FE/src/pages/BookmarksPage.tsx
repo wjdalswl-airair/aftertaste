@@ -19,11 +19,6 @@ export function BookmarksPage() {
       .catch(() => setFavorites([]))
   }, [])
 
-  const places = favorites?.filter(
-    (favorite): favorite is Favorite & { place: NonNullable<Favorite['place']> } =>
-      favorite.type === 'PLACE' && favorite.place !== null,
-  )
-
   return (
     <main className="flex min-h-dvh flex-col gap-6 pb-24">
       <header className="grid min-h-16 grid-cols-[24px_1fr_24px] items-center px-4 pt-6">
@@ -34,29 +29,46 @@ export function BookmarksPage() {
       </header>
 
       <section className="px-4">
-        {places === undefined ? (
+        {favorites === undefined ? (
           <BookmarksSkeleton />
-        ) : places.length > 0 ? (
+        ) : favorites.length > 0 ? (
           <div className="flex flex-col gap-4">
-            {places.map((favorite) => (
-              <Link key={favorite.id} to={`/spots/${favorite.place.id}`} className="flex items-center gap-3">
-                <img
-                  src={favorite.place.photo_url}
-                  alt=""
-                  className="h-[74px] w-[75px] rounded-2xl object-cover"
-                />
-                <div className="flex-1">
-                  <p className="text-sm text-ink">{favorite.place.name}</p>
-                  <p className="text-[11px] text-ink-secondary">{favorite.place.address}</p>
-                </div>
-                <FavoriteButton
-                  placeId={favorite.place.id}
-                  initialFavorited
-                  size={20}
-                  className="rounded-full p-1"
-                />
-              </Link>
-            ))}
+            {favorites.map((favorite) =>
+              favorite.type === 'PLACE' && favorite.place ? (
+                <Link key={favorite.id} to={`/spots/${favorite.place.id}`} className="flex items-center gap-3">
+                  <img
+                    src={favorite.place.photo_url}
+                    alt=""
+                    className="h-[74px] w-[75px] rounded-2xl object-cover"
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm text-ink">{favorite.place.name}</p>
+                    <p className="text-[11px] text-ink-secondary">{favorite.place.address}</p>
+                  </div>
+                  <FavoriteButton
+                    placeId={favorite.place.id}
+                    initialFavorited
+                    size={20}
+                    className="rounded-full p-1"
+                  />
+                </Link>
+              ) : favorite.course ? (
+                <Link key={favorite.id} to={`/courses/${favorite.course.id}`} className="flex items-center gap-3">
+                  <div className="h-[74px] w-[75px] shrink-0 rounded-2xl bg-accent/15" />
+                  <div className="flex-1">
+                    <p className="text-sm text-ink">{favorite.course.title}</p>
+                    <p className="text-[11px] text-ink-secondary">{favorite.course.place_name}</p>
+                  </div>
+                  <FavoriteButton
+                    placeId={favorite.course.id}
+                    type="course"
+                    initialFavorited
+                    size={20}
+                    className="rounded-full p-1"
+                  />
+                </Link>
+              ) : null,
+            )}
           </div>
         ) : (
           <p className="text-sm text-ink-tertiary">{t('bookmarksPage.empty')}</p>
