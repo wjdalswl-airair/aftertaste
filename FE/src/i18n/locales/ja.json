@@ -50,11 +50,12 @@
     "shareCopied": "リンクをコピーしました",
     "location": "位置",
     "mainWorks": "主な出演作品",
+    "mainWorksMore": "もっと見る",
+    "mainWorksLess": "閉じる",
     "photoTips": "撮影のヒント",
     "businessHours": "営業時間",
     "recommendedTime": "おすすめの訪問時間",
     "etiquette": "注意事項",
-    "rateButton": "評価する",
     "reviewButton": "レビューを書く",
     "reviewsTitle": "訪問者レビュー",
     "reviewsEmpty": "まだレビューがありません",
@@ -63,7 +64,8 @@
     "mapTitle": "地図",
     "mapUnavailable": "地図を表示できません",
     "noCoordinates": "位置情報がありません",
-    "directions": "道案内"
+    "directions": "道案内",
+    "currentLocation": "現在地"
   },
   "workDetail": {
     "notFound": "見つかりません",

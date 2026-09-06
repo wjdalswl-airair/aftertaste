@@ -50,11 +50,12 @@
     "shareCopied": "链接已复制",
     "location": "位置",
     "mainWorks": "主要出演作品",
+    "mainWorksMore": "查看更多",
+    "mainWorksLess": "收起",
     "photoTips": "拍照小贴士",
     "businessHours": "营业时间",
     "recommendedTime": "推荐访问时间",
     "etiquette": "注意事项",
-    "rateButton": "评分",
     "reviewButton": "写评论",
     "reviewsTitle": "访客评论",
     "reviewsEmpty": "还没有评论",
@@ -63,7 +64,8 @@
     "mapTitle": "地图",
     "mapUnavailable": "无法显示地图",
     "noCoordinates": "没有位置信息",
-    "directions": "路线"
+    "directions": "路线",
+    "currentLocation": "当前位置"
   },
   "workDetail": {
     "notFound": "不存在",

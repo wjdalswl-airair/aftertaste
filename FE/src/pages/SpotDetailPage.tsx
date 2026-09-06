@@ -14,16 +14,17 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { getPlaceCourses } from '../api/courses'
-import { getPlaceDetail, type PlaceDetail } from '../api/spots'
+import { getPlaceDetail, type PlaceDetail, type PlaceWork } from '../api/spots'
 import { BottomNav } from '../components/BottomNav'
 import { FavoriteButton } from '../components/FavoriteButton'
 import { RatingModal } from '../components/RatingModal'
 import { Skeleton } from '../components/Skeleton'
 import { loadKakaoMaps, pinIconDataUrl } from '../lib/kakaoMap'
+import { useAuthStore } from '../store/useAuthStore'
+import { shortRegion } from '../utils/address'
 
 // index.css의 --color-primary와 맞춘 값 (코스 생성 화면 마커와 동일, CourseCreatePage.tsx 참고).
 const SPOT_PIN_COLOR = '#f47c5c'
-import { useAuthStore } from '../store/useAuthStore'
 
 export function SpotDetailPage() {
   const { t } = useTranslation()
@@ -54,12 +55,21 @@ export function SpotDetailPage() {
     return true
   }
 
-  // 리뷰 작성 화면엔 별점 UI가 없어서(Figma 목업과 동일하게), "별점 남기기"/"리뷰 남기기"
-  // 둘 다 먼저 이 모달에서 별점을 고른 뒤에 작성 화면으로 넘어간다.
+  // "별점 남기기" 버튼은 없앴다(2026-09-06) — BE Review 모델의 content가 필수라 별점만
+  // 저장하는 API 자체가 없어서, 별점만 남기는 흐름을 따로 만들 수 없었다.
+  // 이 명소에 내가 쓴 리뷰가 하나라도 있으면(닉네임 비교 — 리뷰 API에 작성자 본인 여부
+  // 플래그가 없어서 임시로 이렇게 판단, 다른 화면과 동일한 방식) 별점 모달 없이 바로
+  // 작성 화면으로 보내고, 없으면 먼저 별점 모달에서 고른 뒤 작성 화면으로 넘어간다.
   function handleReviewClick() {
-    if (requireLogin()) {
-      setShowRatingModal(true)
+    if (!requireLogin()) {
+      return
     }
+    const alreadyReviewed = place?.reviews.some((review) => review.author_nickname === member?.nickname) ?? false
+    if (alreadyReviewed) {
+      navigate(`/spots/${placeId}/reviews/new`)
+      return
+    }
+    setShowRatingModal(true)
   }
 
   // 이 명소를 기준으로 한 코스가 이미 있으면(로그인 불필요) 그중 첫 번째를 보여주고,
@@ -76,7 +86,7 @@ export function SpotDetailPage() {
   }
 
   return (
-    <main className="flex min-h-dvh flex-col gap-8 pb-24">
+    <main className="flex min-h-dvh flex-col gap-6 pb-24">
       <header className="grid min-h-16 grid-cols-[24px_1fr_24px] items-center px-4 pt-6">
         <button type="button" onClick={() => navigate(-1)} aria-label="뒤로가기">
           <ArrowLeft size={24} className="text-ink" />
@@ -112,12 +122,7 @@ export function SpotDetailPage() {
           <div className="flex flex-col gap-6 px-4">
             <div className="flex items-start justify-between">
               <div className="flex flex-col gap-1">
-                {place.works[0] && (
-                  <Link to={`/works/${place.works[0].work.id}`} className="text-sm text-primary">
-                    {place.works[0].work.category === 'DRAMA' ? t('searchPage.filters.drama') : t('searchPage.filters.movie')}{' '}
-                    &lt;{place.works[0].work.title}&gt;
-                  </Link>
-                )}
+                <p className="text-sm text-ink-tertiary">{shortRegion(place.address)}</p>
                 <p className="text-xl font-bold text-ink">{place.name}</p>
               </div>
               {place.review_count > 0 && (
@@ -132,11 +137,7 @@ export function SpotDetailPage() {
 
             <div className="flex flex-col gap-4 rounded-2xl bg-accent/15 p-5">
               <InfoRow icon={<MapPin size={14} />} label={t('spotDetail.location')} value={place.address} />
-              <InfoRow
-                icon={<Film size={14} />}
-                label={t('spotDetail.mainWorks')}
-                value={place.works.map((w) => w.work.title).join(', ')}
-              />
+              <MainWorksRow works={place.works} />
               <InfoRow icon={<Camera size={14} />} label={t('spotDetail.photoTips')} value={place.photo_tips} />
               <InfoRow icon={<Clock size={14} />} label={t('spotDetail.businessHours')} value={place.business_hours} />
               <InfoRow
@@ -151,22 +152,13 @@ export function SpotDetailPage() {
               />
             </div>
 
-            <div className="flex gap-2.5">
-              <button
-                type="button"
-                onClick={handleReviewClick}
-                className="flex-1 rounded-full border border-primary py-3 text-sm font-medium text-primary"
-              >
-                {t('spotDetail.rateButton')}
-              </button>
-              <button
-                type="button"
-                onClick={handleReviewClick}
-                className="flex-1 rounded-full bg-primary py-3 text-sm font-medium text-white"
-              >
-                {t('spotDetail.reviewButton')}
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleReviewClick}
+              className="w-full rounded-full bg-primary py-3 text-sm font-medium text-white"
+            >
+              {t('spotDetail.reviewButton')}
+            </button>
           </div>
 
           <section className="px-4">
@@ -209,7 +201,7 @@ export function SpotDetailPage() {
             <button
               type="button"
               onClick={handleCourseClick}
-              className="flex w-full items-center justify-center gap-1.5 rounded-2xl bg-primary py-4 text-sm font-medium text-white"
+              className="flex w-full items-center justify-center gap-1.5 rounded-2xl bg-primary py-3 text-sm font-medium text-white"
             >
               <Sparkles size={16} />
               {t('spotDetail.courseCta')}
@@ -248,6 +240,45 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
       <span className="mt-0.5 shrink-0 text-primary">{icon}</span>
       <span className="w-[90px] shrink-0 text-ink">{label}</span>
       <span className="flex-1 text-ink-secondary">{value}</span>
+    </div>
+  )
+}
+
+const MAIN_WORKS_COLLAPSED_COUNT = 7
+
+// "주요 촬영작"은 작품이 8개 이상이면 처음 7개만 보여주고 더보기/접기로 나머지를 토글한다.
+function MainWorksRow({ works }: { works: PlaceWork[] }) {
+  const { t } = useTranslation()
+  const [expanded, setExpanded] = useState(false)
+
+  if (works.length === 0) {
+    return null
+  }
+
+  const hasMore = works.length > MAIN_WORKS_COLLAPSED_COUNT
+  const visibleWorks = expanded ? works : works.slice(0, MAIN_WORKS_COLLAPSED_COUNT)
+
+  return (
+    <div className="flex gap-2.5 text-[13px]">
+      <span className="mt-0.5 shrink-0 text-primary">
+        <Film size={14} />
+      </span>
+      <span className="w-[90px] shrink-0 text-ink">{t('spotDetail.mainWorks')}</span>
+      <span className="flex-1 text-ink-secondary">
+        {visibleWorks.map((placeWork, index) => (
+          <span key={placeWork.work.id}>
+            <Link to={`/works/${placeWork.work.id}`} className="text-ink-secondary no-underline">
+              {placeWork.work.title}
+            </Link>
+            {index < visibleWorks.length - 1 && ', '}
+          </span>
+        ))}
+        {hasMore && (
+          <button type="button" onClick={() => setExpanded((prev) => !prev)} className="ml-1 font-medium text-primary">
+            {expanded ? t('spotDetail.mainWorksLess') : t('spotDetail.mainWorksMore')}
+          </button>
+        )}
+      </span>
     </div>
   )
 }
@@ -319,6 +350,29 @@ function SpotMap({ place }: { place: PlaceDetail }) {
     ? `https://map.kakao.com/link/to/${encodeURIComponent(place.name)},${lat},${lng}`
     : null
 
+  // 길찾기를 누른 시점에 사용자 현재 위치를 물어봐서 출발지로 같이 넣어준다.
+  // 위치를 못 가져오면(거부·미지원 등) 목적지만 있는 기존 링크로 대신 연다.
+  function handleDirectionsClick(event: React.MouseEvent) {
+    event.preventDefault()
+    if (!directionsUrl) {
+      return
+    }
+    if (!navigator.geolocation) {
+      window.open(directionsUrl, '_blank', 'noopener,noreferrer')
+      return
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const from = `${encodeURIComponent(t('spotDetail.currentLocation'))},${position.coords.latitude},${position.coords.longitude}`
+        const to = `${encodeURIComponent(place.name)},${lat},${lng}`
+        window.open(`https://map.kakao.com/link/from/${from}/to/${to}`, '_blank', 'noopener,noreferrer')
+      },
+      () => {
+        window.open(directionsUrl, '_blank', 'noopener,noreferrer')
+      },
+    )
+  }
+
   return (
     <div className="flex flex-col gap-3">
       <div className="relative h-[240px] w-full overflow-hidden rounded-2xl bg-accent/15">
@@ -333,6 +387,7 @@ function SpotMap({ place }: { place: PlaceDetail }) {
       {directionsUrl && (
         <a
           href={directionsUrl}
+          onClick={handleDirectionsClick}
           target="_blank"
           rel="noreferrer"
           className="rounded-full border border-primary py-3 text-center text-sm font-medium text-primary"

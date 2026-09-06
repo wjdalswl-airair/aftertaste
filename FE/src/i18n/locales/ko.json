@@ -50,11 +50,12 @@
     "shareCopied": "링크가 복사됐어요",
     "location": "위치",
     "mainWorks": "주요 촬영작",
+    "mainWorksMore": "더보기",
+    "mainWorksLess": "접기",
     "photoTips": "사진 팁",
     "businessHours": "운영시간",
     "recommendedTime": "추천 방문 시간",
     "etiquette": "주의할 점",
-    "rateButton": "별점 남기기",
     "reviewButton": "리뷰 남기기",
     "reviewsTitle": "방문자 리뷰",
     "reviewsEmpty": "아직 리뷰가 없어요",
@@ -63,7 +64,8 @@
     "mapTitle": "지도",
     "mapUnavailable": "지도를 표시할 수 없어요",
     "noCoordinates": "위치 정보가 없어요",
-    "directions": "길찾기"
+    "directions": "길찾기",
+    "currentLocation": "현재위치"
   },
   "workDetail": {
     "notFound": "존재하지 않습니다",

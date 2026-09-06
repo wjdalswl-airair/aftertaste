@@ -50,11 +50,12 @@
     "shareCopied": "Link copied",
     "location": "Location",
     "mainWorks": "Featured in",
+    "mainWorksMore": "Show more",
+    "mainWorksLess": "Show less",
     "photoTips": "Photo tips",
     "businessHours": "Hours",
     "recommendedTime": "Best time to visit",
     "etiquette": "Etiquette",
-    "rateButton": "Rate",
     "reviewButton": "Write a review",
     "reviewsTitle": "Visitor reviews",
     "reviewsEmpty": "No reviews yet",
@@ -63,7 +64,8 @@
     "mapTitle": "Map",
     "mapUnavailable": "Map unavailable",
     "noCoordinates": "No location data",
-    "directions": "Directions"
+    "directions": "Directions",
+    "currentLocation": "Current location"
   },
   "workDetail": {
     "notFound": "Not found",
