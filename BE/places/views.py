@@ -20,6 +20,7 @@ from places.serializers import (
     PopularKeywordsResponseSerializer,
     RecommendResponseSerializer,
     SearchResponseSerializer,
+    WorkPageSerializer,
     WorkSearchSerializer,
 )
 from places.services import haversine_distance_meters, to_decimal
@@ -488,4 +489,43 @@ class PlaceDetailView(APIView):
         language = resolve_language(request)
         return Response(
             PlaceDetailSerializer(place, context={"request": request, "language": language}).data
+        )
+
+
+class WorkDetailView(APIView):
+    """작품 상세. 로그인 여부와 상관없이 호출할 수 있다 (검색 결과에서 작품을 눌렀을 때).
+
+    작품 기본 정보(제목·줄거리·방영시기·주연·감독·포스터)와 이 작품이 촬영된 명소 목록을
+    함께 내려준다. PlaceDetailView와 같은 이유로 perform_authentication을 오버라이드한다:
+    토큰이 무효/만료돼도 상세 조회 자체는 막지 않는다.
+    """
+
+    def perform_authentication(self, request):
+        try:
+            request.user
+        except AuthenticationFailed:
+            pass
+
+    @extend_schema(
+        summary="작품 상세",
+        description="작품 기본 정보와 이 작품이 촬영된 명소 목록을 한 번에 반환한다.",
+        parameters=[
+            OpenApiParameter("lang", str, description="응답 언어 (예: en). 안 주면 로그인 회원의 언어 → 한국어 순"),
+        ],
+        responses={
+            200: WorkPageSerializer,
+            404: OpenApiResponse(description="해당 작품이 존재하지 않음"),
+        },
+    )
+    def get(self, request, work_id):
+        try:
+            work = Work.objects.prefetch_related(
+                "translations", "place_works__place__translations"
+            ).get(pk=work_id)
+        except Work.DoesNotExist:
+            return Response({"detail": NOT_FOUND_MESSAGE}, status=404)
+
+        language = resolve_language(request)
+        return Response(
+            WorkPageSerializer(work, context={"request": request, "language": language}).data
         )
