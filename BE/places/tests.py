@@ -1401,11 +1401,27 @@ class PopularKeywordsTest(TestCase):
 # Phase 2-4 (위치기반 추천 — 비로그인 분기만) checklist tests. See docs/PHASES/PHASE2.md 2-4.
 # ---------------------------------------------------------------------------
 
+from places.views import RECOMMEND_COUNT
+
 RECOMMEND_URL = "/api/places/recommend/"
 
 # 테스트 기준점: 서울시청 근처. 각 명소를 이 점에서 거리가 다르게 배치해 거리순 정렬을 검증한다.
 BASE_LAT = 37.5665
 BASE_LNG = 126.9780
+
+
+def _make_places_along_longitude(prefix, count, start_lat=37.5665, step=0.002):
+    """기준점에서 경도는 같고 위도만 조금씩 멀어지는 명소 count개를 만든다 (거리순 = 만든 순).
+
+    반환: [Place, ...] (가까운 순).
+    """
+    return [
+        create_place_with_source(
+            f"{prefix}{i}", "TEST_SOURCE", f"{prefix}_{i}",
+            latitude=Decimal(str(start_lat + i * step)), longitude=Decimal(str(BASE_LNG)),
+        )
+        for i in range(count)
+    ]
 
 
 class RecommendTestData(TestCase):
@@ -1450,38 +1466,29 @@ class RecommendationViewLoginNotRequiredTest(RecommendTestData):
 
 
 class RecommendationViewNearestTest(RecommendTestData):
-    """checklist 2: 위치 권한을 허용하면(lat/lng 유효) 주변 명소 3곳이 거리순으로 나온다."""
+    """checklist 2: 위치 권한을 허용하면(lat/lng 유효) 주변 명소가 거리순으로 최대 RECOMMEND_COUNT곳 나온다."""
 
     def setUp(self):
         super().setUp()
-        # 기준점에서 거리가 다른 4개 명소를 만든다. 가까운 순서: near < mid < far < farthest.
-        self.near = create_place_with_source(
-            "가까운명소", "TEST_SOURCE", "REC_NEAR", latitude=Decimal("37.5665"), longitude=Decimal("126.9780")
-        )
-        self.mid = create_place_with_source(
-            "중간명소", "TEST_SOURCE", "REC_MID", latitude=Decimal("37.6000"), longitude=Decimal("126.9780")
-        )
-        self.far = create_place_with_source(
-            "먼명소", "TEST_SOURCE", "REC_FAR", latitude=Decimal("37.7000"), longitude=Decimal("126.9780")
-        )
-        self.farthest = create_place_with_source(
-            "가장먼명소", "TEST_SOURCE", "REC_FARTHEST", latitude=Decimal("38.0000"), longitude=Decimal("126.9780")
-        )
+        # 기준점에서 조금씩 멀어지는 명소를 RECOMMEND_COUNT + 3개 만든다 (거리순 = 만든 순).
+        self.places = _make_places_along_longitude("명소", RECOMMEND_COUNT + 3)
         # 좌표 없는 명소는 거리 기준 추천 대상에서 빠져야 한다.
         self.no_coord = create_place_with_source("좌표없는명소", "TEST_SOURCE", "REC_NOCOORD")
 
-    def test_nearest_places_returns_three_closest_in_distance_order(self):
+    def test_nearest_places_returns_closest_in_distance_order(self):
         response = self.client.get(RECOMMEND_URL, {"lat": str(BASE_LAT), "lng": str(BASE_LNG)})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         names = [p["name"] for p in response.data["places"]]
-        self.assertEqual(names, ["가까운명소", "중간명소", "먼명소"])
+        self.assertEqual(names, [f"명소{i}" for i in range(RECOMMEND_COUNT)])
 
-    def test_nearest_places_excludes_farthest_place(self):
+    def test_nearest_places_excludes_places_beyond_the_count(self):
         response = self.client.get(RECOMMEND_URL, {"lat": str(BASE_LAT), "lng": str(BASE_LNG)})
 
         names = [p["name"] for p in response.data["places"]]
-        self.assertNotIn("가장먼명소", names)
+        # RECOMMEND_COUNT번째 이후로 만든 더 먼 명소는 안 들어간다.
+        self.assertNotIn(f"명소{RECOMMEND_COUNT}", names)
+        self.assertNotIn(f"명소{RECOMMEND_COUNT + 2}", names)
 
     def test_nearest_places_excludes_place_without_coordinates(self):
         response = self.client.get(RECOMMEND_URL, {"lat": str(BASE_LAT), "lng": str(BASE_LNG)})
@@ -1489,49 +1496,49 @@ class RecommendationViewNearestTest(RecommendTestData):
         names = [p["name"] for p in response.data["places"]]
         self.assertNotIn("좌표없는명소", names)
 
-    def test_nearest_places_returns_exactly_three(self):
+    def test_nearest_places_returns_exactly_recommend_count(self):
         response = self.client.get(RECOMMEND_URL, {"lat": str(BASE_LAT), "lng": str(BASE_LNG)})
 
-        self.assertEqual(len(response.data["places"]), 3)
+        self.assertEqual(len(response.data["places"]), RECOMMEND_COUNT)
 
 
 class RecommendationViewRandomFallbackTest(RecommendTestData):
-    """checklist 3, 4, 7: 위치 정보가 없거나/숫자가 아니거나/일부만 있으면 무작위 3곳으로 대체된다."""
+    """checklist 3, 4, 7: 위치 정보가 없거나/숫자가 아니거나/일부만 있으면 무작위로 대체된다."""
 
     def setUp(self):
         super().setUp()
-        for i in range(5):
+        for i in range(RECOMMEND_COUNT + 3):
             create_place_with_source(f"무작위명소{i}", "TEST_SOURCE", f"REC_RAND_{i}")
 
-    def test_no_lat_lng_returns_three_places_without_error(self):
+    def test_no_lat_lng_returns_recommend_count_places_without_error(self):
         response = self.client.get(RECOMMEND_URL)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data["places"]), 3)
+        self.assertEqual(len(response.data["places"]), RECOMMEND_COUNT)
 
     def test_non_numeric_lat_lng_falls_back_to_random_without_error(self):
         response = self.client.get(RECOMMEND_URL, {"lat": "정보없음", "lng": "정보없음"})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data["places"]), 3)
+        self.assertEqual(len(response.data["places"]), RECOMMEND_COUNT)
 
     def test_only_lat_without_lng_falls_back_to_random(self):
         response = self.client.get(RECOMMEND_URL, {"lat": str(BASE_LAT)})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data["places"]), 3)
+        self.assertEqual(len(response.data["places"]), RECOMMEND_COUNT)
 
     def test_only_lng_without_lat_falls_back_to_random(self):
         response = self.client.get(RECOMMEND_URL, {"lng": str(BASE_LNG)})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data["places"]), 3)
+        self.assertEqual(len(response.data["places"]), RECOMMEND_COUNT)
 
     def test_empty_string_lat_lng_falls_back_to_random(self):
         response = self.client.get(RECOMMEND_URL, {"lat": "", "lng": ""})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data["places"]), 3)
+        self.assertEqual(len(response.data["places"]), RECOMMEND_COUNT)
 
     def test_response_place_fields_match_serializer(self):
         response = self.client.get(RECOMMEND_URL)
@@ -1540,8 +1547,8 @@ class RecommendationViewRandomFallbackTest(RecommendTestData):
         self.assertEqual(set(place.keys()), {"id", "name", "address", "photo_url"})
 
 
-class RecommendationViewFewerThanThreeTest(RecommendTestData):
-    """checklist 5: 명소가 3개보다 적어도 에러 없이 있는 만큼만 반환한다."""
+class RecommendationViewFewerThanCountTest(RecommendTestData):
+    """checklist 5: 명소가 추천 개수보다 적어도 에러 없이 있는 만큼만 반환한다."""
 
     def test_random_branch_with_one_place_returns_one_without_error(self):
         create_place_with_source("유일한명소", "TEST_SOURCE", "REC_ONLY1")
@@ -2003,8 +2010,10 @@ class PersonalizedRecommendationKeywordTest(PersonalizedRecommendTestData):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         names = [p["name"] for p in response.data["places"]]
+        # 검색이력과 이름이 맞는 명소가 가장 멀어도 1등이다.
         self.assertEqual(names[0], "특별한장소E5")
-        self.assertEqual(names[1:], ["일반명소1", "일반명소2"])
+        # 나머지는 거리순 (RECOMMEND_COUNT 안이라 4개 다 나온다).
+        self.assertEqual(names[1:], ["일반명소1", "일반명소2", "일반명소3", "일반명소4"])
 
 
 class PersonalizedRecommendationWorkTitleMatchTest(PersonalizedRecommendTestData):
@@ -2176,7 +2185,7 @@ class PersonalizedRecommendationNoLocationTest(PersonalizedRecommendTestData):
         response = self.client.get(RECOMMEND_URL, **self.auth_header)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data["places"]), 3)
+        self.assertEqual(len(response.data["places"]), 5)  # 만든 명소 수만큼(무작위 분기)
         mock_personalized.assert_not_called()
 
     @patch("places.views._personalized_places")
@@ -2212,7 +2221,7 @@ class PersonalizedRecommendationInvalidTokenTest(PersonalizedRecommendTestData):
 
 
 class PersonalizedRecommendationFewerThanPoolTest(PersonalizedRecommendTestData):
-    """checklist: 전체 명소가 후보 풀(10곳)보다 적어도 에러 없이 동작한다."""
+    """checklist: 전체 명소가 후보 풀(RECOMMEND_CANDIDATE_POOL곳)보다 적어도 에러 없이 동작한다."""
 
     def setUp(self):
         super().setUp()
@@ -2231,7 +2240,7 @@ class PersonalizedRecommendationFewerThanPoolTest(PersonalizedRecommendTestData)
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data["places"]), 3)
+        self.assertEqual(len(response.data["places"]), 5)  # 만든 명소 수만큼
 
 
 class PersonalizedRecommendationKeywordAccumulationTest(PersonalizedRecommendTestData):
