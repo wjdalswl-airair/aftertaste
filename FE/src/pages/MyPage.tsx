@@ -13,12 +13,16 @@ import { LanguageSheet } from '../components/LanguageSheet'
 import { Skeleton } from '../components/Skeleton'
 import { resetLocationConsent } from '../hooks/useGeolocation'
 import { uploadProfilePhoto } from '../lib/profilePhotoUpload'
+import { useAuthStore } from '../store/useAuthStore'
 
 const NICKNAME_MAX_LENGTH = 20
 
 export function MyPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  // 프로필 저장 시 이 화면의 로컬 상태(me)뿐 아니라 전역 스토어도 같이 갱신해야,
+  // 메인 화면 인사말처럼 다른 화면에서 쓰는 닉네임도 새로고침 없이 바로 반영된다.
+  const setMember = useAuthStore((state) => state.setMember)
 
   const [me, setMe] = useState<Member | undefined>(undefined)
   const [favorites, setFavorites] = useState<Favorite[] | undefined>(undefined)
@@ -102,6 +106,7 @@ export function MyPage() {
       await updateProfile({ nickname: nickname.trim(), profile_image_url: photoUrl })
       const updated = await getMe()
       setMe(updated)
+      setMember(updated)
       setEditing(false)
     } catch (error) {
       console.error('프로필 저장 실패', error)
