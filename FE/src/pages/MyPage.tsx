@@ -8,8 +8,10 @@ import { getMyCourses, type Course } from '../api/courses'
 import { getMyReviews, type ReviewItem } from '../api/reviews'
 import { getPlaceDetail } from '../api/spots'
 import { BottomNav } from '../components/BottomNav'
+import { BottomSheet } from '../components/BottomSheet'
 import { LanguageSheet } from '../components/LanguageSheet'
 import { Skeleton } from '../components/Skeleton'
+import { resetLocationConsent } from '../hooks/useGeolocation'
 import { uploadProfilePhoto } from '../lib/profilePhotoUpload'
 
 const NICKNAME_MAX_LENGTH = 20
@@ -108,6 +110,11 @@ export function MyPage() {
     }
   }
 
+  function handleResetLocationConsent() {
+    resetLocationConsent()
+    navigate('/')
+  }
+
   async function handleLogout() {
     await logout().catch(() => {})
     navigate('/')
@@ -122,12 +129,12 @@ export function MyPage() {
   return (
     <main className="flex min-h-dvh flex-col gap-8 pb-24">
       <header className="flex items-center justify-between px-4 pt-6">
-        <p className="font-brand text-2xl font-bold text-primary">여운</p>
+        <Link to="/" className="font-brand text-2xl font-bold text-primary">여운</Link>
         <LanguageSheet />
       </header>
 
       {me === undefined ? (
-        <div className="flex items-center gap-4 px-4">
+        <div className="mx-4 flex items-center gap-4 rounded-2xl bg-white p-4 shadow-[0_4px_12px_rgba(0,0,0,0.08)]">
           <Skeleton className="h-20 w-20 rounded-full" />
           <div className="flex flex-1 flex-col gap-2">
             <Skeleton className="h-4 w-24 rounded-sm" />
@@ -136,7 +143,7 @@ export function MyPage() {
         </div>
       ) : (
         <section className="px-4">
-          <div className="flex items-start gap-4">
+          <div className="flex items-start gap-4 rounded-2xl bg-white p-4 shadow-[0_4px_12px_rgba(0,0,0,0.08)]">
             <div className="relative shrink-0">
               {(editing ? photoUrl : me.profile_image_url) ? (
                 <img
@@ -300,13 +307,20 @@ export function MyPage() {
         )}
       </section>
 
-      <section className="px-4">
+      <section className="mt-auto px-4">
         <button
           type="button"
           onClick={handleLogout}
           className="w-full rounded-full border border-primary py-3 text-sm font-medium text-primary"
         >
           {t('myPage.logoutButton')}
+        </button>
+        <button
+          type="button"
+          onClick={handleResetLocationConsent}
+          className="mt-3 block w-full text-center text-xs text-ink-tertiary"
+        >
+          {t('myPage.resetLocationLink')}
         </button>
         <button
           type="button"
@@ -318,36 +332,25 @@ export function MyPage() {
       </section>
 
       {confirmingWithdraw && (
-        <div className="fixed inset-0 z-50 mx-auto w-full max-w-[480px]">
+        <BottomSheet onClose={() => setConfirmingWithdraw(false)}>
+          <p className="px-4 pt-4 text-center text-[15px] font-bold text-ink">
+            {t('myPage.withdrawConfirmTitle')}
+          </p>
           <button
             type="button"
-            aria-label="닫기"
-            className="absolute inset-0 bg-black/40"
+            onClick={handleWithdraw}
+            className="mt-2 block w-full py-4 text-center text-[15px] font-medium text-[#e0574a]"
+          >
+            {t('myPage.withdrawConfirmButton')}
+          </button>
+          <button
+            type="button"
             onClick={() => setConfirmingWithdraw(false)}
-          />
-          <div className="absolute inset-x-0 bottom-0 flex flex-col">
-            <div className="w-full animate-[sheet-up_0.2s_ease-out] rounded-t-2xl bg-white pb-8 pt-2">
-              <div className="mx-auto mt-1.5 h-[3px] w-[46px] rounded-full bg-divider" />
-              <p className="px-4 pt-4 text-center text-[15px] font-bold text-ink">
-                {t('myPage.withdrawConfirmTitle')}
-              </p>
-              <button
-                type="button"
-                onClick={handleWithdraw}
-                className="mt-2 block w-full py-4 text-center text-[15px] font-medium text-[#e0574a]"
-              >
-                {t('myPage.withdrawConfirmButton')}
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmingWithdraw(false)}
-                className="block w-full py-3 text-center text-ink-tertiary"
-              >
-                {t('myPage.withdrawCancelButton')}
-              </button>
-            </div>
-          </div>
-        </div>
+            className="block w-full py-3 text-center text-sm text-ink-tertiary"
+          >
+            {t('myPage.withdrawCancelButton')}
+          </button>
+        </BottomSheet>
       )}
 
       <BottomNav />

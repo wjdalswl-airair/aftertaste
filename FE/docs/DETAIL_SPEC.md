@@ -74,6 +74,8 @@ React Router로 화면 단위 페이지를 분리한다 (PRD 6장 결정).
 
 로그인이 필요한 경로는 공통 가드(`RequireAuth` 래퍼)로 감싸고, 비로그인 접근 시 "로그인이 필요한 기능입니다"를 보여준 뒤 `/login`으로 보낸다 (BE의 공통 예외 규칙과 동일, BE DETAIL_SPEC 5장).
 
+**로그인 성공 후엔 원래 가려던 화면이 아니라 항상 메인(`/`)으로 이동한다 (2026-09-06 변경).** 원래는 `RequireAuth`가 넘긴 `from` 경로로 돌아갔었는데, 사용자 결정으로 단순화했다 — `LoginPage.tsx`는 더 이상 `location.state.from`을 안 보고, `RequireAuth.tsx`도 `state`에 `from`을 안 담는다(`message`만 남음).
+
 추천(S-04)과 공유(S-09)는 별도 화면이 아니라 메인/명소 상세 화면 안의 기능이므로 자체 경로가 없다.
 
 ---
@@ -127,7 +129,8 @@ React Router로 화면 단위 페이지를 분리한다 (PRD 6장 결정).
   - **ja/zh-CN/zh-TW는 Claude가 en.json 기준으로 기계번역한 초안이다 (2026-09-04).** 사용자 검토·수정 전이라 표현이 어색하거나 부정확할 수 있음 — 정식 배포 전에 검수 필요.
 - 명소·작품 설명, 리뷰처럼 **서버에서 오는 콘텐츠 번역**은 UI 문구와 다르다. 이건 리소스 파일이 아니라 BE 응답 자체가 이미 번역된 텍스트로 온다 (BE DETAIL_SPEC 4장 — 서버가 언어별로 번역해서 내려줌). FE는 그 값을 그대로 표시하면 된다.
 - **화면 언어는 국적이 아니라 직접 선택한다 (2026-09-04 변경, PRD 3장 S-02 참고).** 헤더의 지구본 아이콘(`LanguageSheet`)에서 5개 언어 중 하나를 고르면 `useLocaleStore`가 바뀌고, `i18next.changeLanguage()`를 호출해 UI 문구도 함께 바뀐다. `useLocaleStore`엔 더 이상 `nationality` 필드가 없다 — BE `Member.nationality`는 선택 필드라 안 보내도 문제없다(BE DETAIL_SPEC 6-1 #10).
-- 언어를 고르지 않은 사용자는 한국어가 기본값이다.
+- **언어 선택 버튼은 로그인 없이도 누를 수 있는 곳(메인 화면 헤더)에도 있다 (2026-09-06 추가).** 원래 `MyPage.tsx`(로그인 필수 라우트)에만 있어서, 로그인 안 한 방문자는 언어를 바꿀 방법이 아예 없었다 — 이 서비스의 1차 타겟이 외국인이라 문제로 판단해 `MainPage.tsx` 헤더에도 `LanguageSheet`를 추가했다.
+- **처음 방문한 사용자는 기기 언어(`navigator.language`)로 추측해서 시작한다 (2026-09-06 변경, `useLocaleStore.ts`의 `detectInitialLanguage`).** 지원 5개 언어 중 하나로 매핑되면 그 언어, 매핑 안 되는 언어권(예: 프랑스어)이면 한국어보다 더 널리 통할 영어(`en`)로 폴백한다. 한 번이라도 언어를 저장한 적 있으면(`persist`) 그 값이 우선이라 이 로직은 최초 방문에만 적용된다.
 - **명소·작품 콘텐츠의 실제 언어 결정**: BE `places/translation.py`의 `resolve_language()`가 `쿼리파라미터 lang → 로그인 회원의 언어 → 한국어(None)` 순서로 정한다. FE는 `spots.ts`/`works.ts`/`search.ts`의 API 호출마다 `useLocaleStore`의 현재 언어를 `?lang=`으로 항상 붙인다 (Phase 11, 2026-09-04 연동 완료) — 비로그인 사용자도 언어를 바꾸면 명소·작품 콘텐츠가 바뀐다.
 - **리뷰 번역은 아직 BE에 연결 안 됨 (2026-09-04 확인)**: `ReviewTranslation` 모델은 있지만 `reviews/views.py`가 이를 조회/반환하지 않는다. PRD 4장의 "사용자가 작성한 리뷰도 번역 대상" 요구사항은 BE 작업이 선행되어야 한다.
 
@@ -151,6 +154,8 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 새 색상·radius가 필요하면 Figma가 먼저 바뀌어야 하고, 코드에서 임의로 값을 추가하지 않는다.
 
 아이콘은 `lucide-react`를 사용하고, Figma에 명시된 대로 Rounded Outline 스타일(20~28px)을 유지한다.
+
+**바텀시트는 `src/components/BottomSheet.tsx`를 공통으로 쓴다 (2026-09-06 통일).** 원래 `LanguageSheet`(언어 선택)만 패딩·드래그 핸들바가 다르게 만들어져 있었는데, 리뷰 상세(`ReviewDetailPage`)의 수정/삭제 메뉴 스타일(드래그 핸들바 + `pb-8 pt-2` + 항목 `py-4 text-[15px]`)을 기준으로 통일했다. 새 바텀시트가 필요하면 이 컴포넌트를 감싸서(`<BottomSheet onClose={...}>항목들</BottomSheet>`) 쓰고, 개별 항목 스타일도 `block w-full py-4 text-center text-[15px] font-medium`을 기본으로 맞춘다(취소 버튼만 `text-ink-tertiary`, 위험한 동작은 `text-[#e0574a]`). 가운데 뜨는 모달은 `Modal.tsx`를 그대로 쓴다 — 둘은 다른 컴포넌트다.
 
 ---
 
@@ -206,11 +211,15 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
   - `lang` 쿼리 파라미터는 항상 붙인다 (Phase 11, 2026-09-04 — 7장 참고).
   - 항상 3개, `{ places: [{ id, name, address, photo_url }] }`
 - 위치 권한 허용/거부는 `src/hooks/useGeolocation.ts`가 판단. 거부해도 재요청하지 않는다.
-- **위치 권한 커스텀 모달 (Phase 11, 2026-09-04 구현 완료)**: Figma node-id `102:702` 기준. `src/components/LocationPermissionModal.tsx` — "허용"을 눌러야 그때 `useGeolocation`이 브라우저 네이티브 권한 팝업(`getCurrentPosition`)을 띄운다. 응답(허용/거부)은 `localStorage`(`location-permission-consent`)에 저장해 다음 방문부터는 모달을 다시 안 띄운다. 안내/약관/처리방침 3줄 텍스트는 Figma 목업에 실제 이동 경로가 없어서(연결된 페이지 없음) 텍스트로만 두고 링크는 안 걸었다 — 필요해지면 별도 논의.
+- **위치 권한 커스텀 모달 (Phase 11, 2026-09-04 구현 완료)**: Figma node-id `102:702` 기준. `src/components/LocationPermissionModal.tsx` — "허용"을 눌러야 그때 `useGeolocation`이 브라우저 네이티브 권한 팝업(`getCurrentPosition`)을 띄운다. 응답(허용/거부)은 `localStorage`(`location-permission-consent`)에 저장해 다음 방문부터는 모달을 다시 안 띄운다. 이용약관 링크만 남기고(2026-09-06, 사용자 결정) 안내·처리방침 문구는 제거했다 — 어차피 Figma 목업에 실제 이동 경로가 없어서(연결된 페이지 없음) 텍스트로만 있었다.
 - **추천 타이틀 동 이름 표시 (Phase 11, 2026-09-05 구현 완료)**: 좌표를 받으면 카카오맵 JS SDK `services` 라이브러리의 `coord2RegionCode`로 행정동 이름을 구해(`src/lib/kakaoMap.ts`의 `getDongName`) 타이틀을 "역삼동 근처 명소"처럼 보여준다(BE 변경 없음, 클라이언트에서만 처리). 동 이름을 못 가져오면(SDK 미로딩, API 실패 등) 기존 "내 주변 명소" 문구로 폴백한다.
+- **위치 거부 시 섹션 자체를 숨김 (2026-09-06 변경)**: `useGeolocation`의 `status`가 `'denied'`면 `RecommendedSpots.tsx`가 아무것도 렌더링하지 않는다(API 호출도 안 함) — 위치 기반이 아닌 랜덤 추천을 "내 주변 명소"라는 이름으로 보여주는 게 어색해서, 그 자리는 이미 메인 화면에 따로 있는 "전국 Top10"(`TopPlacesCarousel`) 섹션이 대신하도록 했다.
+- **"다음에"(거부) 후 재요청 주기 (2026-09-06 결정)**: `localStorage`(`location-permission-consent`)에 거부 시각(`deniedAt`)까지 같이 저장한다. **로그인 사용자**는 거부 후 24시간이 지나면 모달을 다시 보여준다. **비로그인 사용자**는 시간이 아니라 **세션 단위**로 다시 물어본다 — 같은 브라우저 세션 안에서 화면을 왔다 갔다 하는 것만으로 반복해서 뜨지 않도록 `sessionStorage`(`location-permission-asked-this-session`)에 "이번 세션에 이미 물어봤음"을 기록해두고, 브라우저를 새로 열면(세션이 새로 시작되면) 다시 물어본다. "허용"은 기존과 동일하게 영구 기억(재요청 없음).
+- **마이페이지의 수동 재설정 (2026-09-06 추가)**: 실수로 모달을 닫았거나 재요청 주기를 기다리기 싫은 사용자를 위해, 마이페이지에 "위치 권한 다시 설정" 링크를 추가했다(`src/hooks/useGeolocation.ts`의 `resetLocationConsent`). 누르면 저장된 동의를 지우고 메인 화면(`/`)으로 이동 — 그러면 `RecommendedSpots`가 마운트되면서 커스텀 동의 모달이 다시 뜬다.
 
 ### S-05. 명소 상세 — `pages/SpotDetailPage.tsx` (Phase 4, 구현 완료 — 2026-08-30)
-- 컴포넌트: 카카오맵(+주변 상권 마커), 명소 정보, 작품 정보, 리뷰 목록, 즐겨찾기 버튼(`FavoriteButton` 재사용)
+- 컴포넌트: 카카오맵, 명소 정보, 작품 정보, 리뷰 목록, 즐겨찾기 버튼(`FavoriteButton` 재사용)
+- **지도엔 명소 자체 마커 하나만 찍는다 (2026-09-06 변경).** 원래 `nearby_places`(주변 상권)도 마커로 같이 찍었는데, 반경 1km 안 최대 15곳(`BE/places/views.py`의 `NEARBY_PLACES_LIMIT`)이 한 번에 찍혀서 너무 많아 보인다는 사용자 판단으로 뺐다 — 주변 상권은 코스 화면(S-08) 지도에서 후보로만 마커 표시한다. 이때 명소가 바뀌어도(같은 컴포넌트 재사용) 지도를 새로 만들지 않고 `setCenter()`로 재사용하며, 마커도 `ref`로 관리해 이전 것을 지우고 새로 찍는다 — 안 그러면 다른 명소로 이동할 때 이전 마커가 안 지워지고 쌓이는 버그가 있었다.
 - API: `GET /api/places/{place_id}/` **하나로 전부 해결** (확정, 실제 BE 코드로 확인함 — `places/views.py` `PlaceDetailView`). 명소 기본 정보 + 등장 작품(장면 설명 포함) + 주변 상권(카카오 API 프록시, 저장 안 함) + 리뷰 목록/평균 별점 + 로그인 시 즐겨찾기 여부(`is_favorited`)를 한 번에 준다. 로그인 없어도 호출 가능, 없는 명소는 404.
 - 즐겨찾기 등록/해제는 Phase2에서 이미 구현된 `POST/DELETE /api/places/{id}/favorite/`(`src/api/bookmarks.ts`)를 그대로 쓴다 — Phase4 계획엔 "표시만"이라고 돼 있었지만 실제로 이미 동작한다.
 - Figma 실제 목업(node-id `102:712`)을 사용자가 공유해줘서 그 기준으로 만들었다. 다만 목업과 실제 데이터 모델이 안 맞는 부분이 있어 아래처럼 처리했다(2026-08-30, 사용자 확인):

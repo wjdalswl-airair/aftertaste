@@ -181,9 +181,15 @@ class KakaoCustomTokenViewTests(TestCase):
     def setUp(self):
         self.client = APIClient()
 
+    _BODY = {"code": "fake-auth-code", "redirect_uri": "http://localhost:5173/login"}
+
     @patch("accounts.views.create_custom_token")
     @patch("accounts.views.get_kakao_user")
-    def test_valid_kakao_token_returns_firebase_custom_token(self, mock_get_kakao_user, mock_create_custom_token):
+    @patch("accounts.views.exchange_code_for_token")
+    def test_valid_code_returns_firebase_custom_token(
+        self, mock_exchange, mock_get_kakao_user, mock_create_custom_token
+    ):
+        mock_exchange.return_value = "fake-kakao-access-token"
         mock_get_kakao_user.return_value = {
             "kakao_id": 12345,
             "email": "kakao@example.com",
@@ -192,33 +198,145 @@ class KakaoCustomTokenViewTests(TestCase):
         }
         mock_create_custom_token.return_value = "fake-custom-token"
 
-        response = self.client.post(
-            self.KAKAO_TOKEN_URL, {"access_token": "fake-kakao-access-token"}, format="json",
-        )
+        response = self.client.post(self.KAKAO_TOKEN_URL, self._BODY, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["firebase_custom_token"], "fake-custom-token")
+
+        # 서버가 code → access token 교환을 대신 한다.
+        mock_exchange.assert_called_once_with("fake-auth-code", "http://localhost:5173/login")
+        mock_get_kakao_user.assert_called_once_with("fake-kakao-access-token")
 
         uid, claims = mock_create_custom_token.call_args[0]
         self.assertEqual(uid, "kakao:12345")
         self.assertEqual(claims["provider"], Member.Provider.KAKAO)
         self.assertEqual(claims["email"], "kakao@example.com")
 
-    @patch("accounts.views.get_kakao_user")
-    def test_invalid_kakao_token_is_rejected(self, mock_get_kakao_user):
-        mock_get_kakao_user.side_effect = InvalidKakaoToken("expired")
+    @patch("accounts.views.exchange_code_for_token")
+    def test_invalid_code_is_rejected(self, mock_exchange):
+        mock_exchange.side_effect = InvalidKakaoToken("invalid_grant")
 
-        response = self.client.post(
-            self.KAKAO_TOKEN_URL, {"access_token": "expired-token"}, format="json",
-        )
+        response = self.client.post(self.KAKAO_TOKEN_URL, self._BODY, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         self.assertEqual(response.data["detail"], "다시 로그인하세요")
 
-    def test_missing_access_token_is_rejected(self):
-        response = self.client.post(self.KAKAO_TOKEN_URL, {}, format="json")
+    @patch("accounts.views.get_kakao_user")
+    @patch("accounts.views.exchange_code_for_token")
+    def test_valid_code_but_kakao_user_lookup_fails_is_rejected(self, mock_exchange, mock_get_kakao_user):
+        mock_exchange.return_value = "access-token"
+        mock_get_kakao_user.side_effect = InvalidKakaoToken("expired")
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        response = self.client.post(self.KAKAO_TOKEN_URL, self._BODY, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.data["detail"], "다시 로그인하세요")
+
+    def test_missing_code_or_redirect_uri_is_rejected(self):
+        self.assertEqual(
+            self.client.post(self.KAKAO_TOKEN_URL, {}, format="json").status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+        self.assertEqual(
+            self.client.post(self.KAKAO_TOKEN_URL, {"code": "x"}, format="json").status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+        self.assertEqual(
+            self.client.post(
+                self.KAKAO_TOKEN_URL, {"redirect_uri": "http://x/login"}, format="json"
+            ).status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+
+class ExchangeCodeForTokenTests(TestCase):
+    """accounts.kakao.exchange_code_for_token — 인가 코드를 access token으로 교환."""
+
+    @patch("accounts.kakao.requests.post")
+    def test_returns_access_token_on_success(self, mock_post):
+        from accounts.kakao import exchange_code_for_token
+
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json.return_value = {"access_token": "AAA", "token_type": "bearer"}
+
+        with self.settings(KAKAO_API_KEY="rest-key", KAKAO_CLIENT_SECRET=""):
+            token = exchange_code_for_token("the-code", "http://localhost:5173/login")
+
+        self.assertEqual(token, "AAA")
+        sent = mock_post.call_args.kwargs["data"]
+        self.assertEqual(sent["grant_type"], "authorization_code")
+        self.assertEqual(sent["client_id"], "rest-key")
+        self.assertEqual(sent["redirect_uri"], "http://localhost:5173/login")
+        self.assertEqual(sent["code"], "the-code")
+        self.assertNotIn("client_secret", sent)
+
+    @patch("accounts.kakao.requests.post")
+    def test_client_secret_included_only_when_set(self, mock_post):
+        from accounts.kakao import exchange_code_for_token
+
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json.return_value = {"access_token": "AAA"}
+
+        with self.settings(KAKAO_API_KEY="rest-key", KAKAO_CLIENT_SECRET="secret-123"):
+            exchange_code_for_token("c", "http://x/login")
+
+        self.assertEqual(mock_post.call_args.kwargs["data"]["client_secret"], "secret-123")
+
+    @patch("accounts.kakao.requests.post")
+    def test_kakao_error_response_raises_invalid_token(self, mock_post):
+        from accounts.kakao import InvalidKakaoToken, exchange_code_for_token
+
+        mock_post.return_value.status_code = 400
+        mock_post.return_value.json.return_value = {
+            "error": "invalid_grant", "error_description": "authorization code not found",
+        }
+
+        with self.settings(KAKAO_API_KEY="rest-key"):
+            with self.assertRaises(InvalidKakaoToken):
+                exchange_code_for_token("used-code", "http://x/login")
+
+    def test_missing_code_raises_invalid_token(self):
+        from accounts.kakao import InvalidKakaoToken, exchange_code_for_token
+
+        with self.settings(KAKAO_API_KEY="rest-key"):
+            with self.assertRaises(InvalidKakaoToken):
+                exchange_code_for_token("", "http://x/login")
+
+
+class DeleteFirebaseUserTests(TestCase):
+    """accounts.firebase.delete_firebase_user — 실패해도 예외를 안 올린다 (issue #17)."""
+
+    @patch("accounts.firebase._get_firebase_app")
+    @patch("accounts.firebase.firebase_auth.delete_user")
+    def test_returns_true_on_success(self, mock_delete, mock_app):
+        from accounts.firebase import delete_firebase_user
+
+        self.assertTrue(delete_firebase_user("uid-1"))
+        mock_delete.assert_called_once()
+
+    @patch("accounts.firebase._get_firebase_app")
+    @patch("accounts.firebase.firebase_auth.delete_user")
+    def test_already_deleted_is_treated_as_success(self, mock_delete, mock_app):
+        from firebase_admin import auth as firebase_auth
+
+        from accounts.firebase import delete_firebase_user
+
+        mock_delete.side_effect = firebase_auth.UserNotFoundError("not found")
+        self.assertTrue(delete_firebase_user("gone-uid"))
+
+    @patch("accounts.firebase._get_firebase_app")
+    @patch("accounts.firebase.firebase_auth.delete_user")
+    def test_other_error_returns_false_without_raising(self, mock_delete, mock_app):
+        from accounts.firebase import delete_firebase_user
+
+        mock_delete.side_effect = RuntimeError("firebase down")
+        self.assertFalse(delete_firebase_user("uid-2"))
+
+    @patch("accounts.firebase._get_firebase_app", side_effect=Exception("no credentials"))
+    def test_missing_credentials_returns_false_without_raising(self, mock_app):
+        from accounts.firebase import delete_firebase_user
+
+        self.assertFalse(delete_firebase_user("uid-3"))
 
 
 class MeViewTests(TestCase):
@@ -797,11 +915,15 @@ class WithdrawalTests(TestCase):
     """DELETE /api/account/ - 회원 탈퇴 (Phase 3 사이클 C).
 
     DETAIL_SPEC 2-1 "탈퇴 처리가 특이합니다", 3-1 회원 예외 상황 표를 근거로 만들었다.
+    Firebase 계정 삭제(issue #17)는 실제 Firebase를 안 타도록 delete_firebase_user를 mock한다.
     """
 
     def setUp(self):
         self.client = APIClient()
         self.auth_header = {"HTTP_AUTHORIZATION": "Bearer fake-token"}
+        patcher = patch("accounts.views.delete_firebase_user", return_value=True)
+        self.mock_delete_firebase_user = patcher.start()
+        self.addCleanup(patcher.stop)
 
     def test_withdraw_without_login_is_rejected(self):
         response = self.client.delete(ME_URL)
@@ -1028,3 +1150,39 @@ class WithdrawalTests(TestCase):
 
         second = self.client.delete(ME_URL, **self.auth_header)
         self.assertEqual(second.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_firebase_account_is_deleted_with_original_uid(self, mock_verify):
+        """탈퇴하면 Firebase Authentication 계정도 원래 uid로 삭제 요청한다 (issue #17)."""
+        Member.objects.create(
+            firebase_uid="withdraw-fb-del-uid",
+            provider=Member.Provider.GOOGLE,
+            agreed_terms_at="2026-01-01T00:00:00Z",
+        )
+        mock_verify.return_value = make_decoded_token("withdraw-fb-del-uid")
+
+        self.client.delete(ME_URL, **self.auth_header)
+
+        # firebase_uid를 익명화하기 전, 원래 값으로 삭제를 불러야 한다.
+        self.mock_delete_firebase_user.assert_called_once_with("withdraw-fb-del-uid")
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_withdrawal_completes_even_if_firebase_deletion_fails(self, mock_verify):
+        """Firebase 계정 삭제가 실패해도 탈퇴(DB 익명화)는 그대로 완료돼야 한다."""
+        self.mock_delete_firebase_user.return_value = False
+        member = Member.objects.create(
+            firebase_uid="withdraw-fb-fail-uid",
+            provider=Member.Provider.GOOGLE,
+            email="fail@example.com",
+            nickname="탈퇴할사람",
+            agreed_terms_at="2026-01-01T00:00:00Z",
+        )
+        mock_verify.return_value = make_decoded_token("withdraw-fb-fail-uid")
+
+        response = self.client.delete(ME_URL, **self.auth_header)
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        member.refresh_from_db()
+        self.assertIsNone(member.email)
+        self.assertTrue(member.is_withdrawn)
+        self.assertTrue(member.firebase_uid.startswith("withdrawn:"))

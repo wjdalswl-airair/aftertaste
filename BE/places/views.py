@@ -20,6 +20,7 @@ from places.serializers import (
     PopularKeywordsResponseSerializer,
     RecommendResponseSerializer,
     SearchResponseSerializer,
+    WorkPageSerializer,
     WorkSearchSerializer,
 )
 from places.services import haversine_distance_meters, to_decimal
@@ -36,14 +37,15 @@ AUTOCOMPLETE_LIMIT = 10
 POPULAR_KEYWORDS_DAYS = 30
 POPULAR_KEYWORDS_LIMIT = 5
 
-# 추천 개수. PRD F-04, PHASES/PHASE2.md 2-4에서 3으로 정해짐.
-RECOMMEND_COUNT = 3
+# 추천 개수. PRD F-04에서 3으로 정했다가, 메인 화면을 3-카드에서 캐러셀(최대 10개)로
+# 바꾸면서 10으로 변경 (GitHub issue #29).
+RECOMMEND_COUNT = 10
 
 # 로그인한 사용자의 개인화 추천에서 가산점을 계산할 후보 풀 크기. 문서에 정해진 값이
 # 없어 임의로 정했다 - "거리 우선 + 인기도 보너스" 방식이라 후보를 넉넉히 뽑아야
-# 거리는 가깝지만 가산점이 높은 곳이 상위 3곳 안에 들어올 여지가 생긴다
-# (PHASE3.md 3번, 2026-08-19 사용자 확인).
-RECOMMEND_CANDIDATE_POOL = 10
+# 거리는 가깝지만 가산점이 높은 곳이 상위 RECOMMEND_COUNT개 안에 들어올 여지가 생긴다.
+# 출력 개수의 약 3배로 둔다 (PHASE3.md 3번, 2026-08-19 확인 / issue #29로 10→30).
+RECOMMEND_CANDIDATE_POOL = 30
 
 # 개인화 추천 가산점 가중치. 정확한 공식은 문서에 없어 임의로 정했다(자기신고, 2026-08-19).
 # - 검색이력 키워드가 명소 이름/등장 작품 제목에 걸리면 키워드 하나당 5점을 준다.
@@ -290,6 +292,8 @@ def _personalized_places(member, latitude, longitude, count):
     동점 처리(결정론 보장): 가산점이 같으면 거리가 가까운 쪽을, 거리도 같으면 id가
     작은 쪽을 앞에 둔다. 후보 풀 자체가 거리 기준으로 뽑히므로 "가깝지만 안 맞는 곳"이
     완전히 배제되지는 않는다.
+
+    반환 개수는 항상 count 이하다. 좌표가 있는 명소가 count보다 적으면 그만큼만 나온다.
     """
     candidates = _nearest_places(latitude, longitude, RECOMMEND_CANDIDATE_POOL)
     if not candidates:
@@ -350,12 +354,14 @@ def _personalized_places(member, latitude, longitude, count):
 class RecommendationView(APIView):
     """위치기반 명소 추천. 로그인 여부와 상관없이 호출할 수 있다 (PRD F-04).
 
+    최대 RECOMMEND_COUNT(10)곳을 돌려준다. 메인 화면 캐러셀용 (issue #29).
+
     - lat, lng를 둘 다 보내면(위치 권한 허용):
         - 로그인한 사용자는 "거리 우선 + 인기도 보너스" 개인화 추천을 받는다
           (검색이력·즐겨찾기·리뷰 개수 반영, _personalized_places 참고. PHASE3.md 3번).
-        - 비로그인 사용자는 Phase 2와 동일하게 그 위치에서 가장 가까운 명소 3곳을 추천받는다.
-    - lat, lng를 안 보내거나 숫자가 아니면(위치 권한 거부) 로그인 여부와 상관없이 명소
-      3곳을 무작위로 추천한다. "위치 권한을 거부했을 경우 비로그인 상태의 추천과
+        - 비로그인 사용자는 그 위치에서 가장 가까운 명소를 거리순으로 받는다.
+    - lat, lng를 안 보내거나 숫자가 아니면(위치 권한 거부) 로그인 여부와 상관없이 명소를
+      무작위로 추천한다. "위치 권한을 거부했을 경우 비로그인 상태의 추천과
       동일하다"(PRD F-04)는 규칙을 그대로 따른다.
 
     SearchView와 같은 이유로 perform_authentication을 오버라이드한다: 이 API는
@@ -371,8 +377,8 @@ class RecommendationView(APIView):
     @extend_schema(
         summary="위치기반 명소 추천",
         description=(
-            "lat, lng를 함께 보내면 그 위치에서 가장 가까운 명소 3곳을 추천한다.\n\n"
-            "lat, lng를 안 보내면(위치 권한 거부) 명소 3곳을 무작위로 추천한다."
+            "lat, lng를 함께 보내면 그 위치에서 가장 가까운 명소를 최대 10곳 추천한다.\n\n"
+            "lat, lng를 안 보내면(위치 권한 거부) 명소를 최대 10곳 무작위로 추천한다."
         ),
         parameters=[
             OpenApiParameter("lat", float, description="현재 위도 (선택)"),
@@ -488,4 +494,43 @@ class PlaceDetailView(APIView):
         language = resolve_language(request)
         return Response(
             PlaceDetailSerializer(place, context={"request": request, "language": language}).data
+        )
+
+
+class WorkDetailView(APIView):
+    """작품 상세. 로그인 여부와 상관없이 호출할 수 있다 (검색 결과에서 작품을 눌렀을 때).
+
+    작품 기본 정보(제목·줄거리·방영시기·주연·감독·포스터)와 이 작품이 촬영된 명소 목록을
+    함께 내려준다. PlaceDetailView와 같은 이유로 perform_authentication을 오버라이드한다:
+    토큰이 무효/만료돼도 상세 조회 자체는 막지 않는다.
+    """
+
+    def perform_authentication(self, request):
+        try:
+            request.user
+        except AuthenticationFailed:
+            pass
+
+    @extend_schema(
+        summary="작품 상세",
+        description="작품 기본 정보와 이 작품이 촬영된 명소 목록을 한 번에 반환한다.",
+        parameters=[
+            OpenApiParameter("lang", str, description="응답 언어 (예: en). 안 주면 로그인 회원의 언어 → 한국어 순"),
+        ],
+        responses={
+            200: WorkPageSerializer,
+            404: OpenApiResponse(description="해당 작품이 존재하지 않음"),
+        },
+    )
+    def get(self, request, work_id):
+        try:
+            work = Work.objects.prefetch_related(
+                "translations", "place_works__place__translations"
+            ).get(pk=work_id)
+        except Work.DoesNotExist:
+            return Response({"detail": NOT_FOUND_MESSAGE}, status=404)
+
+        language = resolve_language(request)
+        return Response(
+            WorkPageSerializer(work, context={"request": request, "language": language}).data
         )

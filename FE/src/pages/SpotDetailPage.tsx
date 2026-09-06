@@ -7,6 +7,7 @@ import {
   Film,
   MapPin,
   Share2,
+  Sparkles,
   Star,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -18,7 +19,10 @@ import { BottomNav } from '../components/BottomNav'
 import { FavoriteButton } from '../components/FavoriteButton'
 import { RatingModal } from '../components/RatingModal'
 import { Skeleton } from '../components/Skeleton'
-import { loadKakaoMaps } from '../lib/kakaoMap'
+import { loadKakaoMaps, pinIconDataUrl } from '../lib/kakaoMap'
+
+// index.css의 --color-primary와 맞춘 값 (코스 생성 화면 마커와 동일, CourseCreatePage.tsx 참고).
+const SPOT_PIN_COLOR = '#f47c5c'
 import { useAuthStore } from '../store/useAuthStore'
 
 export function SpotDetailPage() {
@@ -205,8 +209,9 @@ export function SpotDetailPage() {
             <button
               type="button"
               onClick={handleCourseClick}
-              className="w-full rounded-2xl bg-primary py-4 text-sm font-medium text-white"
+              className="flex w-full items-center justify-center gap-1.5 rounded-2xl bg-primary py-4 text-sm font-medium text-white"
             >
+              <Sparkles size={16} />
               {t('spotDetail.courseCta')}
             </button>
           </div>
@@ -250,6 +255,11 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
 function SpotMap({ place }: { place: PlaceDetail }) {
   const { t } = useTranslation()
   const mapRef = useRef<HTMLDivElement>(null)
+  // 지도 인스턴스와 마커를 기억해뒀다가, 명소가 바뀌어도 지도는 재사용(중심만 이동)하고
+  // 마커는 지우고 새로 찍는다 — 안 그러면(예: 다른 명소로 이동) 이전 마커가 안 지워지고
+  // 계속 쌓여서 여러 개로 보인다.
+  const mapInstanceRef = useRef<kakao.maps.Map | null>(null)
+  const markersRef = useRef<kakao.maps.Marker[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'unavailable'>('loading')
 
   // latitude/longitude는 DecimalField라 API가 문자열로 내려준다 ("37.579617").
@@ -276,16 +286,25 @@ function SpotMap({ place }: { place: PlaceDetail }) {
           return
         }
         const center = new kakaoSdk.maps.LatLng(lat, lng)
-        const map = new kakaoSdk.maps.Map(mapRef.current, { center, level: 4 })
-        new kakaoSdk.maps.Marker({ position: center, map, title: place.name })
 
-        place.nearby_places.forEach((nearby) => {
+        if (!mapInstanceRef.current) {
+          mapInstanceRef.current = new kakaoSdk.maps.Map(mapRef.current, { center, level: 4 })
+        } else {
+          mapInstanceRef.current.setCenter(center)
+        }
+        const map = mapInstanceRef.current
+
+        // 이 지도는 명소 자체 위치만 보여준다 — 주변 상권(nearby_places)은 코스 화면
+        // 지도에서만 후보로 마커 표시하고, 명소 상세에선 마커로 안 찍는다(사용자 결정).
+        markersRef.current.forEach((marker) => marker.setMap(null))
+        markersRef.current = [
           new kakaoSdk.maps.Marker({
-            position: new kakaoSdk.maps.LatLng(nearby.latitude, nearby.longitude),
+            position: center,
             map,
-            title: nearby.place_name ?? undefined,
-          })
-        })
+            title: place.name,
+            image: new kakaoSdk.maps.MarkerImage(pinIconDataUrl(SPOT_PIN_COLOR), new kakaoSdk.maps.Size(28, 36)),
+          }),
+        ]
 
         setStatus('ready')
       })

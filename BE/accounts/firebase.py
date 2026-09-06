@@ -1,9 +1,12 @@
+import logging
 import os
 
 import firebase_admin
 from django.conf import settings
 from firebase_admin import auth as firebase_auth
 from firebase_admin import credentials
+
+logger = logging.getLogger(__name__)
 
 _firebase_app = None
 
@@ -48,3 +51,22 @@ def create_custom_token(uid, claims=None):
     app = _get_firebase_app()
     token_bytes = firebase_auth.create_custom_token(uid, developer_claims=claims, app=app)
     return token_bytes.decode("utf-8")
+
+
+def delete_firebase_user(uid):
+    """Firebase Authentication에서 이 uid의 계정을 지운다 (회원 탈퇴 정리, issue #17).
+
+    실패해도(이미 없음, 서비스 계정 키 없음, 통신 오류 등) 예외를 올리지 않고 로그만
+    남긴다 — 탈퇴의 본체(DB 개인정보 익명화)는 어차피 진행돼야 하기 때문이다.
+
+    반환: 지웠거나 이미 없으면 True, 실패했으면 False.
+    """
+    try:
+        app = _get_firebase_app()
+        firebase_auth.delete_user(uid, app=app)
+        return True
+    except firebase_auth.UserNotFoundError:
+        return True  # 이미 없음 = 목표는 달성됨
+    except Exception:
+        logger.warning("Firebase 계정 삭제 실패 (uid=%s)", uid, exc_info=True)
+        return False

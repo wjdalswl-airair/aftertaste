@@ -9,8 +9,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.authentication import FirebaseAuthentication, _extract_bearer_token
-from accounts.firebase import InvalidFirebaseToken, create_custom_token, verify_id_token
-from accounts.kakao import InvalidKakaoToken, get_kakao_user
+from accounts.firebase import (
+    InvalidFirebaseToken,
+    create_custom_token,
+    delete_firebase_user,
+    verify_id_token,
+)
+from accounts.kakao import InvalidKakaoToken, exchange_code_for_token, get_kakao_user
 from accounts.models import NICKNAME_MAX_LENGTH, Member
 from accounts.serializers import (
     ErrorDetailSerializer,
@@ -155,18 +160,21 @@ class KakaoCustomTokenView(APIView):
     Firebase는 카카오를 기본 로그인 제공자로 지원하지 않는다. 그래서 카카오는 다른
     소셜(Google)과 로그인 절차가 다르다:
 
-    1. 프론트엔드가 카카오 SDK로 로그인해 카카오 access token을 받는다.
-    2. 그 토큰으로 이 API를 호출한다. 서버가 카카오 API로 본인 확인 후
+    1. 프론트엔드가 `Kakao.Auth.authorize()`로 로그인하면 카카오가 **인가 코드(code)**만 준다.
+    2. 그 code와 redirect_uri로 이 API를 호출한다. 서버가 카카오 OAuth 서버에서
+       access token을 받고(exchange_code_for_token), 그 토큰으로 본인 확인 후
        Firebase 커스텀 토큰을 만들어 돌려준다(회원을 만들지는 않는다).
     3. 프론트엔드가 그 토큰으로 `signInWithCustomToken`을 호출해 Firebase에 로그인한다.
     4. Firebase가 내려준 ID 토큰으로 평소처럼 `POST /api/account/login/`을 호출하면
        회원 조회/가입이 완료된다 — 여기서부터는 Google 로그인과 같은 절차다.
+
+    access token 교환을 서버에서 하므로 프론트엔드가 access token을 직접 만지지 않는다 (issue #23).
     """
 
     @extend_schema(
         summary="카카오 로그인 - Firebase 커스텀 토큰 발급",
         description=(
-            "카카오 access token을 검증하고 Firebase 커스텀 토큰을 돌려준다. "
+            "카카오 인가 코드(code)를 access token으로 교환·검증하고 Firebase 커스텀 토큰을 돌려준다. "
             "이 토큰 자체로는 로그인이 끝나지 않는다 — 프론트엔드가 `signInWithCustomToken`으로 "
             "Firebase 로그인을 마친 뒤, 그 결과 ID 토큰으로 `POST /api/account/login/`을 "
             "호출해야 회원 조회/가입까지 끝난다."
@@ -174,8 +182,8 @@ class KakaoCustomTokenView(APIView):
         request=KakaoTokenRequestSerializer,
         responses={
             200: KakaoTokenResponseSerializer,
-            400: OpenApiResponse(response=ErrorDetailSerializer, description="access_token 누락"),
-            401: OpenApiResponse(response=ErrorDetailSerializer, description="카카오 토큰 무효/만료"),
+            400: OpenApiResponse(response=ErrorDetailSerializer, description="code 또는 redirect_uri 누락"),
+            401: OpenApiResponse(response=ErrorDetailSerializer, description="인가 코드 무효/만료/이미 사용됨"),
         },
         examples=[
             OpenApiExample(
@@ -187,11 +195,13 @@ class KakaoCustomTokenView(APIView):
         ],
     )
     def post(self, request):
-        access_token = request.data.get("access_token")
-        if not access_token:
-            return Response({"detail": "access_token이 필요합니다"}, status=400)
+        code = request.data.get("code")
+        redirect_uri = request.data.get("redirect_uri")
+        if not code or not redirect_uri:
+            return Response({"detail": "code와 redirect_uri가 필요합니다"}, status=400)
 
         try:
+            access_token = exchange_code_for_token(code, redirect_uri)
             kakao_user = get_kakao_user(access_token)
         except InvalidKakaoToken:
             raise AuthenticationFailed("다시 로그인하세요")
@@ -260,8 +270,9 @@ class MeView(APIView):
         summary="회원 탈퇴",
         description=(
             "회원 row는 지우지 않는다(리뷰·즐겨찾기가 주인을 잃지 않도록). 대신 닉네임·이메일·"
-            "프로필사진 같은 개인정보만 비우고 `is_withdrawn=True`로 표시한다. 탈퇴 후에는 "
-            "같은 소셜 계정으로 다시 로그인해도 이 회원이 아니라 새 회원으로 시작된다."
+            "프로필사진 같은 개인정보를 비우고 `is_withdrawn=True`로 표시하며, Firebase "
+            "Authentication에서도 계정을 지운다. 탈퇴 후에는 같은 소셜 계정으로 다시 "
+            "로그인해도 이 회원이 아니라 새 회원으로 시작된다."
         ),
         request=None,
         responses={
@@ -271,14 +282,19 @@ class MeView(APIView):
     )
     def delete(self, request):
         member = request.user
+
+        # Firebase Authentication의 계정도 지운다 (issue #17 — 콘솔에 이메일·소셜 연결이
+        # 계속 남지 않도록). 실패해도 아래 DB 익명화는 그대로 진행한다 — 사용자가 "탈퇴"를
+        # 눌렀는데 Firebase 정리 실패로 탈퇴 자체가 막히면 안 된다. delete_firebase_user가
+        # 내부에서 예외를 삼키고 로그만 남긴다.
+        delete_firebase_user(member.firebase_uid)
+
         member.nickname = None
         member.email = None
         member.profile_image_url = None
-        # firebase_uid를 다른 값으로 바꿔서(익명화) 더 이상 로그인에 쓸 수 없게 한다.
-        # firebase_uid는 unique라서 원래 값 그대로 두면, 같은 사람이 다시 로그인할 때
-        # LoginView가 이 탈퇴 회원을 그대로 찾아버려서 "새 회원으로 시작"이 안 된다.
-        # 값을 바꿔두면 다음 로그인 때 원래 firebase_uid로는 아무도 안 찾아지므로
-        # 자동으로 새 Member가 만들어진다.
+        # firebase_uid를 로그인에 못 쓰는 값으로 바꾼다. Firebase 삭제가 실패했거나,
+        # 카카오처럼 uid가 재로그인 때 같은 값(kakao:{id})으로 다시 생기는 경우에도
+        # LoginView가 이 탈퇴 회원을 찾지 않고 새 Member를 만들도록 하는 안전장치다.
         member.firebase_uid = f"withdrawn:{uuid.uuid4()}"
         member.is_withdrawn = True
         member.withdrawn_at = timezone.now()

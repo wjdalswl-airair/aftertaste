@@ -21,11 +21,10 @@
     }
   },
   "locationConsent": {
-    "body": "根据《位置信息保护和利用相关法律》，여운需要您同意位置信息服务使用条款，才能为您提供查看当前位置、查找周边景点等服务。如果您不同意，位置信息服务的使用可能会受到限制。",
-    "howTo": "位置信息服务使用方法说明",
+    "title": "同意位置信息服务使用条款",
+    "body": "根据《位置信息保护和利用相关法律》，여운需要您同意位置信息服务使用条款，才能为您提供查看当前位置、查找周边景点等服务。\n如果您不同意，位置信息服务的使用可能会受到限制。",
     "terms": "查看位置信息服务使用条款",
-    "privacy": "查看个人位置信息处理方针",
-    "deny": "拒绝",
+    "deny": "稍后",
     "allow": "允许"
   },
   "searchPage": {
@@ -120,6 +119,7 @@
     "myCoursesTitle": "我的路线",
     "myCoursesEmpty": "还没有创建的路线",
     "logoutButton": "退出登录",
+    "resetLocationLink": "重新设置位置权限",
     "withdrawLink": "注销账号",
     "withdrawConfirmTitle": "确定要注销账号吗？",
     "withdrawConfirmButton": "注销账号",

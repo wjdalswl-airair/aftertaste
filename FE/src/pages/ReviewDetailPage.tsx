@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { deleteReview, getPlaceReviews, likeReview, reportReview, unlikeReview, type ReviewItem } from '../api/reviews'
 import { getPlaceDetail, type PlaceDetail } from '../api/spots'
 import { BottomNav } from '../components/BottomNav'
+import { BottomSheet } from '../components/BottomSheet'
 import { Skeleton } from '../components/Skeleton'
 import { useAuthStore } from '../store/useAuthStore'
 
@@ -157,51 +158,40 @@ export function ReviewDetailPage() {
       )}
 
       {menuOpen && review && (
-        <div className="fixed inset-0 z-50 mx-auto w-full max-w-[480px]">
-          <button
-            type="button"
-            aria-label="닫기"
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setMenuOpen(false)}
-          />
-          <div className="absolute inset-x-0 bottom-0 flex flex-col">
-            <div className="w-full animate-[sheet-up_0.2s_ease-out] rounded-t-2xl bg-white pb-8 pt-2">
-              <div className="mx-auto mt-1.5 h-[3px] w-[46px] rounded-full bg-divider" />
-              {isMine ? (
-                <>
-                  <Link
-                    to={`/spots/${placeId}/reviews/${review.id}/edit`}
-                    className="block w-full py-4 text-center text-[15px] font-medium text-ink"
-                  >
-                    {t('reviewDetail.edit')}
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={handleDelete}
-                    className="block w-full py-4 text-center text-[15px] font-medium text-[#e0574a]"
-                  >
-                    {t('reviewDetail.delete')}
-                  </button>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleReport}
-                  className="block w-full py-4 text-center text-[15px] font-medium text-[#e0574a]"
-                >
-                  {t('reviewDetail.report')}
-                </button>
-              )}
+        <BottomSheet onClose={() => setMenuOpen(false)}>
+          {isMine ? (
+            <>
+              <Link
+                to={`/spots/${placeId}/reviews/${review.id}/edit`}
+                className="block w-full py-4 text-center text-[15px] font-medium text-ink"
+              >
+                {t('reviewDetail.edit')}
+              </Link>
               <button
                 type="button"
-                onClick={() => setMenuOpen(false)}
-                className="mt-2 block w-full py-3 text-center text-ink-tertiary"
+                onClick={handleDelete}
+                className="block w-full py-4 text-center text-[15px] font-medium text-[#e0574a]"
               >
-                {t('reviewDetail.cancel')}
+                {t('reviewDetail.delete')}
               </button>
-            </div>
-          </div>
-        </div>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={handleReport}
+              className="block w-full py-4 text-center text-[15px] font-medium text-[#e0574a]"
+            >
+              {t('reviewDetail.report')}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setMenuOpen(false)}
+            className="mt-2 block w-full py-3 text-center text-sm text-ink-tertiary"
+          >
+            {t('reviewDetail.cancel')}
+          </button>
+        </BottomSheet>
       )}
 
       <BottomNav />
