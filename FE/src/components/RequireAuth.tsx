@@ -1,4 +1,4 @@
-import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { Navigate, Outlet } from 'react-router-dom'
 import { useAuthStore } from '../store/useAuthStore'
 
 // 로그인이 필요한 화면들을 감싸는 공통 가드.
@@ -6,20 +6,13 @@ import { useAuthStore } from '../store/useAuthStore'
 export function RequireAuth() {
   const member = useAuthStore((state) => state.member)
   const isLoading = useAuthStore((state) => state.isLoading)
-  const location = useLocation()
 
   if (isLoading) {
     return null
   }
 
   if (!member) {
-    return (
-      <Navigate
-        to="/login"
-        state={{ from: location.pathname, message: '로그인이 필요한 기능입니다' }}
-        replace
-      />
-    )
+    return <Navigate to="/login" state={{ message: '로그인이 필요한 기능입니다' }} replace />
   }
 
   return <Outlet />
