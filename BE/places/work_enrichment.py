@@ -19,6 +19,10 @@ import logging
 
 from django.conf import settings
 
+# 제목 비교용 정규화는 작품 동일성 판정(Work.title_key)과 같은 규칙을 써야 하므로 services에 둔다.
+# "(아는 건 별로 없지만) 가족입니다" 와 "아는 건 별로 없지만 가족입니다" 를 같은 것으로,
+# "Parasite" 와 "parasite" 를 같은 것으로 본다.
+from places.services import normalize_work_title as normalize_title_for_match
 from places.sources import tmdb
 
 logger = logging.getLogger(__name__)
@@ -34,18 +38,6 @@ _DIRECTOR_MAX_LENGTH = 100
 # 우리 Work에 방영일자가 이미 있는 경우, TMDB 후보와 연도가 이만큼 넘게 차이 나면
 # 다른 작품으로 본다. 재방영·해외 개봉 지연을 감안해 1년까지는 같은 작품으로 인정한다.
 _YEAR_TOLERANCE = 1
-
-# 제목 비교 시 지우는 문자. 괄호·구두점·공백처럼 표기만 다르고 뜻은 같은 것들.
-_TITLE_NOISE_CHARS = set(" \t　()[]{}<>「」『』:;,.·・…!?\"'`~-–—/\\")
-
-
-def normalize_title_for_match(title):
-    """제목 비교용으로 정규화한다. 공백·괄호·구두점을 모두 지우고 소문자로 만든다.
-
-    "(아는 건 별로 없지만) 가족입니다" 와 "아는 건 별로 없지만 가족입니다" 를 같은 것으로,
-    "Parasite" 와 "parasite" 를 같은 것으로 본다.
-    """
-    return "".join(ch for ch in (title or "").casefold() if ch not in _TITLE_NOISE_CHARS)
 
 
 def pick_tmdb_match(work_title, work_release_date, candidates, *, require_korean=True):

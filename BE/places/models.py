@@ -61,12 +61,29 @@ class Work(models.Model):
         MOVIE = "MOVIE", "영화"
 
     title = models.CharField(max_length=200)
+    # 제목에서 구두점·공백을 지운 비교용 키. save할 때 title에서 자동으로 계산한다(직접 수정 불가).
+    # (title_key, category)가 같으면 같은 작품으로 본다 — 데이터를 다시 수집해도 같은 작품이
+    # 띄어쓰기·구두점 차이로 중복 생성되지 않게 막는다 (services.normalize_work_title).
+    title_key = models.CharField(max_length=200, editable=False)
     description = models.TextField(blank=True)
     category = models.CharField(max_length=10, choices=Category.choices)
     release_date = models.DateField(null=True, blank=True)
     main_cast = models.CharField(max_length=300, blank=True)
     director = models.CharField(max_length=100, blank=True)
     poster_url = models.URLField(blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["title_key", "category"], name="uniq_work_title_key_category"
+            )
+        ]
+
+    def save(self, *args, **kwargs):
+        from places.services import normalize_work_title
+
+        self.title_key = normalize_work_title(self.title)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.title

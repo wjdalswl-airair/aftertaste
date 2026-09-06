@@ -60,6 +60,20 @@ _MEDIA_TYPE_TO_CATEGORY = {"drama": "DRAMA", "movie": "MOVIE"}
 # (translation.py의 NAME_TITLE_MAX_LENGTH 처리와 같은 방식).
 _WORK_TITLE_MAX_LENGTH = 200
 
+# 제목 비교(작품 동일성 판정)용으로 지우는 문자 — 괄호·구두점·공백·붙임표.
+# "여름 향기"와 "여름향기", "아테나: 전쟁의 여신"과 "아테나:전쟁의 여신"을 같은 작품으로 본다.
+# 부제는 글자라 남으므로 "신과함께: 죄와 벌"과 "신과함께: 인과 연"은 다른 작품으로 유지된다.
+_WORK_TITLE_NOISE_CHARS = set(" \t　()[]{}<>「」『』:;,.·・…!?\"'`~-–—/\\")
+
+
+def normalize_work_title(title):
+    """작품 제목에서 표기 차이(괄호·구두점·공백)를 지운 비교용 문자열을 돌려준다.
+
+    Work.title_key가 이 값으로 채워지고, (title_key, category)가 같으면 같은 작품으로 본다.
+    촬영지·영화 데이터를 다시 수집해도 같은 작품이 띄어쓰기 차이로 중복 생성되지 않게 한다.
+    """
+    return "".join(ch for ch in (title or "").casefold() if ch not in _WORK_TITLE_NOISE_CHARS)
+
 
 def media_type_to_category(media_type):
     """KCISA 미디어타입 문자열을 Work.category 값으로 바꾼다.
@@ -93,7 +107,11 @@ def link_place_to_work(place, *, title, media_type):
     if not normalized_title:
         return None, False
 
-    work, _ = Work.objects.get_or_create(title=normalized_title, category=category)
+    work, _ = Work.objects.get_or_create(
+        title_key=normalize_work_title(normalized_title),
+        category=category,
+        defaults={"title": normalized_title},
+    )
     _, linked = PlaceWork.objects.get_or_create(place=place, work=work)
     return work, linked
 
@@ -101,8 +119,9 @@ def link_place_to_work(place, *, title, media_type):
 def get_or_create_work(title, category, *, create_only_fields=None):
     """제목+구분(category)으로 Work를 찾거나 만든다. link_place_to_work와 같은 매칭 원칙이다 —
 
-    공백을 정리한 제목 문자열이 같으면 같은 작품으로 본다(DETAIL_SPEC 6-1 #27·#28). Work엔
-    PlaceSource 같은 출처·원본번호 테이블이 없어서 제목 문자열 매칭만 쓴다.
+    normalize_work_title로 표기 차이(구두점·공백)를 지운 제목이 같고 category가 같으면
+    같은 작품으로 본다(DETAIL_SPEC 6-1 #27·#28). Work엔 PlaceSource 같은 출처·원본번호
+    테이블이 없어서 제목 매칭만 쓴다.
     create_only_fields는 작품을 새로 만들 때만 채우고, 이미 있는 작품은 절대 덮어쓰지 않는다 —
     business_hours/scene_description 보존과 같은 원칙(관리자가 고친 값을 지킨다).
 
@@ -116,7 +135,10 @@ def get_or_create_work(title, category, *, create_only_fields=None):
 
     create_only_fields = create_only_fields or {}
     defaults = {field: value for field, value in create_only_fields.items() if value not in (None, "")}
-    return Work.objects.get_or_create(title=normalized_title, category=category, defaults=defaults)
+    defaults["title"] = normalized_title
+    return Work.objects.get_or_create(
+        title_key=normalize_work_title(normalized_title), category=category, defaults=defaults
+    )
 
 
 def build_composite_source_id(*parts, delimiter="|"):
