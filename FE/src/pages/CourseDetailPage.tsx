@@ -5,6 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { deleteCourse, getCourseDetail, type Course, type CoursePlaceRole } from '../api/courses'
 import { getPlaceDetail, type PlaceDetail } from '../api/spots'
 import { BottomNav } from '../components/BottomNav'
+import { BottomSheet } from '../components/BottomSheet'
 import { FavoriteButton } from '../components/FavoriteButton'
 import { Skeleton } from '../components/Skeleton'
 import { loadKakaoMaps } from '../lib/kakaoMap'
@@ -150,33 +151,22 @@ export function CourseDetailPage() {
       )}
 
       {menuOpen && course && (
-        <div className="fixed inset-0 z-50 mx-auto w-full max-w-[480px]">
+        <BottomSheet onClose={() => setMenuOpen(false)}>
           <button
             type="button"
-            aria-label="닫기"
-            className="absolute inset-0 bg-black/40"
+            onClick={handleDelete}
+            className="block w-full py-4 text-center text-[15px] font-medium text-[#e0574a]"
+          >
+            {t('courseDetail.delete')}
+          </button>
+          <button
+            type="button"
             onClick={() => setMenuOpen(false)}
-          />
-          <div className="absolute inset-x-0 bottom-0 flex flex-col">
-            <div className="w-full animate-[sheet-up_0.2s_ease-out] rounded-t-2xl bg-white pb-8 pt-2">
-              <div className="mx-auto mt-1.5 h-[3px] w-[46px] rounded-full bg-divider" />
-              <button
-                type="button"
-                onClick={handleDelete}
-                className="block w-full py-4 text-center text-[15px] font-medium text-[#e0574a]"
-              >
-                {t('courseDetail.delete')}
-              </button>
-              <button
-                type="button"
-                onClick={() => setMenuOpen(false)}
-                className="mt-2 block w-full py-3 text-center text-ink-tertiary"
-              >
-                {t('courseDetail.cancel')}
-              </button>
-            </div>
-          </div>
-        </div>
+            className="mt-2 block w-full py-3 text-center text-sm text-ink-tertiary"
+          >
+            {t('courseDetail.cancel')}
+          </button>
+        </BottomSheet>
       )}
 
       <BottomNav />
