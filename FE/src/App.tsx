@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { RequireAuth } from './components/RequireAuth'
+import { ScrollToTop } from './components/ScrollToTop'
 import { useInitAuth } from './hooks/useInitAuth'
 import { BookmarksPage } from './pages/BookmarksPage'
 import { CourseCreatePage } from './pages/CourseCreatePage'
@@ -19,25 +20,28 @@ function App() {
   useInitAuth()
 
   return (
-    <Routes>
-      <Route path="/" element={<MainPage />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/search" element={<SearchPage />} />
-      <Route path="/spots/:placeId" element={<SpotDetailPage />} />
-      <Route path="/spots/:placeId/reviews" element={<ReviewListPage />} />
-      <Route path="/spots/:placeId/reviews/:reviewId" element={<ReviewDetailPage />} />
-      <Route path="/works/:workId" element={<WorkDetailPage />} />
-      <Route path="/courses/:courseId" element={<CourseDetailPage />} />
-      <Route element={<RequireAuth />}>
-        <Route path="/mypage" element={<MyPage />} />
-        <Route path="/bookmarks" element={<BookmarksPage />} />
-        <Route path="/mycourses" element={<MyCourseListPage />} />
-        <Route path="/spots/:placeId/reviews/new" element={<ReviewFormPage />} />
-        <Route path="/spots/:placeId/reviews/:reviewId/edit" element={<ReviewFormPage />} />
-        <Route path="/spots/:placeId/courses/new" element={<CourseCreatePage />} />
-      </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <>
+      <ScrollToTop />
+      <Routes>
+        <Route path="/" element={<MainPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/search" element={<SearchPage />} />
+        <Route path="/spots/:placeId" element={<SpotDetailPage />} />
+        <Route path="/spots/:placeId/reviews" element={<ReviewListPage />} />
+        <Route path="/spots/:placeId/reviews/:reviewId" element={<ReviewDetailPage />} />
+        <Route path="/works/:workId" element={<WorkDetailPage />} />
+        <Route path="/courses/:courseId" element={<CourseDetailPage />} />
+        <Route element={<RequireAuth />}>
+          <Route path="/mypage" element={<MyPage />} />
+          <Route path="/bookmarks" element={<BookmarksPage />} />
+          <Route path="/mycourses" element={<MyCourseListPage />} />
+          <Route path="/spots/:placeId/reviews/new" element={<ReviewFormPage />} />
+          <Route path="/spots/:placeId/reviews/:reviewId/edit" element={<ReviewFormPage />} />
+          <Route path="/spots/:placeId/courses/new" element={<CourseCreatePage />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
   )
 }
 
