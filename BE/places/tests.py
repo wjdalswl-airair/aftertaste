@@ -2552,7 +2552,32 @@ class PlaceTranslationSignalTest(TestCase):
         translation = PlaceTranslation.objects.get(place=place, language="en")
         self.assertEqual(translation.status, TranslationStatus.SUCCESS)
         self.assertEqual(translation.name, "Gyeongbokgung")
-        self.assertFalse(translation.is_approved)
+        # 설명이 없어 번역 결과가 이름뿐이면 검수 없이 바로 노출한다.
+        self.assertTrue(translation.is_approved)
+
+    @patch("places.translation.google_translate.translate_text")
+    def test_place_with_description_is_held_for_review(self, mock_translate):
+        mock_translate.side_effect = lambda text, *a, **kw: f"[{text}]"
+
+        with self.captureOnCommitCallbacks(execute=True):
+            place = Place.objects.create(name="경복궁", description="조선의 정궁")
+
+        translation = PlaceTranslation.objects.get(place=place, language="en")
+        self.assertFalse(translation.is_approved)  # 설명 번역은 관리자 검수 대기
+
+    @patch("places.translation.google_translate.translate_text")
+    def test_creating_place_translates_all_supported_languages(self, mock_translate):
+        from places.translation import SUPPORTED_LANGUAGES
+
+        mock_translate.return_value = "Gyeongbokgung"
+
+        with self.captureOnCommitCallbacks(execute=True):
+            place = Place.objects.create(name="경복궁")
+
+        self.assertEqual(
+            set(PlaceTranslation.objects.filter(place=place).values_list("language", flat=True)),
+            set(SUPPORTED_LANGUAGES),
+        )
 
     @patch("places.translation.google_translate.translate_text")
     def test_updating_place_does_not_retranslate_automatically(self, mock_translate):
@@ -2561,13 +2586,14 @@ class PlaceTranslationSignalTest(TestCase):
 
         with self.captureOnCommitCallbacks(execute=True):
             place = Place.objects.create(name="경복궁")
-        self.assertEqual(mock_translate.call_count, 1)
+        calls_after_create = mock_translate.call_count
+        self.assertGreater(calls_after_create, 0)
 
         with self.captureOnCommitCallbacks(execute=True):
             place.business_hours = "09:00~18:00"
             place.save()
 
-        self.assertEqual(mock_translate.call_count, 1)
+        self.assertEqual(mock_translate.call_count, calls_after_create)
 
     @patch("places.translation.google_translate.translate_text")
     def test_creating_work_triggers_translation(self, mock_translate):
@@ -2638,6 +2664,40 @@ class TranslationAdminRetranslateActionTest(TestCase):
         )
 
         mock_translate.assert_called_once_with(work, "en")
+
+
+class TranslateContentCommandTest(TestCase):
+    """translate_content: 전수 (재)번역, 성공한 것은 건너뛰고 재개 가능."""
+
+    @patch("places.translation.google_translate.translate_text")
+    def test_translates_every_supported_language(self, mock_translate):
+        from places.translation import SUPPORTED_LANGUAGES
+
+        mock_translate.side_effect = lambda text, target, **kw: f"{text}-{target}"
+        Place.objects.create(name="경복궁")
+
+        call_command("translate_content", model="place", sleep=0)
+
+        langs = set(
+            PlaceTranslation.objects.filter(status=TranslationStatus.SUCCESS).values_list(
+                "language", flat=True
+            )
+        )
+        self.assertEqual(langs, set(SUPPORTED_LANGUAGES))
+
+    @patch("places.translation.google_translate.translate_text")
+    def test_skips_already_succeeded_unless_overwrite(self, mock_translate):
+        mock_translate.side_effect = lambda text, target, **kw: f"{text}-{target}"
+        work = Work.objects.create(title="사랑비", category=Work.Category.DRAMA)
+        WorkTranslation.objects.create(
+            work=work, language="ja", title="이미함", status=TranslationStatus.SUCCESS
+        )
+
+        call_command("translate_content", model="work", language="ja", sleep=0)
+        self.assertFalse(mock_translate.called)  # ja는 이미 성공 → 건너뜀
+
+        call_command("translate_content", model="work", language="ja", overwrite=True, sleep=0)
+        self.assertTrue(mock_translate.called)
 
 
 class TranslationApiIntegrationTest(TestCase):

@@ -30,8 +30,9 @@ LENGTH_CHECK_MIN_SOURCE_LENGTH = 20
 LENGTH_RATIO_MIN = 1 / 5
 LENGTH_RATIO_MAX = 5
 
-# 지원 언어 목록. 지금은 영어만이지만(DETAIL_SPEC 6-1 #14), 이후 언어가 늘어날 걸 감안해 목록으로 둔다.
-SUPPORTED_LANGUAGES = ["en"]
+# 지원 언어 목록 (DETAIL_SPEC 6-1 #14, 2026-09-04 5개 언어로 확장). 한국어는 원문이라 뺀다.
+# 코드는 프런트(useLocaleStore)와 Google Translate v2가 함께 받는 값이어야 한다.
+SUPPORTED_LANGUAGES = ["en", "ja", "zh-CN", "zh-TW"]
 
 
 def _translate_one(text, target_language):
@@ -64,16 +65,16 @@ def _translate_one(text, target_language):
     return translated, True
 
 
-def _apply_translation(translation, field_results):
+def _apply_translation(translation, field_results, *, auto_approve=False):
     """번역 결과를 translation 레코드에 반영한다.
 
     field_results: [(필드이름, 번역문 또는 None, 성공여부), ...]
     실패한 필드는 기존 값을 그대로 둔다 (부분 성공을 지우지 않기 위해).
-    실제로 내용이 바뀐 필드가 하나라도 있으면(=하나라도 성공하면) 재승인이 필요해서
-    is_approved를 False로 되돌린다 (DETAIL_SPEC 4-3 (2): 자동 번역은 관리자가 다시
-    확인해야 손님에게 보인다). 반대로 전부 실패해서 내용이 하나도 안 바뀌었다면,
+    실제로 내용이 바뀐 필드가 하나라도 있으면 is_approved를 auto_approve 값으로 정한다.
+    기본은 False — 자동 번역은 관리자가 다시 확인해야 손님에게 보인다 (DETAIL_SPEC 4-3 (2)).
+    auto_approve=True는 검수 없이 노출해도 되는 짧은 값(명소 이름·작품 제목처럼 설명이 없는
+    경우)에만 호출하는 쪽에서 넘긴다. 전부 실패해서 내용이 하나도 안 바뀌었다면,
     이미 승인되어 노출 중이던 번역을 건드리지 않고 is_approved를 그대로 둔다.
-    (일시적인 API 실패 한 번 때문에 정상 노출 중이던 번역이 사라지면 안 된다.)
     """
     all_ok = True
     any_changed = False
@@ -88,7 +89,7 @@ def _apply_translation(translation, field_results):
             all_ok = False
 
     if any_changed:
-        translation.is_approved = False
+        translation.is_approved = auto_approve
     if all_ok:
         translation.status = TranslationStatus.SUCCESS
         translation.translated_at = timezone.now()
@@ -99,26 +100,37 @@ def _apply_translation(translation, field_results):
 
 
 def translate_place(place, language="en"):
-    """명소 하나를 language로 번역해서 PlaceTranslation에 저장한다. 실패해도 예외를 올리지 않는다."""
+    """명소 하나를 language로 번역해서 PlaceTranslation에 저장한다. 실패해도 예외를 올리지 않는다.
+
+    설명이 없으면(=번역 결과가 이름뿐이면) 검수 없이 바로 노출한다. 설명이 있으면 관리자
+    검수를 위해 is_approved=False로 둔다.
+    """
     translation, _ = PlaceTranslation.objects.get_or_create(place=place, language=language)
 
     name, name_ok = _translate_one(place.name, language)
     description, description_ok = _translate_one(place.description, language)
 
     return _apply_translation(
-        translation, [("name", name, name_ok), ("description", description, description_ok)]
+        translation,
+        [("name", name, name_ok), ("description", description, description_ok)],
+        auto_approve=not place.description,
     )
 
 
 def translate_work(work, language="en"):
-    """작품 하나를 language로 번역해서 WorkTranslation에 저장한다. 실패해도 예외를 올리지 않는다."""
+    """작품 하나를 language로 번역해서 WorkTranslation에 저장한다. 실패해도 예외를 올리지 않는다.
+
+    translate_place와 같은 규칙 — 설명이 없으면(제목뿐이면) 바로 노출, 있으면 검수 대기.
+    """
     translation, _ = WorkTranslation.objects.get_or_create(work=work, language=language)
 
     title, title_ok = _translate_one(work.title, language)
     description, description_ok = _translate_one(work.description, language)
 
     return _apply_translation(
-        translation, [("title", title, title_ok), ("description", description, description_ok)]
+        translation,
+        [("title", title, title_ok), ("description", description, description_ok)],
+        auto_approve=not work.description,
     )
 
 
