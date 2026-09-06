@@ -1,6 +1,6 @@
 import { signInWithCustomToken, signInWithPopup } from 'firebase/auth'
 import { useEffect, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { kakaoLogin } from '../api/auth'
 import googleIcon from '../assets/icons/google.svg'
 import kakaoIcon from '../assets/icons/kakao.svg'
@@ -72,7 +72,7 @@ export function LoginPage() {
   return (
     <main className="flex min-h-dvh flex-col pb-24">
       <header className="flex items-center px-4 pt-6">
-        <p className="font-brand text-2xl font-bold text-primary">여운</p>
+        <Link to="/" className="font-brand text-2xl font-bold text-primary">여운</Link>
       </header>
 
       <div className="flex flex-1 flex-col items-center justify-center gap-12 px-6 text-center">

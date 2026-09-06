@@ -49,7 +49,8 @@
 | `FavoriteButton.tsx` | 명소 카드/상세에 붙는 즐겨찾기(별) 토글 버튼. 비로그인이면 로그인 화면으로 유도. |
 | `RatingModal.tsx` | 별점 등록 모달 (리뷰 작성 진입점). |
 | `RequireAuth.tsx` | 로그인 필요한 라우트를 감싸는 가드. 비로그인이면 안내와 함께 `/login`으로 리다이렉트. |
-| `Modal.tsx` | 범용 모달 껍데기(제목 + 닫기 + children). |
+| `Modal.tsx` | 화면 가운데 뜨는 범용 모달 껍데기(제목 + 닫기 + children). |
+| `BottomSheet.tsx` | 화면 아래에서 올라오는 범용 바텀시트 껍데기(드래그 핸들바 + children). 언어 선택, 리뷰/코스 수정·삭제 메뉴, 회원탈퇴 확인 등에서 공통으로 씀. |
 | `Skeleton.tsx` | 로딩 중 표시하는 회색 스켈레톤 블록. |
 
 ### `src/api/` — 백엔드 호출
@@ -79,7 +80,7 @@
 | 파일 | 역할 |
 |---|---|
 | `useAuthStore.ts` | 로그인 회원 정보(`member`)와 로딩 상태. `useInitAuth`가 채워준다. |
-| `useLocaleStore.ts` | 현재 언어 설정(`ko`/`en`/`ja`/`zh-CN`/`zh-TW`). `persist`로 `localStorage`에 저장. |
+| `useLocaleStore.ts` | 현재 언어 설정(`ko`/`en`/`ja`/`zh-CN`/`zh-TW`). `persist`로 `localStorage`에 저장. 최초 방문 시엔 `detectInitialLanguage`가 기기 언어로 초기값을 추측한다(지원 안 하는 언어권은 `en` 폴백). |
 | `*.test.ts` | 스토어 로직 테스트. |
 
 ### `src/lib/` — 외부 SDK 연동

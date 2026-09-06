@@ -16,7 +16,7 @@ export function MainPage() {
   return (
     <main className="flex min-h-dvh flex-col gap-6 pb-24">
       <header className="flex items-center justify-between px-4 pt-6">
-        <p className="font-brand text-2xl font-bold text-primary">여운</p>
+        <Link to="/" className="font-brand text-2xl font-bold text-primary">여운</Link>
         <div className="flex items-center gap-4">
           <LanguageSheet />
           {!isLoading && !member && (
@@ -32,7 +32,7 @@ export function MainPage() {
           {t('mainPage.greeting.hello')}
           {!isLoading && member && t('mainPage.greeting.nameSuffix', { name: member.nickname })}
         </h1>
-        <p className="mt-2 text-ink-secondary">{t('mainPage.greeting.subtitle')}</p>
+        <p className=" text-ink-secondary">{t('mainPage.greeting.subtitle')}</p>
       </div>
 
       <Hero />
