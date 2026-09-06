@@ -102,13 +102,17 @@ class ErrorDetailSerializer(serializers.Serializer):
 
 
 class KakaoTokenRequestSerializer(serializers.Serializer):
-    """카카오 로그인 요청 body (POST /account/kakao/token/)."""
+    """카카오 로그인 요청 body (POST /account/kakao/token/).
 
-    access_token = serializers.CharField(help_text="카카오 SDK 로그인으로 받은 access token")
+    Kakao.Auth.authorize()가 돌려준 인가 코드와, authorize에 넘긴 redirect_uri를 그대로 보낸다.
+    """
+
+    code = serializers.CharField(help_text="Kakao.Auth.authorize()가 redirect로 돌려준 인가 코드")
+    redirect_uri = serializers.CharField(help_text="authorize()에 넘긴 값과 정확히 같아야 한다")
 
 
 class KakaoTokenResponseSerializer(serializers.Serializer):
-    """카카오 access token을 Firebase 커스텀 토큰으로 교환한 응답."""
+    """카카오 인가 코드를 Firebase 커스텀 토큰으로 교환한 응답."""
 
     firebase_custom_token = serializers.CharField(
         help_text="이 토큰으로 signInWithCustomToken을 호출하면 Firebase 로그인이 끝난다."

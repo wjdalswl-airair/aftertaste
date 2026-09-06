@@ -181,9 +181,15 @@ class KakaoCustomTokenViewTests(TestCase):
     def setUp(self):
         self.client = APIClient()
 
+    _BODY = {"code": "fake-auth-code", "redirect_uri": "http://localhost:5173/login"}
+
     @patch("accounts.views.create_custom_token")
     @patch("accounts.views.get_kakao_user")
-    def test_valid_kakao_token_returns_firebase_custom_token(self, mock_get_kakao_user, mock_create_custom_token):
+    @patch("accounts.views.exchange_code_for_token")
+    def test_valid_code_returns_firebase_custom_token(
+        self, mock_exchange, mock_get_kakao_user, mock_create_custom_token
+    ):
+        mock_exchange.return_value = "fake-kakao-access-token"
         mock_get_kakao_user.return_value = {
             "kakao_id": 12345,
             "email": "kakao@example.com",
@@ -192,33 +198,109 @@ class KakaoCustomTokenViewTests(TestCase):
         }
         mock_create_custom_token.return_value = "fake-custom-token"
 
-        response = self.client.post(
-            self.KAKAO_TOKEN_URL, {"access_token": "fake-kakao-access-token"}, format="json",
-        )
+        response = self.client.post(self.KAKAO_TOKEN_URL, self._BODY, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["firebase_custom_token"], "fake-custom-token")
+
+        # 서버가 code → access token 교환을 대신 한다.
+        mock_exchange.assert_called_once_with("fake-auth-code", "http://localhost:5173/login")
+        mock_get_kakao_user.assert_called_once_with("fake-kakao-access-token")
 
         uid, claims = mock_create_custom_token.call_args[0]
         self.assertEqual(uid, "kakao:12345")
         self.assertEqual(claims["provider"], Member.Provider.KAKAO)
         self.assertEqual(claims["email"], "kakao@example.com")
 
-    @patch("accounts.views.get_kakao_user")
-    def test_invalid_kakao_token_is_rejected(self, mock_get_kakao_user):
-        mock_get_kakao_user.side_effect = InvalidKakaoToken("expired")
+    @patch("accounts.views.exchange_code_for_token")
+    def test_invalid_code_is_rejected(self, mock_exchange):
+        mock_exchange.side_effect = InvalidKakaoToken("invalid_grant")
 
-        response = self.client.post(
-            self.KAKAO_TOKEN_URL, {"access_token": "expired-token"}, format="json",
-        )
+        response = self.client.post(self.KAKAO_TOKEN_URL, self._BODY, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         self.assertEqual(response.data["detail"], "다시 로그인하세요")
 
-    def test_missing_access_token_is_rejected(self):
-        response = self.client.post(self.KAKAO_TOKEN_URL, {}, format="json")
+    @patch("accounts.views.get_kakao_user")
+    @patch("accounts.views.exchange_code_for_token")
+    def test_valid_code_but_kakao_user_lookup_fails_is_rejected(self, mock_exchange, mock_get_kakao_user):
+        mock_exchange.return_value = "access-token"
+        mock_get_kakao_user.side_effect = InvalidKakaoToken("expired")
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        response = self.client.post(self.KAKAO_TOKEN_URL, self._BODY, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.data["detail"], "다시 로그인하세요")
+
+    def test_missing_code_or_redirect_uri_is_rejected(self):
+        self.assertEqual(
+            self.client.post(self.KAKAO_TOKEN_URL, {}, format="json").status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+        self.assertEqual(
+            self.client.post(self.KAKAO_TOKEN_URL, {"code": "x"}, format="json").status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+        self.assertEqual(
+            self.client.post(
+                self.KAKAO_TOKEN_URL, {"redirect_uri": "http://x/login"}, format="json"
+            ).status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+
+class ExchangeCodeForTokenTests(TestCase):
+    """accounts.kakao.exchange_code_for_token — 인가 코드를 access token으로 교환."""
+
+    @patch("accounts.kakao.requests.post")
+    def test_returns_access_token_on_success(self, mock_post):
+        from accounts.kakao import exchange_code_for_token
+
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json.return_value = {"access_token": "AAA", "token_type": "bearer"}
+
+        with self.settings(KAKAO_API_KEY="rest-key", KAKAO_CLIENT_SECRET=""):
+            token = exchange_code_for_token("the-code", "http://localhost:5173/login")
+
+        self.assertEqual(token, "AAA")
+        sent = mock_post.call_args.kwargs["data"]
+        self.assertEqual(sent["grant_type"], "authorization_code")
+        self.assertEqual(sent["client_id"], "rest-key")
+        self.assertEqual(sent["redirect_uri"], "http://localhost:5173/login")
+        self.assertEqual(sent["code"], "the-code")
+        self.assertNotIn("client_secret", sent)
+
+    @patch("accounts.kakao.requests.post")
+    def test_client_secret_included_only_when_set(self, mock_post):
+        from accounts.kakao import exchange_code_for_token
+
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json.return_value = {"access_token": "AAA"}
+
+        with self.settings(KAKAO_API_KEY="rest-key", KAKAO_CLIENT_SECRET="secret-123"):
+            exchange_code_for_token("c", "http://x/login")
+
+        self.assertEqual(mock_post.call_args.kwargs["data"]["client_secret"], "secret-123")
+
+    @patch("accounts.kakao.requests.post")
+    def test_kakao_error_response_raises_invalid_token(self, mock_post):
+        from accounts.kakao import InvalidKakaoToken, exchange_code_for_token
+
+        mock_post.return_value.status_code = 400
+        mock_post.return_value.json.return_value = {
+            "error": "invalid_grant", "error_description": "authorization code not found",
+        }
+
+        with self.settings(KAKAO_API_KEY="rest-key"):
+            with self.assertRaises(InvalidKakaoToken):
+                exchange_code_for_token("used-code", "http://x/login")
+
+    def test_missing_code_raises_invalid_token(self):
+        from accounts.kakao import InvalidKakaoToken, exchange_code_for_token
+
+        with self.settings(KAKAO_API_KEY="rest-key"):
+            with self.assertRaises(InvalidKakaoToken):
+                exchange_code_for_token("", "http://x/login")
 
 
 class MeViewTests(TestCase):

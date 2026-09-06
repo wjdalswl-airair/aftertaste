@@ -221,9 +221,13 @@ KOBIS_API_KEY = os.environ.get("KOBIS_API_KEY", "")
 GYEONGGI_DATA_DREAM_API_KEY = os.environ.get("GYEONGGI_DATA_DREAM_API_KEY", "")
 KCISA_API_KEY = os.environ.get("KCISA_API_KEY", "")
 
-# 카카오맵 지오코딩용 REST API 키. 좌표가 없는 출처(경기 데이터 드림)의 장소명을
-# 좌표로 바꿔서, 좌표가 있는 다른 출처(한국문화정보원)와 같은 명소인지 비교하는 데 쓴다.
+# 카카오 REST API 키. 지오코딩(경기 데이터 드림 장소명→좌표)과 카카오 로그인의
+# 인가 코드 → access token 교환(accounts/kakao.py)에 함께 쓴다 — 카카오 앱은 REST 키가 하나다.
 KAKAO_API_KEY = os.environ.get("KAKAO_API_KEY", "")
+
+# 카카오 로그인 "보안 → Client Secret"을 켰을 때만 필요. 켜져 있으면 토큰 교환 요청에
+# 반드시 실어야 하고, 안 켜져 있으면 비워 둔다.
+KAKAO_CLIENT_SECRET = os.environ.get("KAKAO_CLIENT_SECRET", "")
 
 # Google Cloud Translation API (v2) 키. 명소·작품 번역에 쓴다 (docs/DETAIL_SPEC.md 6-1 #13).
 GOOGLE_TRANSLATE_API_KEY = os.environ.get("GOOGLE_TRANSLATE_API_KEY", "")
