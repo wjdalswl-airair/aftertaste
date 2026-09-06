@@ -11,6 +11,7 @@ import { BottomNav } from '../components/BottomNav'
 import { BottomSheet } from '../components/BottomSheet'
 import { LanguageSheet } from '../components/LanguageSheet'
 import { Skeleton } from '../components/Skeleton'
+import { resetLocationConsent } from '../hooks/useGeolocation'
 import { uploadProfilePhoto } from '../lib/profilePhotoUpload'
 
 const NICKNAME_MAX_LENGTH = 20
@@ -107,6 +108,11 @@ export function MyPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  function handleResetLocationConsent() {
+    resetLocationConsent()
+    navigate('/')
   }
 
   async function handleLogout() {
@@ -308,6 +314,13 @@ export function MyPage() {
           className="w-full rounded-full border border-primary py-3 text-sm font-medium text-primary"
         >
           {t('myPage.logoutButton')}
+        </button>
+        <button
+          type="button"
+          onClick={handleResetLocationConsent}
+          className="mt-3 block w-full text-center text-xs text-ink-tertiary"
+        >
+          {t('myPage.resetLocationLink')}
         </button>
         <button
           type="button"
