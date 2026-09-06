@@ -21,11 +21,10 @@
     }
   },
   "locationConsent": {
-    "body": "根據《位置資訊保護及利用相關法律》，여운需要您同意位置資訊服務使用條款，才能為您提供查看目前位置、尋找周邊景點等服務。如果您不同意，位置資訊服務的使用可能會受到限制。",
-    "howTo": "位置服務使用方法說明",
+    "title": "同意位置資訊服務使用條款",
+    "body": "根據《位置資訊保護及利用相關法律》，여운需要您同意位置資訊服務使用條款，才能為您提供查看目前位置、尋找周邊景點等服務。\n如果您不同意，位置資訊服務的使用可能會受到限制。",
     "terms": "查看位置資訊服務使用條款",
-    "privacy": "查看個人位置資訊處理方針",
-    "deny": "拒絕",
+    "deny": "稍後",
     "allow": "允許"
   },
   "searchPage": {
@@ -120,6 +119,7 @@
     "myCoursesTitle": "我的路線",
     "myCoursesEmpty": "尚無建立的路線",
     "logoutButton": "登出",
+    "resetLocationLink": "重新設定位置權限",
     "withdrawLink": "刪除帳號",
     "withdrawConfirmTitle": "確定要刪除帳號嗎？",
     "withdrawConfirmButton": "刪除帳號",

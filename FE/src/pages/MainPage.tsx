@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { BottomNav } from '../components/BottomNav'
 import { Hero } from '../components/Hero'
+import { LanguageSheet } from '../components/LanguageSheet'
 import { RecommendedSpots } from '../components/RecommendedSpots'
 import { TopPlacesCarousel } from '../components/TopPlacesCarousel'
 import { useAuthStore } from '../store/useAuthStore'
@@ -15,12 +16,15 @@ export function MainPage() {
   return (
     <main className="flex min-h-dvh flex-col gap-6 pb-24">
       <header className="flex items-center justify-between px-4 pt-6">
-        <p className="font-brand text-2xl font-bold text-primary">여운</p>
-        {!isLoading && !member && (
-          <Link to="/login" aria-label="로그인">
-            <LogIn size={22} className="text-ink" />
-          </Link>
-        )}
+        <Link to="/" className="font-brand text-2xl font-bold text-primary">여운</Link>
+        <div className="flex items-center gap-4">
+          <LanguageSheet />
+          {!isLoading && !member && (
+            <Link to="/login" aria-label="로그인">
+              <LogIn size={22} className="text-ink" />
+            </Link>
+          )}
+        </div>
       </header>
 
       <div className="px-4">
@@ -28,7 +32,7 @@ export function MainPage() {
           {t('mainPage.greeting.hello')}
           {!isLoading && member && t('mainPage.greeting.nameSuffix', { name: member.nickname })}
         </h1>
-        <p className="mt-2 text-ink-secondary">{t('mainPage.greeting.subtitle')}</p>
+        <p className=" text-ink-secondary">{t('mainPage.greeting.subtitle')}</p>
       </div>
 
       <Hero />

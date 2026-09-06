@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router-dom'
 import { getBanners, getHallOfFame, type Banner, type HallOfFameReview } from '../api/main'
 import { getPlaceDetail, getRecommendedSpots, type PlaceDetail, type RecommendedSpot } from '../api/spots'
 import { Skeleton } from './Skeleton'
@@ -107,13 +108,17 @@ export function Hero() {
           className="scrollbar-hide flex snap-x snap-mandatory overflow-x-auto rounded-lg"
         >
           {slides.map((slide, index) => (
-            <div key={index} className="relative h-56 w-full flex-shrink-0 snap-center overflow-hidden">
+            <Link
+              key={index}
+              to={`/spots/${slide.type === 'hallOfFame' ? slide.review.place : slide.spot.id}`}
+              className="relative h-56 w-full flex-shrink-0 snap-center overflow-hidden"
+            >
               {slide.type === 'hallOfFame' ? (
                 <HallOfFameSlide slide={slide} title={t('mainPage.hero.title')} />
               ) : (
                 <RecommendSlide slide={slide} title={t('mainPage.hero.recommendTitle')} />
               )}
-            </div>
+            </Link>
           ))}
         </div>
 

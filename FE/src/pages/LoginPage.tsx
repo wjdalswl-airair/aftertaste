@@ -1,6 +1,6 @@
 import { signInWithCustomToken, signInWithPopup } from 'firebase/auth'
 import { useEffect, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { kakaoLogin } from '../api/auth'
 import googleIcon from '../assets/icons/google.svg'
 import kakaoIcon from '../assets/icons/kakao.svg'
@@ -10,7 +10,7 @@ import { auth, googleProvider } from '../lib/firebase'
 import { loadKakaoAuth } from '../lib/kakaoAuth'
 import { useAuthStore } from '../store/useAuthStore'
 
-type LocationState = { from?: string; message?: string } | null
+type LocationState = { message?: string } | null
 
 // 카카오는 리다이렉트 방식(Kakao.Auth.authorize())이라, 로그인 화면 자기 자신을 돌아올 주소로 쓴다.
 const KAKAO_REDIRECT_URI = `${window.location.origin}/login`
@@ -24,14 +24,13 @@ export function LoginPage() {
   const [openModal, setOpenModal] = useState<'terms' | 'privacy' | null>(null)
 
   const state = location.state as LocationState
-  const from = state?.from ?? '/'
 
-  // 로그인이 완료되면(useInitAuth가 member를 채우면) 원래 가려던 곳으로 이동한다.
+  // 로그인이 완료되면(useInitAuth가 member를 채우면) 원래 가려던 곳이 아니라 메인으로 이동한다.
   useEffect(() => {
     if (!isLoading && member) {
-      navigate(from, { replace: true })
+      navigate('/', { replace: true })
     }
-  }, [isLoading, member, navigate, from])
+  }, [isLoading, member, navigate])
 
   // 카카오 로그인 2단계: authorize()가 이 화면으로 ?code=...를 붙여 돌려보내면 여기서 이어받는다.
   useEffect(() => {
@@ -73,7 +72,7 @@ export function LoginPage() {
   return (
     <main className="flex min-h-dvh flex-col pb-24">
       <header className="flex items-center px-4 pt-6">
-        <p className="font-brand text-2xl font-bold text-primary">여운</p>
+        <Link to="/" className="font-brand text-2xl font-bold text-primary">여운</Link>
       </header>
 
       <div className="flex flex-1 flex-col items-center justify-center gap-12 px-6 text-center">

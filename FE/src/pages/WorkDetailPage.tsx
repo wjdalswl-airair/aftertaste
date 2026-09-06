@@ -1,4 +1,4 @@
-import { ArrowLeft, CalendarDays, Clapperboard, Share2, Users } from 'lucide-react'
+import { ArrowLeft, CalendarDays, Clapperboard, ExternalLink, Share2, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router-dom'
@@ -81,8 +81,9 @@ export function WorkDetailPage() {
               href={`https://www.google.com/search?q=${encodeURIComponent(work.title)}`}
               target="_blank"
               rel="noreferrer"
-              className="mt-4 block w-full rounded-full bg-primary py-3 text-center text-sm font-medium text-white"
+              className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-full bg-primary py-3 text-center text-sm font-medium text-white"
             >
+              <ExternalLink size={16} />
               {t('workDetail.detailButton')}
             </a>
           </section>

@@ -18,8 +18,11 @@ export function RatingModal({ place, onClose, onNext }: RatingModalProps) {
   return (
     <div className="fixed inset-0 z-50 mx-auto w-full max-w-[480px]">
       <button type="button" aria-label="닫기" className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="absolute inset-0 flex items-center justify-center px-6">
-        <div className="relative w-full rounded-3xl bg-white px-6 pb-8 pt-6 text-center">
+      <div className="absolute inset-0 flex items-center justify-center px-6" onClick={onClose}>
+        <div
+          className="relative w-full rounded-3xl bg-white px-6 pb-8 pt-6 text-center"
+          onClick={(event) => event.stopPropagation()}
+        >
           <button type="button" onClick={onClose} aria-label="닫기" className="absolute right-5 top-5">
             <X size={24} className="text-ink" />
           </button>
