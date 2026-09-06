@@ -1842,6 +1842,97 @@ class PlaceDetailViewNearbyPlacesTest(PlaceDetailTestData):
 
 
 # ---------------------------------------------------------------------------
+# 작품 상세 (GET /api/works/<id>/) — 검색 결과에서 작품을 눌렀을 때 여는 화면.
+# ---------------------------------------------------------------------------
+
+WORK_URL_TEMPLATE = "/api/works/{}/"
+
+
+class WorkDetailViewTest(TestCase):
+    """작품 상세: 기본 정보 + 촬영지 목록, 로그인 불필요, 번역 반영, 없는 작품은 404."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.work = Work.objects.create(
+            title="호텔 델루나",
+            category=Work.Category.DRAMA,
+            description="귀신이 묵는 호텔 이야기",
+            release_date="2019-07-13",
+            main_cast="이지은, 여진구",
+            director="오충환",
+            poster_url="https://image.tmdb.org/t/p/w500/deluna.jpg",
+        )
+        self.place_a = create_place_with_source(
+            "북촌 한옥마을", "TEST_SOURCE", "WD_A", address="서울 종로구",
+            photo_url="https://example.com/a.jpg",
+        )
+        self.place_b = create_place_with_source(
+            "인천 개항장", "TEST_SOURCE", "WD_B", address="인천 중구",
+            photo_url="https://example.com/b.jpg",
+        )
+        PlaceWork.objects.create(place=self.place_a, work=self.work)
+        PlaceWork.objects.create(place=self.place_b, work=self.work)
+
+    def test_returns_work_fields_and_linked_places(self):
+        response = self.client.get(WORK_URL_TEMPLATE.format(self.work.id))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["title"], "호텔 델루나")
+        self.assertEqual(response.data["category"], "DRAMA")
+        self.assertEqual(response.data["main_cast"], "이지은, 여진구")
+        self.assertEqual(response.data["director"], "오충환")
+        self.assertEqual(response.data["release_date"], "2019-07-13")
+        self.assertEqual(response.data["poster_url"], "https://image.tmdb.org/t/p/w500/deluna.jpg")
+        names = [p["name"] for p in response.data["places"]]
+        self.assertEqual(names, ["북촌 한옥마을", "인천 개항장"])
+        self.assertEqual(
+            set(response.data["places"][0].keys()), {"id", "name", "address", "photo_url"}
+        )
+
+    def test_login_not_required(self):
+        response = self.client.get(WORK_URL_TEMPLATE.format(self.work.id))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_work_without_places_returns_empty_list(self):
+        lonely = Work.objects.create(title="외톨이", category=Work.Category.MOVIE)
+        response = self.client.get(WORK_URL_TEMPLATE.format(lonely.id))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["places"], [])
+
+    def test_missing_work_returns_404(self):
+        response = self.client.get(WORK_URL_TEMPLATE.format(999999))
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.data["detail"], "존재하지 않습니다")
+
+    def test_lang_param_returns_approved_translation(self):
+        WorkTranslation.objects.create(
+            work=self.work, language="en", title="Hotel Del Luna",
+            description="A hotel for ghosts", is_approved=True,
+            status=TranslationStatus.SUCCESS,
+        )
+        PlaceTranslation.objects.create(
+            place=self.place_a, language="en", name="Bukchon Hanok Village",
+            is_approved=True, status=TranslationStatus.SUCCESS,
+        )
+
+        response = self.client.get(WORK_URL_TEMPLATE.format(self.work.id), {"lang": "en"})
+
+        self.assertEqual(response.data["title"], "Hotel Del Luna")
+        self.assertEqual(response.data["description"], "A hotel for ghosts")
+        self.assertEqual(response.data["places"][0]["name"], "Bukchon Hanok Village")
+        # 승인 안 된 번역이 없는 곳은 한국어 원문
+        self.assertEqual(response.data["places"][1]["name"], "인천 개항장")
+
+    def test_unapproved_translation_falls_back_to_korean(self):
+        WorkTranslation.objects.create(
+            work=self.work, language="en", title="Hotel Del Luna",
+            is_approved=False, status=TranslationStatus.SUCCESS,
+        )
+        response = self.client.get(WORK_URL_TEMPLATE.format(self.work.id), {"lang": "en"})
+        self.assertEqual(response.data["title"], "호텔 델루나")
+
+
+# ---------------------------------------------------------------------------
 # Phase 3 사이클 B (검색이력 기반 추천 고도화) checklist tests. See docs/PHASES/PHASE3.md 3번,
 # places/views.py _personalized_places 참고.
 #

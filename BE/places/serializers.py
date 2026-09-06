@@ -97,6 +97,57 @@ class PlaceWorkSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class WorkPlaceSerializer(serializers.ModelSerializer):
+    """작품 상세에 보여줄, 그 작품이 촬영된 명소 하나. name은 lang에 따라 번역문을 고른다."""
+
+    name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Place
+        fields = ["id", "name", "address", "photo_url"]
+        read_only_fields = fields
+
+    def get_name(self, obj):
+        return pick_translated_text(obj, "name", self.context.get("language"))
+
+
+class WorkPageSerializer(serializers.ModelSerializer):
+    """GET /api/works/<id>/ 응답. 작품 정보 + 이 작품이 촬영된 명소 목록.
+
+    title/description은 PlaceDetailSerializer.name과 같은 규칙으로 번역문을 고른다.
+    places는 PlaceWork로 연결된 명소들이고, 촬영지가 없는 작품이면 빈 배열이다.
+    """
+
+    title = serializers.SerializerMethodField()
+    description = serializers.SerializerMethodField()
+    places = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Work
+        fields = [
+            "id",
+            "title",
+            "description",
+            "category",
+            "release_date",
+            "main_cast",
+            "director",
+            "poster_url",
+            "places",
+        ]
+        read_only_fields = fields
+
+    def get_title(self, obj):
+        return pick_translated_text(obj, "title", self.context.get("language"))
+
+    def get_description(self, obj):
+        return pick_translated_text(obj, "description", self.context.get("language"))
+
+    def get_places(self, obj):
+        places = sorted((pw.place for pw in obj.place_works.all()), key=lambda p: p.id)
+        return WorkPlaceSerializer(places, many=True, context=self.context).data
+
+
 class NearbyPlaceSerializer(serializers.Serializer):
     """카카오 장소 검색 API에서 받아온 주변 상권 하나. 우리 DB에는 저장하지 않는다."""
 
