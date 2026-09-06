@@ -53,3 +53,10 @@ export async function getDongName(lat: number, lng: number): Promise<string | nu
     })
   })
 }
+
+// 카카오맵 기본 마커(빨간 핀)를 index.css --color-primary 색으로 바꾼 SVG 데이터 URL을 만든다.
+// kakao.maps.MarkerImage에 이 값을 넘기면 원하는 색의 핀 마커를 그릴 수 있다.
+export function pinIconDataUrl(color: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="36" viewBox="0 0 28 36"><path d="M14 0C6.3 0 0 6.3 0 14c0 10.5 14 22 14 22s14-11.5 14-22C28 6.3 21.7 0 14 0z" fill="${color}"/><circle cx="14" cy="14" r="5" fill="white"/></svg>`
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
+}

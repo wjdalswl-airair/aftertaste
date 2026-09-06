@@ -6,7 +6,7 @@ import { createCourse, type CoursePlaceInput, type CoursePlaceRole } from '../ap
 import { getPlaceDetail, type NearbyPlace, type PlaceDetail } from '../api/spots'
 import { BottomNav } from '../components/BottomNav'
 import { Skeleton } from '../components/Skeleton'
-import { loadKakaoMaps } from '../lib/kakaoMap'
+import { loadKakaoMaps, pinIconDataUrl } from '../lib/kakaoMap'
 import { classifyNearbyPlace, getCoursePlaceRole, type CourseCategoryTab } from '../utils/courseCategory'
 import { getDistanceKm } from '../utils/distance'
 
@@ -22,11 +22,6 @@ const TITLE_MAX_LENGTH = 200
 const ANCHOR_PIN_COLOR = '#f47c5c'
 const PICKED_PIN_COLOR = '#f47c5c'
 const CANDIDATE_PIN_COLOR = '#c9bab0'
-
-function pinIconDataUrl(color: string): string {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="36" viewBox="0 0 28 36"><path d="M14 0C6.3 0 0 6.3 0 14c0 10.5 14 22 14 22s14-11.5 14-22C28 6.3 21.7 0 14 0z" fill="${color}"/><circle cx="14" cy="14" r="5" fill="white"/></svg>`
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
-}
 
 type Pick = { role: CoursePlaceRole; candidate: NearbyPlace }
 
