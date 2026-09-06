@@ -127,14 +127,14 @@ export function MyPage() {
   }
 
   return (
-    <main className="flex min-h-dvh flex-col gap-8 pb-24">
+    <main className="flex min-h-dvh flex-col gap-6 pb-24">
       <header className="flex items-center justify-between px-4 pt-6">
         <Link to="/" className="font-brand text-2xl font-bold text-primary">여운</Link>
         <LanguageSheet />
       </header>
 
       {me === undefined ? (
-        <div className="mx-4 flex items-center gap-4 rounded-2xl bg-white p-4 shadow-[0_4px_12px_rgba(0,0,0,0.08)]">
+        <div className="mx-4 flex items-center gap-8 rounded-2xl bg-white px-6 py-4 shadow-[0_4px_12px_rgba(0,0,0,0.08)]">
           <Skeleton className="h-20 w-20 rounded-full" />
           <div className="flex flex-1 flex-col gap-2">
             <Skeleton className="h-4 w-24 rounded-sm" />
@@ -143,7 +143,7 @@ export function MyPage() {
         </div>
       ) : (
         <section className="px-4">
-          <div className="flex items-start gap-4 rounded-2xl bg-white p-4 shadow-[0_4px_12px_rgba(0,0,0,0.08)]">
+          <div className="flex items-center gap-8 rounded-2xl bg-white px-6 py-4 shadow-[0_4px_12px_rgba(0,0,0,0.08)]">
             <div className="relative shrink-0">
               {(editing ? photoUrl : me.profile_image_url) ? (
                 <img

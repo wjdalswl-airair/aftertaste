@@ -80,7 +80,7 @@ export function ReviewDetailPage() {
   const isMine = Boolean(member && review && member.nickname === review.author_nickname)
 
   return (
-    <main className="flex min-h-dvh flex-col pb-24">
+    <main className="flex min-h-dvh flex-col gap-6 pb-24">
       <header className="grid min-h-16 grid-cols-[24px_1fr_24px] items-center px-4 pt-6">
         <button type="button" onClick={() => navigate(-1)} aria-label="뒤로가기">
           <ArrowLeft size={24} className="text-ink" />
@@ -94,7 +94,7 @@ export function ReviewDetailPage() {
       </header>
 
       {review === undefined && (
-        <div className="mt-6 flex flex-col gap-4">
+        <div className="flex flex-col gap-4">
           <div className="flex items-center gap-3 px-4 py-3">
             <Skeleton className="h-[38px] w-[38px] rounded-full" />
             <Skeleton className="h-3 w-20 rounded-sm" />
@@ -122,7 +122,7 @@ export function ReviewDetailPage() {
       )}
 
       {review && (
-        <div className="mt-6 flex flex-col gap-4">
+        <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between px-4 py-3">
             <div className="flex items-center gap-3">
               <div className="h-[40px] w-[40px] rounded-full bg-divider" />
