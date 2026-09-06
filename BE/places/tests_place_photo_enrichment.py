@@ -121,13 +121,41 @@ class EnrichPlacePhotoTest(TestCase):
         self.assertEqual(self.place.photo_url, url)
 
     @patch("places.place_photo_enrichment.tour_api.search_keyword")
-    def test_no_match_leaves_place_untouched(self, mock_search):
+    def test_no_match_leaves_photo_url_but_records_no_match(self, mock_search):
         mock_search.return_value = [_candidate("전혀다른곳")]
         status, url = enrich_place_photo(self.place)
         self.assertEqual(status, "no_match")
         self.place.refresh_from_db()
         self.assertEqual(self.place.photo_url, "")
-        self.assertFalse(PlaceSource.objects.filter(place=self.place, source=TOUR_API_SOURCE).exists())
+        src = PlaceSource.objects.get(place=self.place, source=TOUR_API_SOURCE)
+        self.assertTrue(src.source_id.startswith("__no_match__"))
+
+    @patch("places.place_photo_enrichment.tour_api.search_keyword")
+    def test_recorded_no_match_is_not_searched_again(self, mock_search):
+        PlaceSource.objects.create(
+            place=self.place, source=TOUR_API_SOURCE, source_id=f"__no_match__{self.place.id}"
+        )
+        status, url = enrich_place_photo(self.place)
+        self.assertEqual(status, "no_match")
+        mock_search.assert_not_called()
+
+    @patch("places.place_photo_enrichment.tour_api.search_keyword")
+    def test_overwrite_retries_recorded_no_match(self, mock_search):
+        PlaceSource.objects.create(
+            place=self.place, source=TOUR_API_SOURCE, source_id=f"__no_match__{self.place.id}"
+        )
+        mock_search.return_value = [
+            _candidate("남산서울타워", lat=37.5512, lng=126.9882) | {"content_id": "555"}
+        ]
+        status, url = enrich_place_photo(self.place, overwrite=True)
+        self.assertEqual(status, "matched")
+        mock_search.assert_called_once()
+        self.assertTrue(
+            PlaceSource.objects.filter(place=self.place, source=TOUR_API_SOURCE, source_id="555").exists()
+        )
+        self.assertFalse(
+            PlaceSource.objects.filter(source_id=f"__no_match__{self.place.id}").exists()
+        )
 
     @patch("places.place_photo_enrichment.tour_api.search_keyword")
     def test_match_records_tour_api_placesource(self, mock_search):
@@ -187,6 +215,21 @@ class ImportPlacePhotosCommandTest(TestCase):
 
         place.refresh_from_db()
         self.assertEqual(place.photo_url, "")
+
+    @patch("places.place_photo_enrichment.tour_api.get_detail")
+    @patch("places.place_photo_enrichment.tour_api.search_keyword")
+    def test_default_run_skips_already_tried_places(self, mock_search, mock_detail):
+        done = Place.objects.create(name="이미함", latitude=Decimal("37.5"), longitude=Decimal("127.0"))
+        PlaceSource.objects.create(place=done, source=TOUR_API_SOURCE, source_id=f"__no_match__{done.id}")
+        fresh = Place.objects.create(name="남산서울타워", latitude=Decimal("37.5512"), longitude=Decimal("126.9882"))
+        mock_search.return_value = [_candidate("남산서울타워", lat=37.5512, lng=126.9882)]
+
+        call_command("import_place_photos", "--sleep", "0")
+
+        # 이미 시도한 명소는 다시 검색하지 않는다.
+        searched = [c.args[0] for c in mock_search.call_args_list]
+        self.assertNotIn("이미함", searched)
+        self.assertIn("남산서울타워", searched)
 
     @patch("places.place_photo_enrichment.tour_api.search_keyword")
     def test_command_stops_after_consecutive_errors(self, mock_search):

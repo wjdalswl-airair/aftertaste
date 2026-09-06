@@ -83,9 +83,14 @@ class Command(BaseCommand):
         places = Place.objects.all().order_by("id")
         if options["place_id"]:
             places = places.filter(id=options["place_id"])
-        elif not options["overwrite"]:
-            # --overwrite가 아니면 항상 빈 photo_url만 대상이다 (--only-missing은 명시용).
-            places = places.filter(photo_url="")
+        elif options["overwrite"]:
+            # 이미 채워진 것·실패로 기록된 것까지 전부 다시 시도한다.
+            pass
+        else:
+            # 빈 photo_url + 아직 TourAPI 매칭을 시도한 적 없는 명소만 (재실행 시 이어서).
+            # 매칭 실패도 PlaceSource(__no_match__)로 기록돼 여기서 걸러진다.
+            tried = PlaceSource.objects.filter(source=TOUR_API_SOURCE).values("place_id")
+            places = places.filter(photo_url="").exclude(id__in=tried)
         if options["limit"]:
             places = places[: options["limit"]]
 
@@ -153,9 +158,11 @@ class Command(BaseCommand):
 
     def _dry_run_one(self, place, max_distance):
         """저장하지 않고 어떤 이미지가 매칭되는지만 본다."""
-        from places.place_photo_enrichment import pick_photo_match
+        from places.place_photo_enrichment import NO_MATCH_PREFIX, pick_photo_match
 
         known = PlaceSource.objects.filter(place=place, source=TOUR_API_SOURCE).first()
+        if known is not None and known.source_id.startswith(NO_MATCH_PREFIX):
+            return "no_match", None
         if known is not None:
             detail = tour_api.get_detail(known.source_id)
             url = (detail or {}).get("first_image", "")

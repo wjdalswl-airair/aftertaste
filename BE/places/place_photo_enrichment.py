@@ -25,6 +25,11 @@ logger = logging.getLogger(__name__)
 # "대표 사진을 어디서 가져왔는지"지만, (source, source_id) 구조가 그대로 맞아 재사용한다.
 TOUR_API_SOURCE = "TOUR_API"
 
+# 매칭 실패("맞는 관광정보 없음")도 PlaceSource에 남겨서, 다시 실행할 때 같은 명소를
+# 또 검색하지 않게 한다. source_id는 (source, source_id) 유일 제약 때문에 명소별로 다르게
+# "__no_match__<place_id>" 형태로 둔다. --overwrite로 재시도할 수 있다.
+NO_MATCH_PREFIX = "__no_match__"
+
 # TourAPI가 채우는 Place 필드. 지금은 대표 이미지 하나뿐이다.
 FILLABLE_FIELDS = ("photo_url",)
 
@@ -107,6 +112,12 @@ def enrich_place_photo(place, *, overwrite=False, max_distance_meters=PHOTO_MATC
     통신 오류·타임아웃 등 예외는 그대로 올린다 (호출하는 커맨드가 건별로 잡는다).
     """
     known = PlaceSource.objects.filter(place=place, source=TOUR_API_SOURCE).first()
+    if known is not None and known.source_id.startswith(NO_MATCH_PREFIX):
+        if not overwrite:
+            return "no_match", None
+        known.delete()  # --overwrite면 실패 기록을 지우고 다시 검색한다
+        known = None
+
     if known is not None:
         detail = tour_api.get_detail(known.source_id)
         photo_url = (detail or {}).get("first_image", "")
@@ -114,6 +125,11 @@ def enrich_place_photo(place, *, overwrite=False, max_distance_meters=PHOTO_MATC
         candidates = tour_api.search_keyword(place.name)
         match = pick_photo_match(place, candidates, max_distance_meters=max_distance_meters)
         if match is None:
+            PlaceSource.objects.get_or_create(
+                source=TOUR_API_SOURCE,
+                source_id=f"{NO_MATCH_PREFIX}{place.id}",
+                defaults={"place": place},
+            )
             return "no_match", None
         photo_url = match["first_image"]
         PlaceSource.objects.get_or_create(
