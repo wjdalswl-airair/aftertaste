@@ -103,7 +103,7 @@ class Command(BaseCommand):
         total = places.count()
         self.stdout.write(f"대상 명소 {total}건" + (" (dry-run)" if dry_run else ""))
 
-        stopped_early = False
+        stop_reason = None
         consecutive_errors = 0
         for index, place in enumerate(places.iterator(), start=1):
             try:
@@ -116,8 +116,7 @@ class Command(BaseCommand):
             except tour_api.TourApiDailyLimitError as exc:
                 # 일일 한도 초과. 남은 건을 계속 돌려봐야 전부 같은 오류라, 여기서 멈추고
                 # 지금까지 채운 것만 남긴다. 다음 날 다시 실행하면 빈 것만 이어서 채운다.
-                self.stderr.write(self.style.WARNING(f"\n중단: {exc}"))
-                stopped_early = True
+                stop_reason = str(exc)
                 break
             except Exception as exc:  # 한 건 실패해도 나머지는 계속 처리한다
                 counts["error"] += 1
@@ -126,12 +125,7 @@ class Command(BaseCommand):
                 # 연속으로 계속 실패하면 API가 죽었거나 트래픽 한도에 걸린 것 — 몇 시간을
                 # 타임아웃으로 허비하지 않도록 멈춘다. 재실행하면 빈 것만 이어서 채운다.
                 if consecutive_errors >= _CONSECUTIVE_ERROR_LIMIT:
-                    self.stderr.write(
-                        self.style.WARNING(
-                            f"\n중단: {_CONSECUTIVE_ERROR_LIMIT}건 연속 실패 — API 응답 없음"
-                        )
-                    )
-                    stopped_early = True
+                    stop_reason = f"{_CONSECUTIVE_ERROR_LIMIT}건 연속 실패 — API 응답 없음"
                     break
                 continue
 
@@ -143,7 +137,7 @@ class Command(BaseCommand):
             if sleep_seconds and index < total:
                 time.sleep(sleep_seconds)
 
-        self._print_summary(counts, dry_run, stopped_early)
+        self._print_summary(counts, dry_run, stop_reason)
 
     def _pin_content_id(self, place_id, content_id):
         try:
@@ -176,9 +170,9 @@ class Command(BaseCommand):
             return "matched_no_change", None
         return "matched", url
 
-    def _print_summary(self, counts, dry_run, stopped_early):
+    def _print_summary(self, counts, dry_run, stop_reason):
         verb = "매칭됨(저장 안 함)" if dry_run else "채움"
-        headline = "일일 한도로 중단" if stopped_early else "완료"
+        headline = f"중단 ({stop_reason})" if stop_reason else "완료"
         self.stdout.write(
             self.style.SUCCESS(
                 f"\n{headline}\n"
