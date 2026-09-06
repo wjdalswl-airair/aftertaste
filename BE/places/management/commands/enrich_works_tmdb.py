@@ -13,9 +13,9 @@
 
 import time
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 
-from places.models import Work
+from places.models import Work, WorkSource
 from places.work_enrichment import FILLABLE_FIELDS, enrich_work
 
 
@@ -29,6 +29,11 @@ class Command(BaseCommand):
             help="이 종류만 처리한다 (기본: 전체).",
         )
         parser.add_argument("--work-id", type=int, help="이 작품 하나만 처리한다.")
+        parser.add_argument(
+            "--tmdb-id",
+            help="--work-id와 함께 쓴다. 그 작품의 TMDB id를 이 값으로 고정한다"
+            " (검색·매칭 대신 직접 지정 — 오매칭을 바로잡을 때).",
+        )
         parser.add_argument(
             "--only-missing",
             action="store_true",
@@ -53,6 +58,11 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        if options["tmdb_id"]:
+            if not options["work_id"]:
+                raise CommandError("--tmdb-id는 --work-id와 함께 써야 합니다.")
+            self._pin_tmdb_id(options["work_id"], options["tmdb_id"])
+
         works = Work.objects.all().order_by("id")
 
         if options["category"]:
@@ -94,6 +104,20 @@ class Command(BaseCommand):
             if sleep_seconds and index < total:
                 time.sleep(sleep_seconds)
 
+        self._print_summary(counts, filled_field_counts)
+
+    def _pin_tmdb_id(self, work_id, tmdb_id):
+        try:
+            work = Work.objects.get(id=work_id)
+        except Work.DoesNotExist:
+            raise CommandError(f"작품 {work_id}이(가) 없습니다.")
+        WorkSource.objects.filter(work=work, source="TMDB").delete()
+        WorkSource.objects.update_or_create(
+            source="TMDB", source_id=str(tmdb_id), defaults={"work": work}
+        )
+        self.stdout.write(f"[{work.id}] {work.title} - TMDB id {tmdb_id}로 고정")
+
+    def _print_summary(self, counts, filled_field_counts):
         self.stdout.write(
             self.style.SUCCESS(
                 "\n완료\n"

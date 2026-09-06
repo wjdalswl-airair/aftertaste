@@ -120,8 +120,8 @@ def get_or_create_work(title, category, *, create_only_fields=None):
     """제목+구분(category)으로 Work를 찾거나 만든다. link_place_to_work와 같은 매칭 원칙이다 —
 
     normalize_work_title로 표기 차이(구두점·공백)를 지운 제목이 같고 category가 같으면
-    같은 작품으로 본다(DETAIL_SPEC 6-1 #27·#28). Work엔 PlaceSource 같은 출처·원본번호
-    테이블이 없어서 제목 매칭만 쓴다.
+    같은 작품으로 본다(DETAIL_SPEC 6-1 #27·#28). 외부 고유번호(KMDB DOCID, TMDB id)를
+    아는 경우에는 get_or_create_work_by_source를 써서 번호로 먼저 매칭한다.
     create_only_fields는 작품을 새로 만들 때만 채우고, 이미 있는 작품은 절대 덮어쓰지 않는다 —
     business_hours/scene_description 보존과 같은 원칙(관리자가 고친 값을 지킨다).
 
@@ -139,6 +139,36 @@ def get_or_create_work(title, category, *, create_only_fields=None):
     return Work.objects.get_or_create(
         title_key=normalize_work_title(normalized_title), category=category, defaults=defaults
     )
+
+
+def get_or_create_work_by_source(source, source_id, *, title, category, create_only_fields=None):
+    """외부 API 고유번호로 작품을 먼저 찾고, 없으면 제목으로 찾거나 만든 뒤 WorkSource를 남긴다.
+
+    - (source, source_id)로 아는 WorkSource가 있으면 그 작품을 그대로 돌려준다(제목은 안 본다).
+      → 재수집 때 제목 표기가 바뀌어도 같은 작품으로 이어진다.
+    - 없으면 get_or_create_work(제목)로 찾거나 만들고, 그 작품에 이 (source, source_id)를 기록한다.
+    - source_id가 비어 있으면 그냥 제목 매칭만 한다 (KMDB DOCID가 없는 행 등).
+
+    반환값: (work, created) — created는 이번에 Work가 새로 만들어졌는지.
+    """
+    from places.models import WorkSource
+
+    source_id = str(source_id) if source_id not in (None, "") else ""
+    if source_id:
+        known = (
+            WorkSource.objects.filter(source=source, source_id=source_id)
+            .select_related("work")
+            .first()
+        )
+        if known is not None:
+            return known.work, False
+
+    work, created = get_or_create_work(title, category, create_only_fields=create_only_fields)
+    if work is not None and source_id:
+        WorkSource.objects.get_or_create(
+            source=source, source_id=source_id, defaults={"work": work}
+        )
+    return work, created
 
 
 def build_composite_source_id(*parts, delimiter="|"):

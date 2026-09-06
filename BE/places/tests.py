@@ -11,8 +11,24 @@ from django.core.management import call_command
 from django.test import TestCase
 
 from places.management.commands.import_places import Command as ImportPlacesCommand
-from places.models import Place, PlaceSource, PlaceTranslation, PlaceWork, Work, WorkTranslation
-from places.services import build_composite_source_id, haversine_distance_meters, save_place_from_source
+from places.models import (
+    Place,
+    PlaceSource,
+    PlaceTranslation,
+    PlaceWork,
+    Work,
+    WorkSource,
+    WorkTranslation,
+)
+from places.services import (
+    build_composite_source_id,
+    get_or_create_work,
+    get_or_create_work_by_source,
+    haversine_distance_meters,
+    link_place_to_work,
+    normalize_work_title,
+    save_place_from_source,
+)
 
 SAMPLE_DIR = os.path.join(os.path.dirname(__file__), "sample_data")
 SAMPLE_V1 = os.path.join(SAMPLE_DIR, "sample_places_v1.json")
@@ -881,6 +897,74 @@ class ImportKcisaWorkLinkingTest(TestCase):
         self.assertEqual(place.name, "경복궁")
         self.assertTrue(place.place_works.filter(work__title="역적").exists())
         self.assertFalse(PlaceSource.objects.filter(source_id="show1").exists())
+
+
+class WorkTitleKeyTest(TestCase):
+    """제목 표기 차이(구두점·공백)를 지운 title_key로 작품 동일성을 판정한다 (커밋 2)."""
+
+    def test_title_key_ignores_spacing_and_punctuation(self):
+        self.assertEqual(
+            normalize_work_title("아테나: 전쟁의 여신"), normalize_work_title("아테나:전쟁의 여신")
+        )
+        self.assertEqual(normalize_work_title("여름 향기"), normalize_work_title("여름향기"))
+
+    def test_subtitle_is_preserved(self):
+        self.assertNotEqual(
+            normalize_work_title("신과함께: 죄와 벌"), normalize_work_title("신과함께: 인과 연")
+        )
+
+    def test_save_computes_title_key(self):
+        work = Work.objects.create(title="위대한 유혹자", category=Work.Category.DRAMA)
+        self.assertEqual(work.title_key, "위대한유혹자")
+
+    def test_spacing_variants_resolve_to_one_work(self):
+        w1, created1 = get_or_create_work("위대한 유혹자", Work.Category.DRAMA)
+        w2, created2 = get_or_create_work("위대한유혹자", Work.Category.DRAMA)
+        self.assertTrue(created1)
+        self.assertFalse(created2)
+        self.assertEqual(w1.id, w2.id)
+        self.assertEqual(w1.title, "위대한 유혹자")  # 먼저 만든 표기를 유지
+
+    def test_same_title_key_different_category_are_separate(self):
+        movie, _ = get_or_create_work("터널", Work.Category.MOVIE)
+        drama, _ = get_or_create_work("터널", Work.Category.DRAMA)
+        self.assertNotEqual(movie.id, drama.id)
+
+    def test_link_place_to_work_uses_title_key(self):
+        place = Place.objects.create(name="어느 카페", latitude=Decimal("37.5"), longitude=Decimal("127.0"))
+        w1, _ = link_place_to_work(place, title="빈센조", media_type="drama")
+        place2 = Place.objects.create(name="다른 곳", latitude=Decimal("37.6"), longitude=Decimal("127.1"))
+        w2, _ = link_place_to_work(place2, title="빈 센조", media_type="drama")
+        self.assertEqual(w1.id, w2.id)
+
+
+class GetOrCreateWorkBySourceTest(TestCase):
+    """외부 고유번호(KMDB DOCID 등)로 작품을 먼저 매칭한다 — 재수집 안정화 (커밋 4)."""
+
+    def test_creates_work_and_records_source(self):
+        work, created = get_or_create_work_by_source(
+            "KMDB", "K/12345/01", title="기생충", category=Work.Category.MOVIE
+        )
+        self.assertTrue(created)
+        self.assertTrue(WorkSource.objects.filter(work=work, source="KMDB", source_id="K/12345/01").exists())
+
+    def test_same_docid_returns_same_work_even_if_title_changed(self):
+        first, _ = get_or_create_work_by_source(
+            "KMDB", "K/12345/01", title="기생충", category=Work.Category.MOVIE
+        )
+        again, created = get_or_create_work_by_source(
+            "KMDB", "K/12345/01", title="기생충 (2019)", category=Work.Category.MOVIE
+        )
+        self.assertFalse(created)
+        self.assertEqual(first.id, again.id)
+        self.assertEqual(Work.objects.filter(category=Work.Category.MOVIE).count(), 1)
+
+    def test_empty_source_id_falls_back_to_title_match(self):
+        work, _ = get_or_create_work_by_source(
+            "KMDB", "", title="살인의 추억", category=Work.Category.MOVIE
+        )
+        self.assertIsNotNone(work)
+        self.assertFalse(WorkSource.objects.filter(work=work).exists())
 
 
 # ---------------------------------------------------------------------------
@@ -2833,6 +2917,18 @@ class ImportKmdbCommandTest(TestCase):
 
         work.refresh_from_db()
         self.assertEqual(work.description, "관리자가 다시 쓴 감성적인 소개")
+
+    @patch("places.management.commands.import_kmdb.kmdb.search_movies")
+    def test_same_docid_different_title_is_one_work(self, mock_search):
+        mock_search.return_value = [_fake_kmdb_parsed_movie()]
+        self._run()
+
+        mock_search.return_value = [_fake_kmdb_parsed_movie(title="기생충 (2019)")]
+        output = self._run()
+
+        self.assertIn("이미 있어서 건너뜀 1건", output)
+        self.assertEqual(Work.objects.filter(category=Work.Category.MOVIE).count(), 1)
+        self.assertTrue(WorkSource.objects.filter(source="KMDB", source_id="K17748").exists())
 
     @patch("places.management.commands.import_kmdb.kmdb.search_movies")
     def test_skips_movie_without_title(self, mock_search):

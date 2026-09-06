@@ -89,6 +89,25 @@ class Work(models.Model):
         return self.title
 
 
+class WorkSource(models.Model):
+    """이 작품이 어느 외부 API에서 왔는지, 그쪽 고유번호가 무엇인지 기록한다.
+
+    PlaceSource와 같은 구조·같은 목적이다. 작품을 다시 수집할 때 제목 표기가 조금 달라도
+    "같은 출처 + 같은 고유번호"면 같은 작품으로 알아본다 (KMDB DOCID, TMDB id 등).
+    한 작품이 여러 출처를 가질 수 있다(KMDB로 만들고 TMDB로 보강).
+    """
+
+    work = models.ForeignKey(Work, on_delete=models.CASCADE, related_name="sources")
+    source = models.CharField(max_length=50)
+    source_id = models.CharField(max_length=500)
+
+    class Meta:
+        unique_together = ("source", "source_id")
+
+    def __str__(self):
+        return f"{self.work} - {self.source}:{self.source_id}"
+
+
 class PlaceWork(models.Model):
     """명소와 작품을 잇는 자리.
 

@@ -133,16 +133,31 @@ def enrich_work(work, *, overwrite=False, require_korean=True):
       filled_fields: 이번에 실제로 값이 바뀐 Work 필드 이름 리스트
 
     통신 오류·타임아웃 등 예외는 그대로 올린다 (호출하는 커맨드가 건별로 잡아서 계속 돈다).
+
+    이 작품에 TMDB WorkSource가 이미 있으면(한 번 매칭됐거나 관리자가 직접 지정) 검색·매칭을
+    건너뛰고 그 id로 바로 상세를 받는다 — 재실행 때마다 매칭이 흔들리거나 잘못 붙는 것을 막는다.
     """
+    from places.models import WorkSource
+
     if tmdb.category_to_media_type(work.category) is None:
         return "unsupported", []
 
-    candidates = tmdb.search(work.title, work.category)
-    match = pick_tmdb_match(work.title, work.release_date, candidates, require_korean=require_korean)
-    if match is None:
-        return "no_match", []
+    pinned = WorkSource.objects.filter(work=work, source="TMDB").first()
+    if pinned is not None:
+        tmdb_id = pinned.source_id
+    else:
+        candidates = tmdb.search(work.title, work.category)
+        match = pick_tmdb_match(
+            work.title, work.release_date, candidates, require_korean=require_korean
+        )
+        if match is None:
+            return "no_match", []
+        tmdb_id = str(match["tmdb_id"])
+        WorkSource.objects.get_or_create(
+            source="TMDB", source_id=tmdb_id, defaults={"work": work}
+        )
 
-    detail = tmdb.get_detail(match["tmdb_id"], work.category)
+    detail = tmdb.get_detail(tmdb_id, work.category)
     values = _values_from_detail(detail)
 
     filled = []
