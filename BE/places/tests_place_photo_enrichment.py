@@ -189,6 +189,19 @@ class ImportPlacePhotosCommandTest(TestCase):
         self.assertEqual(place.photo_url, "")
 
     @patch("places.place_photo_enrichment.tour_api.search_keyword")
+    def test_command_stops_after_consecutive_errors(self, mock_search):
+        for i in range(8):
+            Place.objects.create(
+                name=f"장소{i}", latitude=Decimal("37.5"), longitude=Decimal(f"127.{i}")
+            )
+        mock_search.side_effect = RuntimeError("Read timed out")
+
+        call_command("import_place_photos", "--sleep", "0")
+
+        # 5건 연속 실패하면 멈춘다 (8건 전부 시도하지 않는다).
+        self.assertEqual(mock_search.call_count, 5)
+
+    @patch("places.place_photo_enrichment.tour_api.search_keyword")
     def test_command_stops_on_daily_limit(self, mock_search):
         first = Place.objects.create(name="가장소", latitude=Decimal("37.5"), longitude=Decimal("127.0"))
         second = Place.objects.create(name="나장소", latitude=Decimal("37.6"), longitude=Decimal("127.1"))

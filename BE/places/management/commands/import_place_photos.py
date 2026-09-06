@@ -31,6 +31,9 @@ from places.place_photo_enrichment import (
 )
 from places.sources import tour_api
 
+# 이만큼 연속으로 호출이 실패하면 API가 죽은 것으로 보고 실행을 멈춘다.
+_CONSECUTIVE_ERROR_LIMIT = 5
+
 
 class Command(BaseCommand):
     help = "DB의 명소를 한국관광공사 TourAPI의 대표 이미지(firstimage)로 채운다."
@@ -96,6 +99,7 @@ class Command(BaseCommand):
         self.stdout.write(f"대상 명소 {total}건" + (" (dry-run)" if dry_run else ""))
 
         stopped_early = False
+        consecutive_errors = 0
         for index, place in enumerate(places.iterator(), start=1):
             try:
                 if dry_run:
@@ -112,9 +116,21 @@ class Command(BaseCommand):
                 break
             except Exception as exc:  # 한 건 실패해도 나머지는 계속 처리한다
                 counts["error"] += 1
+                consecutive_errors += 1
                 self.stderr.write(f"[{place.id}] {place.name} - 오류: {exc}")
+                # 연속으로 계속 실패하면 API가 죽었거나 트래픽 한도에 걸린 것 — 몇 시간을
+                # 타임아웃으로 허비하지 않도록 멈춘다. 재실행하면 빈 것만 이어서 채운다.
+                if consecutive_errors >= _CONSECUTIVE_ERROR_LIMIT:
+                    self.stderr.write(
+                        self.style.WARNING(
+                            f"\n중단: {_CONSECUTIVE_ERROR_LIMIT}건 연속 실패 — API 응답 없음"
+                        )
+                    )
+                    stopped_early = True
+                    break
                 continue
 
+            consecutive_errors = 0
             counts[status] += 1
             if status == "matched":
                 self.stdout.write(f"[{place.id}] {place.name} - {url}")
