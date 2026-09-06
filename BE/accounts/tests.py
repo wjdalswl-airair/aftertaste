@@ -303,6 +303,42 @@ class ExchangeCodeForTokenTests(TestCase):
                 exchange_code_for_token("", "http://x/login")
 
 
+class DeleteFirebaseUserTests(TestCase):
+    """accounts.firebase.delete_firebase_user — 실패해도 예외를 안 올린다 (issue #17)."""
+
+    @patch("accounts.firebase._get_firebase_app")
+    @patch("accounts.firebase.firebase_auth.delete_user")
+    def test_returns_true_on_success(self, mock_delete, mock_app):
+        from accounts.firebase import delete_firebase_user
+
+        self.assertTrue(delete_firebase_user("uid-1"))
+        mock_delete.assert_called_once()
+
+    @patch("accounts.firebase._get_firebase_app")
+    @patch("accounts.firebase.firebase_auth.delete_user")
+    def test_already_deleted_is_treated_as_success(self, mock_delete, mock_app):
+        from firebase_admin import auth as firebase_auth
+
+        from accounts.firebase import delete_firebase_user
+
+        mock_delete.side_effect = firebase_auth.UserNotFoundError("not found")
+        self.assertTrue(delete_firebase_user("gone-uid"))
+
+    @patch("accounts.firebase._get_firebase_app")
+    @patch("accounts.firebase.firebase_auth.delete_user")
+    def test_other_error_returns_false_without_raising(self, mock_delete, mock_app):
+        from accounts.firebase import delete_firebase_user
+
+        mock_delete.side_effect = RuntimeError("firebase down")
+        self.assertFalse(delete_firebase_user("uid-2"))
+
+    @patch("accounts.firebase._get_firebase_app", side_effect=Exception("no credentials"))
+    def test_missing_credentials_returns_false_without_raising(self, mock_app):
+        from accounts.firebase import delete_firebase_user
+
+        self.assertFalse(delete_firebase_user("uid-3"))
+
+
 class MeViewTests(TestCase):
     """GET /api/account/"""
 
@@ -879,11 +915,15 @@ class WithdrawalTests(TestCase):
     """DELETE /api/account/ - 회원 탈퇴 (Phase 3 사이클 C).
 
     DETAIL_SPEC 2-1 "탈퇴 처리가 특이합니다", 3-1 회원 예외 상황 표를 근거로 만들었다.
+    Firebase 계정 삭제(issue #17)는 실제 Firebase를 안 타도록 delete_firebase_user를 mock한다.
     """
 
     def setUp(self):
         self.client = APIClient()
         self.auth_header = {"HTTP_AUTHORIZATION": "Bearer fake-token"}
+        patcher = patch("accounts.views.delete_firebase_user", return_value=True)
+        self.mock_delete_firebase_user = patcher.start()
+        self.addCleanup(patcher.stop)
 
     def test_withdraw_without_login_is_rejected(self):
         response = self.client.delete(ME_URL)
@@ -1110,3 +1150,39 @@ class WithdrawalTests(TestCase):
 
         second = self.client.delete(ME_URL, **self.auth_header)
         self.assertEqual(second.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_firebase_account_is_deleted_with_original_uid(self, mock_verify):
+        """탈퇴하면 Firebase Authentication 계정도 원래 uid로 삭제 요청한다 (issue #17)."""
+        Member.objects.create(
+            firebase_uid="withdraw-fb-del-uid",
+            provider=Member.Provider.GOOGLE,
+            agreed_terms_at="2026-01-01T00:00:00Z",
+        )
+        mock_verify.return_value = make_decoded_token("withdraw-fb-del-uid")
+
+        self.client.delete(ME_URL, **self.auth_header)
+
+        # firebase_uid를 익명화하기 전, 원래 값으로 삭제를 불러야 한다.
+        self.mock_delete_firebase_user.assert_called_once_with("withdraw-fb-del-uid")
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_withdrawal_completes_even_if_firebase_deletion_fails(self, mock_verify):
+        """Firebase 계정 삭제가 실패해도 탈퇴(DB 익명화)는 그대로 완료돼야 한다."""
+        self.mock_delete_firebase_user.return_value = False
+        member = Member.objects.create(
+            firebase_uid="withdraw-fb-fail-uid",
+            provider=Member.Provider.GOOGLE,
+            email="fail@example.com",
+            nickname="탈퇴할사람",
+            agreed_terms_at="2026-01-01T00:00:00Z",
+        )
+        mock_verify.return_value = make_decoded_token("withdraw-fb-fail-uid")
+
+        response = self.client.delete(ME_URL, **self.auth_header)
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        member.refresh_from_db()
+        self.assertIsNone(member.email)
+        self.assertTrue(member.is_withdrawn)
+        self.assertTrue(member.firebase_uid.startswith("withdrawn:"))
