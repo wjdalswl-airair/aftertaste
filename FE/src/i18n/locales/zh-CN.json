@@ -1,4 +1,9 @@
 {
+  "bottomNav": {
+    "home": "首页",
+    "search": "搜索",
+    "profile": "我的"
+  },
   "mainPage": {
     "greeting": {
       "hello": "你好",
@@ -73,6 +78,8 @@
     "director": "导演",
     "releaseDate": "上映日期",
     "storyTitle": "该作品的故事",
+    "storyMore": "查看更多",
+    "storyLess": "收起",
     "detailButton": "查看详情",
     "placesTitle": "《{{title}}》拍摄地",
     "placesEmpty": "还没有登记的拍摄地"

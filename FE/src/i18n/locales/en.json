@@ -1,4 +1,9 @@
 {
+  "bottomNav": {
+    "home": "Home",
+    "search": "Search",
+    "profile": "Profile"
+  },
   "mainPage": {
     "greeting": {
       "hello": "Hello",
@@ -73,6 +78,8 @@
     "director": "Director",
     "releaseDate": "Release date",
     "storyTitle": "The story",
+    "storyMore": "Show more",
+    "storyLess": "Show less",
     "detailButton": "See more",
     "placesTitle": "Filming spots in \"{{title}}\"",
     "placesEmpty": "No filming spots yet"

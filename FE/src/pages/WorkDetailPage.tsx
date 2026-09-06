@@ -1,9 +1,10 @@
 import { ArrowLeft, CalendarDays, Clapperboard, ExternalLink, Share2, Users } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { getWorkDetail, type WorkDetail } from '../api/works'
 import { BottomNav } from '../components/BottomNav'
+import { FavoriteButton } from '../components/FavoriteButton'
 import { Skeleton } from '../components/Skeleton'
 
 export function WorkDetailPage() {
@@ -26,7 +27,7 @@ export function WorkDetailPage() {
   }
 
   return (
-    <main className="flex min-h-dvh flex-col gap-8 pb-24">
+    <main className="flex min-h-dvh flex-col gap-6 pb-24">
       <header className="grid min-h-16 grid-cols-[24px_1fr_24px] items-center px-4 pt-6">
         <button type="button" onClick={() => navigate(-1)} aria-label="뒤로가기">
           <ArrowLeft size={24} className="text-ink" />
@@ -74,9 +75,7 @@ export function WorkDetailPage() {
 
           <section className="px-4">
             <h2 className="mb-3 text-lg font-bold text-ink">{t('workDetail.storyTitle')}</h2>
-            <p className="rounded-2xl bg-accent/15 p-5 text-sm leading-[1.7] text-ink-secondary">
-              {work.description}
-            </p>
+            <WorkDescription description={work.description} />
             <a
               href={`https://www.google.com/search?q=${encodeURIComponent(work.title)}`}
               target="_blank"
@@ -98,11 +97,14 @@ export function WorkDetailPage() {
               <div className="grid grid-cols-3 gap-x-3 gap-y-4">
                 {work.places.map((place) => (
                   <Link key={place.id} to={`/spots/${place.id}`}>
-                    <img
-                      src={place.photo_url}
-                      alt=""
-                      className="aspect-square w-full rounded-xl object-cover"
-                    />
+                    <div className="relative">
+                      <img
+                        src={place.photo_url}
+                        alt=""
+                        className="aspect-square w-full rounded-xl object-cover"
+                      />
+                      <FavoriteButton placeId={place.id} />
+                    </div>
                     <p className="mt-1 truncate text-xs text-ink">{place.name}</p>
                     <p className="truncate text-[11px] text-ink-secondary">{place.address}</p>
                   </Link>
@@ -115,6 +117,41 @@ export function WorkDetailPage() {
 
       <BottomNav />
     </main>
+  )
+}
+
+// "이 작품의 이야기" 설명이 4줄 넘게 넘치면 더보기/접기 토글을 보여준다.
+// 실제로 4줄을 넘는지는 line-clamp 적용 상태에서 scrollHeight/clientHeight를 비교해서 판단한다.
+function WorkDescription({ description }: { description: string }) {
+  const { t } = useTranslation()
+  const textRef = useRef<HTMLParagraphElement>(null)
+  const [expanded, setExpanded] = useState(false)
+  const [overflowing, setOverflowing] = useState(false)
+
+  useEffect(() => {
+    if (textRef.current) {
+      setOverflowing(textRef.current.scrollHeight > textRef.current.clientHeight)
+    }
+  }, [description])
+
+  return (
+    <div className="rounded-2xl bg-accent/15 p-5">
+      <p
+        ref={textRef}
+        className={`text-sm leading-[1.7] text-ink-secondary ${expanded ? '' : 'line-clamp-3'}`}
+      >
+        {description}
+      </p>
+      {(overflowing || expanded) && (
+        <button
+          type="button"
+          onClick={() => setExpanded((prev) => !prev)}
+          className="mt-2 text-xs font-medium text-primary"
+        >
+          {expanded ? t('workDetail.storyLess') : t('workDetail.storyMore')}
+        </button>
+      )}
+    </div>
   )
 }
 
