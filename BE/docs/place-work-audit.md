@@ -142,6 +142,19 @@ PYTHONUTF8=1 .venv/Scripts/python.exe manage.py shell -c "import tools.audit_pla
 
 감사 재실행: bad_coords 0 / dup_works 0 / orphans 0 / tmdb_suspect 12→2(오탐) / variety_leak 20→3(오탐).
 
+### 번역 데이터 (기존 문제, 이번 범위 밖)
+
+시드의 `PlaceTranslation`·`WorkTranslation`은 **전부 `status=FAILED` / `is_approved=False`**다.
+master 시드(2,907/1,513)도, 이번 갱신본(2,900/1,505)도 동일 — 과거에 유효한
+`GOOGLE_TRANSLATE_API_KEY` 없이 번역을 돌려 전부 실패로 오염됐다. 손님 화면은 승인된 번역만
+쓰므로(`pick_translated_text`) 영어 사용자는 한국어 원문을 본다 — 깨지진 않지만 번역이 안 된다.
+
+적재 시 번역 시그널을 끊는 이유: 안 끊으면 loaddata가 명소·작품 생성마다 `on_commit`으로
+번역 API를 호출한다(약 4,400회). 키가 있으면 유료 호출 + is_approved 뒤집힘, 없으면
+행을 다시 저장하며 헛돈다. 시드에 번역 행이 이미 있으므로 시그널만 끊으면 된다.
+
+수정하려면 유효한 Google Translate 키로 `manage.py` 재번역 액션을 돌려야 한다(별도 작업).
+
 ## 후속 (이번 범위 밖)
 
 - **명소 중복 9건 + 같은주소·먼좌표 28쌍** — 웹으로 개별 확인 필요(나무위키 봇 차단으로 이번에

@@ -4,18 +4,23 @@
 공공데이터 수집(`import_kcisa`, `import_gyeonggi_data_dream`)을 각자 돌리지 않아도
 팀원이 로컬에서 같은 데이터를 볼 수 있게 하려고 만들었다.
 
-담긴 것 (총 25,451건):
+담긴 것 (총 25,421건):
 
 | 모델 | 건수 | 설명 |
 |---|---|---|
-| `places.Place` | 2,907 | 촬영 명소 |
+| `places.Place` | 2,900 | 촬영 명소 |
 | `places.PlaceSource` | 8,417 | 명소의 원본 출처(어느 공공데이터에서 왔는지) |
-| `places.Work` | 1,513 | 영화/드라마 작품 (1,049건은 TMDB 포스터·줄거리·감독·방영일자 포함, `enrich_works_tmdb`로 채움) |
+| `places.Work` | 1,505 | 영화/드라마 작품 (TMDB로 포스터·줄거리·방영일자 보강) |
 | `places.PlaceWork` | 8,194 | 명소↔작품 연결 |
-| `places.PlaceTranslation` | 2,907 | 명소 번역 |
-| `places.WorkTranslation` | 1,513 | 작품 번역 |
+| `places.PlaceTranslation` | 2,900 | 명소 번역 |
+| `places.WorkTranslation` | 1,505 | 작품 번역 |
+| `places.WorkSource` | 0 | 작품의 외부 API 고유번호(KMDB DOCID·TMDB id). 재수집 때 채워진다 |
 
 리뷰·즐겨찾기·코스·회원 같은 사용자 생성 데이터는 들어있지 않다(현재 DB에도 없음).
+
+`feature/be/db-reinforce`(2026-09)에서 데이터 정리: 고아 작품 1,544건 삭제, 표기 차이
+중복 작품 98건 병합, 명소 중복 7건 병합, TMDB가 잘못 넣은 드라마 감독 695건 제거.
+자세한 내용은 `docs/place-work-audit.md`.
 
 ## 불러오기
 
