@@ -12,7 +12,8 @@ from unittest.mock import patch
 from django.core.management import call_command
 from django.test import TestCase, override_settings
 
-from places.models import Work
+from places.models import Work, WorkSource
+from places.sources.tmdb import _extract_director
 from places.work_enrichment import enrich_work, normalize_title_for_match, pick_tmdb_match
 
 
@@ -218,6 +219,57 @@ class EnrichWorkTest(TestCase):
         self.assertNotIn("release_date", filled)
         work.refresh_from_db()
         self.assertIsNone(work.release_date)
+
+    def test_records_tmdb_worksource_on_match(self):
+        work = Work.objects.create(title="도깨비", category=Work.Category.DRAMA)
+        search, get_detail = self._mock([_candidate(777, "도깨비")], _detail(777))
+        with search, get_detail:
+            enrich_work(work)
+
+        self.assertTrue(
+            WorkSource.objects.filter(work=work, source="TMDB", source_id="777").exists()
+        )
+
+    def test_pinned_worksource_skips_search_and_match(self):
+        work = Work.objects.create(title="아무거나", category=Work.Category.DRAMA)
+        WorkSource.objects.create(work=work, source="TMDB", source_id="999")
+
+        detail = patch("places.work_enrichment.tmdb.get_detail", return_value=_detail(999))
+        search = patch("places.work_enrichment.tmdb.search")
+        with search as search_mock, detail as detail_mock:
+            status, filled = enrich_work(work)
+
+        search_mock.assert_not_called()  # 제목 검색을 건너뛴다
+        detail_mock.assert_called_once_with("999", Work.Category.DRAMA)
+        self.assertEqual(status, "matched")
+
+    def test_command_pins_tmdb_id_with_work_id(self):
+        work = Work.objects.create(title="내일", category=Work.Category.DRAMA)
+        call_command("enrich_works_tmdb", work_id=work.id, tmdb_id="151972")
+
+        self.assertTrue(
+            WorkSource.objects.filter(work=work, source="TMDB", source_id="151972").exists()
+        )
+
+
+class ExtractDirectorTest(TestCase):
+    """TMDB 상세에서 감독을 뽑을 때 credits.crew의 Director만 본다 — TV의 created_by(한국
+    드라마에선 극본 작가)는 쓰지 않는다 (2026-09 데이터 감사)."""
+
+    def test_tv_created_by_is_ignored(self):
+        data = {
+            "created_by": [{"name": "이수연"}],  # 라이프 극본 작가
+            "credits": {"crew": [{"job": "Director", "name": "홍종찬"}]},
+        }
+        self.assertEqual(_extract_director(data, "tv"), "홍종찬")
+
+    def test_tv_without_crew_director_returns_empty(self):
+        data = {"created_by": [{"name": "박계옥"}], "credits": {"crew": []}}
+        self.assertEqual(_extract_director(data, "tv"), "")
+
+    def test_movie_director_from_crew(self):
+        data = {"credits": {"crew": [{"job": "Director", "name": "봉준호"}, {"job": "Writer", "name": "한진원"}]}}
+        self.assertEqual(_extract_director(data, "movie"), "봉준호")
 
 
 @override_settings(TMDB_API_KEY="test-token", TMDB_IMAGE_BASE_URL="https://image.tmdb.org/t/p", TMDB_POSTER_SIZE="w500")

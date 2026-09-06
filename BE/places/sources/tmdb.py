@@ -117,20 +117,18 @@ def _normalize_search_result(item, media_type):
 
 
 def _extract_director(data, media_type):
-    """상세 응답에서 감독/연출 이름을 뽑는다.
+    """상세 응답에서 감독/연출 이름을 뽑는다. credits.crew에서 job이 "Director"인 사람만 본다.
 
-    TV 시리즈: 먼저 created_by(제작·기획)를 보고, 없으면 credits.crew의 Director를 본다.
-    영화: credits.crew에서 job이 "Director"인 사람.
-    한국 드라마는 연출(PD)이 crew에 잘 안 들어와서 created_by가 그나마 가깝다.
+    TV의 created_by는 쓰지 않는다 — 한국 드라마는 여기에 연출이 아니라 극본 작가가 들어가서
+    (예: "라이프"→이수연, "철인왕후"→박계옥) 감독 필드를 오염시킨다. crew에 연출이 없으면
+    감독을 비워 두는 쪽이 틀린 값을 넣는 것보다 낫다 (2026-09 데이터 감사 결정).
     """
-    names = []
-
-    if media_type == "tv":
-        names = [person.get("name") for person in data.get("created_by", []) if person.get("name")]
-
-    if not names:
-        crew = data.get("credits", {}).get("crew", [])
-        names = [person.get("name") for person in crew if person.get("job") == "Director" and person.get("name")]
+    crew = data.get("credits", {}).get("crew", [])
+    names = [
+        person.get("name")
+        for person in crew
+        if person.get("job") == "Director" and person.get("name")
+    ]
 
     # 같은 이름이 중복으로 들어오는 경우가 있어서 순서를 지키며 한 번씩만 남긴다.
     seen = set()

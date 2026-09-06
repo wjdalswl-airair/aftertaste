@@ -61,6 +61,10 @@ class Work(models.Model):
         MOVIE = "MOVIE", "영화"
 
     title = models.CharField(max_length=200)
+    # 제목에서 구두점·공백을 지운 비교용 키. save할 때 title에서 자동으로 계산한다(직접 수정 불가).
+    # (title_key, category)가 같으면 같은 작품으로 본다 — 데이터를 다시 수집해도 같은 작품이
+    # 띄어쓰기·구두점 차이로 중복 생성되지 않게 막는다 (services.normalize_work_title).
+    title_key = models.CharField(max_length=200, editable=False)
     description = models.TextField(blank=True)
     category = models.CharField(max_length=10, choices=Category.choices)
     release_date = models.DateField(null=True, blank=True)
@@ -68,8 +72,40 @@ class Work(models.Model):
     director = models.CharField(max_length=100, blank=True)
     poster_url = models.URLField(blank=True)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["title_key", "category"], name="uniq_work_title_key_category"
+            )
+        ]
+
+    def save(self, *args, **kwargs):
+        from places.services import normalize_work_title
+
+        self.title_key = normalize_work_title(self.title)
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return self.title
+
+
+class WorkSource(models.Model):
+    """이 작품이 어느 외부 API에서 왔는지, 그쪽 고유번호가 무엇인지 기록한다.
+
+    PlaceSource와 같은 구조·같은 목적이다. 작품을 다시 수집할 때 제목 표기가 조금 달라도
+    "같은 출처 + 같은 고유번호"면 같은 작품으로 알아본다 (KMDB DOCID, TMDB id 등).
+    한 작품이 여러 출처를 가질 수 있다(KMDB로 만들고 TMDB로 보강).
+    """
+
+    work = models.ForeignKey(Work, on_delete=models.CASCADE, related_name="sources")
+    source = models.CharField(max_length=50)
+    source_id = models.CharField(max_length=500)
+
+    class Meta:
+        unique_together = ("source", "source_id")
+
+    def __str__(self):
+        return f"{self.work} - {self.source}:{self.source_id}"
 
 
 class PlaceWork(models.Model):
