@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 
 from accounts.authentication import FirebaseAuthentication, _extract_bearer_token
 from accounts.firebase import InvalidFirebaseToken, create_custom_token, verify_id_token
-from accounts.kakao import InvalidKakaoToken, get_kakao_user
+from accounts.kakao import InvalidKakaoToken, exchange_code_for_token, get_kakao_user
 from accounts.models import NICKNAME_MAX_LENGTH, Member
 from accounts.serializers import (
     ErrorDetailSerializer,
@@ -155,18 +155,21 @@ class KakaoCustomTokenView(APIView):
     Firebase는 카카오를 기본 로그인 제공자로 지원하지 않는다. 그래서 카카오는 다른
     소셜(Google)과 로그인 절차가 다르다:
 
-    1. 프론트엔드가 카카오 SDK로 로그인해 카카오 access token을 받는다.
-    2. 그 토큰으로 이 API를 호출한다. 서버가 카카오 API로 본인 확인 후
+    1. 프론트엔드가 `Kakao.Auth.authorize()`로 로그인하면 카카오가 **인가 코드(code)**만 준다.
+    2. 그 code와 redirect_uri로 이 API를 호출한다. 서버가 카카오 OAuth 서버에서
+       access token을 받고(exchange_code_for_token), 그 토큰으로 본인 확인 후
        Firebase 커스텀 토큰을 만들어 돌려준다(회원을 만들지는 않는다).
     3. 프론트엔드가 그 토큰으로 `signInWithCustomToken`을 호출해 Firebase에 로그인한다.
     4. Firebase가 내려준 ID 토큰으로 평소처럼 `POST /api/account/login/`을 호출하면
        회원 조회/가입이 완료된다 — 여기서부터는 Google 로그인과 같은 절차다.
+
+    access token 교환을 서버에서 하므로 프론트엔드가 access token을 직접 만지지 않는다 (issue #23).
     """
 
     @extend_schema(
         summary="카카오 로그인 - Firebase 커스텀 토큰 발급",
         description=(
-            "카카오 access token을 검증하고 Firebase 커스텀 토큰을 돌려준다. "
+            "카카오 인가 코드(code)를 access token으로 교환·검증하고 Firebase 커스텀 토큰을 돌려준다. "
             "이 토큰 자체로는 로그인이 끝나지 않는다 — 프론트엔드가 `signInWithCustomToken`으로 "
             "Firebase 로그인을 마친 뒤, 그 결과 ID 토큰으로 `POST /api/account/login/`을 "
             "호출해야 회원 조회/가입까지 끝난다."
@@ -174,8 +177,8 @@ class KakaoCustomTokenView(APIView):
         request=KakaoTokenRequestSerializer,
         responses={
             200: KakaoTokenResponseSerializer,
-            400: OpenApiResponse(response=ErrorDetailSerializer, description="access_token 누락"),
-            401: OpenApiResponse(response=ErrorDetailSerializer, description="카카오 토큰 무효/만료"),
+            400: OpenApiResponse(response=ErrorDetailSerializer, description="code 또는 redirect_uri 누락"),
+            401: OpenApiResponse(response=ErrorDetailSerializer, description="인가 코드 무효/만료/이미 사용됨"),
         },
         examples=[
             OpenApiExample(
@@ -187,11 +190,13 @@ class KakaoCustomTokenView(APIView):
         ],
     )
     def post(self, request):
-        access_token = request.data.get("access_token")
-        if not access_token:
-            return Response({"detail": "access_token이 필요합니다"}, status=400)
+        code = request.data.get("code")
+        redirect_uri = request.data.get("redirect_uri")
+        if not code or not redirect_uri:
+            return Response({"detail": "code와 redirect_uri가 필요합니다"}, status=400)
 
         try:
+            access_token = exchange_code_for_token(code, redirect_uri)
             kakao_user = get_kakao_user(access_token)
         except InvalidKakaoToken:
             raise AuthenticationFailed("다시 로그인하세요")
