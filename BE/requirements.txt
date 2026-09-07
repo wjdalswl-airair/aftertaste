@@ -1,3 +1,4 @@
+anthropic==1.4.0
 asgiref==3.12.1
 dj-database-url==2.3.0
 Django==5.2.17
