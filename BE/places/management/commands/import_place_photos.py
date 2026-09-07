@@ -10,6 +10,10 @@
 TourAPI는 등록된 관광지·음식점 위주라, 소규모 카페 촬영지는 매칭이 안 되는 게 정상이다.
 그런 명소 사진은 다른 소스(Google Places 등)나 관리자 입력으로 채워야 한다.
 
+TourAPI 개발계정은 하루 1,000회만 부를 수 있다. 촬영지 대부분(카페·골목·민가)은
+TourAPI에 없어서 매칭률이 낮으니, 한도가 빠듯할 때는 --name-contains로 관광지 이름
+패턴이 든 명소부터 돌려 한도를 효율적으로 쓴다. 예: --name-contains 해수욕장,공원,박물관
+
 예)
   python manage.py import_place_photos                 # photo_url 빈 명소 전체
   python manage.py import_place_photos --place-id 3    # 한 명소만 (매칭 확인용)
@@ -17,13 +21,23 @@ TourAPI는 등록된 관광지·음식점 위주라, 소규모 카페 촬영지�
   python manage.py import_place_photos --overwrite     # 이미 채워진 photo_url도 교체
   python manage.py import_place_photos --dry-run       # 저장하지 않고 매칭 결과만 출력
   python manage.py import_place_photos --limit 50 --sleep 0.3
+  python manage.py import_place_photos --name-contains 해수욕장,공원,궁,박물관,사,계곡,폭포,전망대,항,섬,마을
 """
 
 import time
 
 from django.core.management.base import BaseCommand, CommandError
+from django.db.models import Q
 
 from places.models import Place, PlaceSource
+
+# --name-contains를 안 줬을 때 참고하라고 남겨두는, TourAPI 매칭이 잘 되는 관광지 이름 패턴.
+# 도움말에만 쓰고 기본 동작에는 영향을 주지 않는다 (아무 것도 안 주면 전체 대상).
+_SUGGESTED_TOURIST_NAME_PATTERNS = (
+    "해수욕장,해변,공원,궁,궁궐,museum,박물관,미술관,수목원,식물원,사찰,사,암,"
+    "폭포,계곡,저수지,호수,전망대,타워,전망,항,포구,등대,섬,도,마을,한옥,고택,"
+    "성,읍성,서원,향교,왕릉,릉,고분,유적,생태공원,둘레길,수변공원,아쿠아리움"
+)
 from places.place_photo_enrichment import (
     PHOTO_MATCH_DISTANCE_METERS,
     TOUR_API_SOURCE,
@@ -66,6 +80,12 @@ class Command(BaseCommand):
             default=PHOTO_MATCH_DISTANCE_METERS,
             help=f"이름이 같아도 좌표가 이 거리(m)보다 멀면 다른 장소로 본다 (기본: {PHOTO_MATCH_DISTANCE_METERS}).",
         )
+        parser.add_argument(
+            "--name-contains",
+            help="쉼표로 구분한 낱말 목록. 이름에 그중 하나라도 들어간 명소만 처리한다"
+            " (대소문자 무시). TourAPI 한도가 빠듯할 때 관광지부터 채우는 용도."
+            f" 참고할 만한 값: {_SUGGESTED_TOURIST_NAME_PATTERNS}",
+        )
         parser.add_argument("--limit", type=int, help="최대 이 개수만 처리한다.")
         parser.add_argument(
             "--sleep",
@@ -91,6 +111,16 @@ class Command(BaseCommand):
             # 매칭 실패도 PlaceSource(__no_match__)로 기록돼 여기서 걸러진다.
             tried = PlaceSource.objects.filter(source=TOUR_API_SOURCE).values("place_id")
             places = places.filter(photo_url="").exclude(id__in=tried)
+
+        name_contains = options["name_contains"]
+        if name_contains:
+            words = [w.strip() for w in name_contains.split(",") if w.strip()]
+            if words:
+                name_filter = Q()
+                for word in words:
+                    name_filter |= Q(name__icontains=word)
+                places = places.filter(name_filter)
+
         if options["limit"]:
             places = places[: options["limit"]]
 

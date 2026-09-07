@@ -232,6 +232,26 @@ class ImportPlacePhotosCommandTest(TestCase):
         self.assertIn("남산서울타워", searched)
 
     @patch("places.place_photo_enrichment.tour_api.search_keyword")
+    def test_name_contains_only_processes_matching_names(self, mock_search):
+        beach = Place.objects.create(
+            name="협재해수욕장", latitude=Decimal("33.39"), longitude=Decimal("126.24")
+        )
+        park = Place.objects.create(
+            name="올림픽공원", latitude=Decimal("37.52"), longitude=Decimal("127.12")
+        )
+        cafe = Place.objects.create(
+            name="바다뷰 카페", latitude=Decimal("33.40"), longitude=Decimal("126.25")
+        )
+        mock_search.return_value = []
+
+        call_command("import_place_photos", "--name-contains", "해수욕장,공원", "--sleep", "0")
+
+        searched = [c.args[0] for c in mock_search.call_args_list]
+        self.assertIn("협재해수욕장", searched)
+        self.assertIn("올림픽공원", searched)
+        self.assertNotIn("바다뷰 카페", searched)
+
+    @patch("places.place_photo_enrichment.tour_api.search_keyword")
     def test_command_stops_after_consecutive_errors(self, mock_search):
         for i in range(8):
             Place.objects.create(
