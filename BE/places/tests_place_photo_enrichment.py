@@ -56,6 +56,23 @@ class PickPhotoMatchTest(TestCase):
         candidates = [_candidate("스타벅스", lat=35.1796, lng=129.0756)]  # 부산
         self.assertIsNone(pick_photo_match(place, candidates))
 
+    def test_large_place_within_2km_is_picked(self):
+        # 광교호수공원처럼 넓은 곳은 우리 좌표와 TourAPI 대표 지점이 ~1km 떨어지기도 한다.
+        place = Place(name="광교호수공원", latitude=Decimal("37.2758"), longitude=Decimal("127.0638"))
+        candidates = [_candidate("광교호수공원", lat=37.2848, lng=127.0680)]  # 약 1.1km
+        self.assertIsNotNone(pick_photo_match(place, candidates))
+
+    def test_tour_api_title_with_alias_in_parens_matches(self):
+        # TourAPI는 "등명해변(등명해수욕장)"처럼 별칭을 괄호로 붙인다.
+        place = Place(name="등명해변", latitude=Decimal("37.7044"), longitude=Decimal("129.0164"))
+        candidates = [_candidate("등명해변(등명해수욕장)", lat=37.7045, lng=129.0165)]
+        self.assertIsNotNone(pick_photo_match(place, candidates))
+
+    def test_place_name_matching_the_alias_part_matches(self):
+        place = Place(name="등명해수욕장", latitude=Decimal("37.7044"), longitude=Decimal("129.0164"))
+        candidates = [_candidate("등명해변(등명해수욕장)", lat=37.7045, lng=129.0165)]
+        self.assertIsNotNone(pick_photo_match(place, candidates))
+
     def test_partial_name_is_not_accepted(self):
         place = Place(name="그루비", latitude=Decimal("37.5665"), longitude=Decimal("126.9780"))
         candidates = [_candidate("카페 그루비", lat=37.5665, lng=126.9780)]

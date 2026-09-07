@@ -14,6 +14,7 @@
 """
 
 import logging
+import re
 
 from places.models import PlaceSource
 from places.services import haversine_distance_meters
@@ -35,8 +36,11 @@ FILLABLE_FIELDS = ("photo_url",)
 
 # 우리 Place 좌표와 TourAPI 후보 좌표가 이 거리(미터)보다 멀면 다른 장소로 본다.
 # Place 좌표는 KCISA CSV·카카오 지오코딩에서 오고 TourAPI 좌표는 관광공사가 찍은
-# 대표 지점이라, 같은 장소여도 약간 어긋난다. 너무 좁히면 진짜 매칭도 놓친다.
-PHOTO_MATCH_DISTANCE_METERS = 200
+# 대표 지점이라, 같은 장소여도 어긋난다. 특히 해수욕장·공원·궁처럼 넓은 곳은 두 지점이
+# 1km 넘게 떨어지기도 한다(예: 광교호수공원 ~994m, 경복궁 ~515m). 이름이 정확히
+# 일치해야 여기까지 오므로(pick_photo_match 규칙 2), 동명의 다른 장소는 대개 수십 km
+# 떨어진 다른 도시라 2km로 넉넉히 잡아도 오매칭 위험이 거의 없다.
+PHOTO_MATCH_DISTANCE_METERS = 2000
 
 # 이름 비교 시 지우는 문자. 괄호·구두점·공백처럼 표기만 다르고 뜻은 같은 것들
 # (work_enrichment._TITLE_NOISE_CHARS와 같은 목적).
@@ -51,12 +55,26 @@ def normalize_name_for_match(name):
     return "".join(ch for ch in (name or "").casefold() if ch not in _NAME_NOISE_CHARS)
 
 
+def _title_match_keys(title):
+    """TourAPI 제목에서 우리 이름과 비교할 후보들을 정규화해 집합으로 돌려준다.
+
+    TourAPI는 "등명해변(등명해수욕장)"처럼 별칭을 괄호로 붙여 두는 경우가 많다.
+    이때 우리 Place 이름은 "등명해변"이거나 "등명해수욕장"일 수 있어서, 제목 전체뿐 아니라
+    괄호 앞부분과 괄호 안 내용도 각각 비교 대상으로 둔다.
+    """
+    title = title or ""
+    parts = {title, re.split(r"[(（]", title, maxsplit=1)[0]}
+    parts.update(re.findall(r"[(（]([^)）]*)[)）]", title))
+    return {key for key in (normalize_name_for_match(p) for p in parts) if key}
+
+
 def pick_photo_match(place, candidates, *, max_distance_meters=PHOTO_MATCH_DISTANCE_METERS):
     """TourAPI 검색 후보 중 우리 명소와 같은 장소를 하나 고른다. 없으면 None.
 
     규칙:
       1. 대표 이미지가 없는 후보는 처음부터 제외한다 (사진이 목적이라 의미 없다).
-      2. 정규화한 이름이 후보 제목과 정확히 같아야 한다 (부분 일치·유사도는 인정하지 않는다).
+      2. 정규화한 이름이 후보 제목(또는 "제목(별칭)"의 제목·별칭 어느 한쪽)과 정확히
+         같아야 한다. 부분 일치·유사도는 인정하지 않는다.
       3. 우리 Place에 좌표가 있으면, 좌표가 있는 후보는 거리가 max_distance_meters 이내여야 한다.
       4. 남은 후보가 여럿이면: 거리가 가까운 것. 좌표로 비교할 수 없는 후보는 맨 뒤로.
       5. 우리 Place에 좌표가 없고, 이름만 같은 후보들의 대표 이미지가 서로 다르면
@@ -72,7 +90,7 @@ def pick_photo_match(place, candidates, *, max_distance_meters=PHOTO_MATCH_DISTA
     for candidate in candidates:
         if not candidate.get("first_image"):
             continue
-        if normalize_name_for_match(candidate.get("title")) != target:
+        if target not in _title_match_keys(candidate.get("title")):
             continue
 
         distance = None
