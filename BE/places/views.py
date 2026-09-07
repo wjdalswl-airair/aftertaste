@@ -1,4 +1,5 @@
 import logging
+import random
 from datetime import timedelta
 
 from django.contrib.postgres.search import TrigramSimilarity
@@ -265,20 +266,48 @@ class PopularKeywordsView(APIView):
         return Response({"keywords": [row["keyword"] for row in rows]})
 
 
+def _places_by_ids_in_order(ids):
+    """id 목록을 받아 그 순서대로 Place 객체를 돌려준다.
+
+    번역(translations)을 함께 prefetch한다 — 추천 응답은 PlaceSearchSerializer가
+    명소마다 번역 이름을 고르므로(?lang=이 붙어 오면), prefetch가 없으면 결과 개수만큼
+    번역 쿼리가 따로 나간다(N+1). 배포 DB가 멀리 있어 이 N+1이 추천이 느렸던 주 원인이었다.
+    """
+    by_id = Place.objects.filter(id__in=ids).prefetch_related("translations").in_bulk()
+    return [by_id[pk] for pk in ids if pk in by_id]
+
+
+def _nearest_place_ids(latitude, longitude, count):
+    """좌표를 가진 명소를 (id·좌표만) 가볍게 훑어 가까운 순으로 count개의 id를 돌려준다."""
+    rows = Place.objects.filter(
+        latitude__isnull=False, longitude__isnull=False
+    ).values_list("id", "latitude", "longitude")
+    nearest = sorted(
+        rows, key=lambda row: haversine_distance_meters(latitude, longitude, row[1], row[2])
+    )[:count]
+    return [row[0] for row in nearest]
+
+
 def _nearest_places(latitude, longitude, count):
     """좌표를 가진 명소 중 현재 위치에서 가까운 순서로 count개를 돌려준다.
 
-    명소 수가 적어(수백~수천 건) 파이썬에서 전부 훑어 거리를 계산해도 충분하다.
-    좌표가 없는 명소는 거리를 잴 수 없으므로 대상에서 뺀다.
+    거리 계산에는 좌표만 필요하므로, 먼저 (id·좌표)만 가볍게 훑어 가까운 count개를 고른 뒤
+    그 명소만 실제로 불러온다. 좌표가 없는 명소는 거리를 잴 수 없어 제외한다.
+    (예전엔 명소 전체를 통째로 메모리에 올렸는데, 배포 DB가 멀리 있어 전송·객체 생성
+    비용이 컸다.)
     """
-    places = list(Place.objects.filter(latitude__isnull=False, longitude__isnull=False))
-    places.sort(key=lambda p: haversine_distance_meters(latitude, longitude, p.latitude, p.longitude))
-    return places[:count]
+    return _places_by_ids_in_order(_nearest_place_ids(latitude, longitude, count))
 
 
 def _random_places(count):
-    """위치 정보가 없을 때(위치 권한 거부) 명소를 무작위로 count개 고른다."""
-    return list(Place.objects.order_by("?")[:count])
+    """위치 정보가 없을 때(위치 권한 거부) 명소를 무작위로 count개 고른다.
+
+    ORDER BY random()은 매 호출마다 테이블 전체를 정렬한다. 대신 id만 받아와
+    파이썬에서 표본을 뽑고, 그 명소만 불러온다.
+    """
+    ids = list(Place.objects.values_list("id", flat=True))
+    chosen = random.sample(ids, min(count, len(ids)))
+    return _places_by_ids_in_order(chosen)
 
 
 def _personalized_places(member, latitude, longitude, count):
