@@ -1,4 +1,6 @@
+from django.contrib.postgres.indexes import GinIndex, OpClass
 from django.db import models
+from django.db.models.functions import Upper
 
 from accounts.models import Member
 from config.constants import LANGUAGE_CODE_MAX_LENGTH
@@ -27,6 +29,19 @@ class Place(models.Model):
     etiquette = models.TextField(blank=True)  # 주의할 점 (예: "나무를 꺾지 말아주세요")
 
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        # 검색은 이름을 대소문자 무시 부분일치(icontains)와 오타 허용(trigram_similar)으로
+        # 뒤진다. 둘 다 일반 인덱스를 못 타서, 이 GIN 트라이그램 인덱스가 없으면 매 검색이
+        # 명소 전체를 훑는다(Seq Scan) — 배포 DB에서 검색이 느렸던 주 원인.
+        # 검색 쿼리가 UPPER(name)에 걸므로(대소문자 통일) 인덱스도 UPPER(name) 식이다.
+        # pg_trgm은 트라이그램을 소문자로 만들어 비교하므로 UPPER를 씌워도 오타 검색 결과는 같다.
+        indexes = [
+            GinIndex(
+                OpClass(Upper("name"), name="gin_trgm_ops"),
+                name="place_name_upper_trgm",
+            ),
+        ]
 
     def __str__(self):
         return self.name
@@ -77,6 +92,13 @@ class Work(models.Model):
             models.UniqueConstraint(
                 fields=["title_key", "category"], name="uniq_work_title_key_category"
             )
+        ]
+        # Place.name과 같은 이유 — 제목을 icontains·trigram_similar로 검색한다.
+        indexes = [
+            GinIndex(
+                OpClass(Upper("title"), name="gin_trgm_ops"),
+                name="work_title_upper_trgm",
+            ),
         ]
 
     def save(self, *args, **kwargs):
@@ -155,6 +177,13 @@ class PlaceTranslation(models.Model):
 
     class Meta:
         unique_together = ("place", "language")
+        # 검색이 번역된 이름(translations.name)도 icontains·trigram_similar로 뒤진다.
+        indexes = [
+            GinIndex(
+                OpClass(Upper("name"), name="gin_trgm_ops"),
+                name="placetrans_name_upper_trgm",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.place} ({self.language})"
@@ -174,6 +203,13 @@ class WorkTranslation(models.Model):
 
     class Meta:
         unique_together = ("work", "language")
+        # PlaceTranslation.name과 같은 이유 — 검색이 번역된 제목도 뒤진다.
+        indexes = [
+            GinIndex(
+                OpClass(Upper("title"), name="gin_trgm_ops"),
+                name="worktrans_title_upper_trgm",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.work} ({self.language})"
