@@ -66,6 +66,8 @@
     "reviewsEmpty": "아직 리뷰가 없어요",
     "reviewsMore": "더보기",
     "courseCta": "이 장소로 AI 코스 추천받기",
+    "courseCtaLoading": "AI가 코스를 만드는 중...",
+    "courseAiError": "코스를 만들지 못했어요. 다시 시도해주세요.",
     "mapTitle": "지도",
     "mapUnavailable": "지도를 표시할 수 없어요",
     "noCoordinates": "위치 정보가 없어요",

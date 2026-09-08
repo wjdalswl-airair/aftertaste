@@ -284,7 +284,10 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 - `CoursePlace`에도 거리·anchor place 좌표가 없어서, 코스 상세 화면은 `getCourseDetail`과 별개로 `getPlaceDetail(course.place_id)`를 추가로 불러서 anchor 좌표·주소·작품명을 채운다.
 - 코스 상세의 "지역" 표시(예: "경기 수원")는 anchor place `address`의 앞 두 토큰을 자른 임시 값이다 — BE에 지역명 필드가 따로 없다. `MyCourseListPage`(내가 만든 코스 목록)는 이 추가 조회(N+1)까지는 안 하고 대신 `place_name`을 보여준다(Phase7 "내가 쓴 리뷰" 갭과 같은 타협).
 - "내가 만든 코스인지" 판단은 리뷰와 동일하게 닉네임 비교로 임시 처리했다(`creator_nickname === member.nickname`) — 정확한 방법 아님, 기존 갭과 동일.
-- 명소 상세(Phase4)의 "이 장소로 AI 코스 추천받기" 버튼을 활성화했다: 이 명소에 이미 코스가 있으면(로그인 불필요) 첫 번째 코스 상세로, 없으면 로그인 확인 후 생성 화면으로 보낸다.
+- 명소 상세(Phase4)의 "이 장소로 AI 코스 추천받기" 버튼: 이 명소에 이미 코스가 있으면(로그인 불필요) 첫 번째 코스 상세로 이동한다.
+- **AI 코스 추천 연동 (2026-09-08, GitHub 이슈 #38)**: 코스가 없으면 로그인 확인 후 `POST /api/places/{place_id}/courses/ai-recommend/`(`src/api/courses.ts`의 `aiRecommendCourse`)를 호출해 Claude가 주변 상권 중 식당 1+카페 1+그 외 1로 코스를 자동 생성한다(성공 시 201, 생성된 코스 상세로 바로 이동). 이전엔 수동 생성 화면(`/spots/{placeId}/courses/new`, `CourseCreatePage.tsx`)으로 보냈으나 이걸로 대체했다 — 그 라우트/페이지 자체는 남아있지만 지금은 도달할 진입점이 없다.
+  - 버튼 클릭 시 로딩 중엔 "AI가 코스를 만드는 중..."으로 문구가 바뀌고 비활성화된다.
+  - 에러(400 이미 코스 있음 / 422 주변 후보 부족 / 503 AI 호출 실패)는 BE가 주는 한국어 `detail` 메시지를 그대로 버튼 아래에 보여준다 — FE에서 상태 코드별로 문구를 따로 만들지 않는다.
 
 ### S-09. 공유 — 명소 상세/코스 화면 내부 기능 (Phase 4·8에서 이미 구현됨, Phase9은 확인만)
 - 링크 복사만 구현 (PRD 5장). 별도 공유 API 없음 — `navigator.clipboard.writeText(location.href)`.

@@ -66,6 +66,8 @@
     "reviewsEmpty": "还没有评论",
     "reviewsMore": "查看更多",
     "courseCta": "获取此地点的AI路线推荐",
+    "courseCtaLoading": "AI正在生成路线...",
+    "courseAiError": "无法生成路线，请再试一次。",
     "mapTitle": "地图",
     "mapUnavailable": "无法显示地图",
     "noCoordinates": "没有位置信息",

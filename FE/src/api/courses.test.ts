@@ -189,4 +189,73 @@ describe('src/api/courses.ts', () => {
       expect(fetchSpy).not.toHaveBeenCalled()
     })
   })
+
+  describe('aiRecommendCourse', () => {
+    it('성공하면 AI가 만든 코스를 반환한다', async () => {
+      const { aiRecommendCourse } = await import('./courses')
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 201, json: async () => course }))
+
+      const result = await aiRecommendCourse(1)
+
+      expect(result).toEqual(course)
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/places/1/courses/ai-recommend/'),
+        expect.objectContaining({ method: 'POST' }),
+      )
+    })
+
+    it('이미 코스가 있으면(400) 에러를 던진다', async () => {
+      const { aiRecommendCourse } = await import('./courses')
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 400,
+          json: async () => ({ detail: '이미 코스가 있는 명소입니다. 기존 코스를 확인해 주세요.' }),
+        }),
+      )
+
+      await expect(aiRecommendCourse(1)).rejects.toThrow('이미 코스가 있는 명소입니다. 기존 코스를 확인해 주세요.')
+    })
+
+    it('주변 후보가 부족하면(422) 에러를 던진다', async () => {
+      const { aiRecommendCourse } = await import('./courses')
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 422,
+          json: async () => ({ detail: '주변에서 코스에 넣을 후보(식당·카페·그 외)를 충분히 찾지 못했습니다.' }),
+        }),
+      )
+
+      await expect(aiRecommendCourse(1)).rejects.toThrow(
+        '주변에서 코스에 넣을 후보(식당·카페·그 외)를 충분히 찾지 못했습니다.',
+      )
+    })
+
+    it('AI 호출에 실패하면(503) 에러를 던진다', async () => {
+      const { aiRecommendCourse } = await import('./courses')
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 503,
+          json: async () => ({ detail: 'AI 코스 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.' }),
+        }),
+      )
+
+      await expect(aiRecommendCourse(1)).rejects.toThrow('AI 코스 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.')
+    })
+
+    it('로그인 안 되어 있으면 에러를 던진다', async () => {
+      const { aiRecommendCourse } = await import('./courses')
+      mockAuth.currentUser = null
+      const fetchSpy = vi.fn()
+      vi.stubGlobal('fetch', fetchSpy)
+
+      await expect(aiRecommendCourse(1)).rejects.toThrow('로그인이 필요합니다')
+      expect(fetchSpy).not.toHaveBeenCalled()
+    })
+  })
 })
