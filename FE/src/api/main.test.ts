@@ -43,7 +43,14 @@ describe('src/api/main.ts', () => {
     it('성공하면 명소 배열을 반환한다', async () => {
       const { getTopPlaces } = await import('./main')
       const places = [
-        { id: 1, name: '경복궁', address: '서울', photo_url: 'https://a.com/1.png', favorite_count: 5 },
+        {
+          id: 1,
+          name: '경복궁',
+          address: '서울',
+          photo_url: 'https://a.com/1.png',
+          favorite_count: 5,
+          is_favorited: false,
+        },
       ]
       vi.stubGlobal(
         'fetch',

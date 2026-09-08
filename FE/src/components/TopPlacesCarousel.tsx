@@ -42,7 +42,7 @@ export function TopPlacesCarousel() {
             <Link key={place.id} to={`/spots/${place.id}`} className="w-[110px] flex-shrink-0 snap-center">
               <div className="relative">
                 <img src={place.photo_url} alt="" className="aspect-square w-full rounded-md object-cover" />
-                <FavoriteButton placeId={place.id} />
+                <FavoriteButton placeId={place.id} initialFavorited={place.is_favorited} />
               </div>
               <p className="mt-1 truncate text-xs text-ink">{place.name}</p>
               <p className="truncate text-[11px] text-ink-secondary">{place.address}</p>

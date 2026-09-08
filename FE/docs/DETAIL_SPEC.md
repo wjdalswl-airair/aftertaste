@@ -174,14 +174,14 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 - API (전부 확정, 실제 BE 코드로 확인함 — 2026-08-29):
   - `GET /api/banners/` → `{ banners: [{ id, image_url, link_url, order }] }`
   - `GET /api/main/hall-of-fame/` → `{ review: {...} | null }` (없으면 `null`, 200 정상 응답)
-  - `GET /api/main/top-places/` → `{ places: [{ id, name, address, photo_url, favorite_count }] }`
+  - `GET /api/main/top-places/` → `{ places: [{ id, name, address, photo_url, favorite_count, is_favorited }] }`
   - `PATCH /api/account/locale/` → `{ nationality?, language? }` 요청, `{ language }` 응답. 로그인 불필요(선택), 비로그인이면 검증만 하고 저장은 프론트가 `useLocaleStore`(localStorage)로 한다.
 - 처음엔 BE 번역 지원 언어가 영어만으로 결정된 것에 맞춰 국적 선택(한국(ko)/해외(en) 2개)으로 만들었으나(2026-08-29), **2026-09-04부터 국적이 아니라 화면 언어를 직접 고르는 방식**으로 바꿨다 — 지원 언어가 5개(ko/en/ja/zh-CN/zh-TW)로 늘면서 국적↔언어 1:1 매핑이 안 맞아서다 (BE 합의, 7장 참고). UI는 Figma처럼 헤더 지구본 아이콘 → 바텀시트, 이제 5개 언어 목록이 뜬다.
 - 명예의전당·Top10은 BE 자체 문서엔 "Phase3 전엔 못 채운다"고 되어 있지만, 실제 코드는 스텁이 아니라 진짜 랭킹 로직이 이미 구현돼 있다. 데이터가 없으면 각각 `null`/`[]`을 정상 응답하므로 그 값 그대로 빈 상태 UI를 보여준다.
 - **Hero(배너+명예의전당 병합, 2026-08-30 캐러셀로 확장)**: "금주의 명예의 전당"(`GET /api/main/hall-of-fame/`)과 "이 장소, 어떠세요?"(`GET /api/places/recommend/`의 첫 번째 결과) 두 슬라이드를 4초마다 자동 전환 + 손가락 스와이프로 넘겨볼 수 있는 캐러셀로 보여준다. 둘 다 없으면 `GET /api/banners/`로 대체하고, 그마저 없으면 아무것도 안 보인다.
 - **배너 데이터 연동은 FE 쪽엔 이미 완성돼 있다 (2026-09-04 재확인)**. 배포 서버(`/api/banners/`)가 빈 배열을 돌려주는 건 코드 문제가 아니라 배포 DB에 배너 데이터(관리자 등록)가 아직 없어서다 — FE에서 추가로 할 일 없음, BE/운영 쪽에서 데이터만 채우면 된다.
 - **즐겨찾기 (2026-08-30 추가, `src/api/bookmarks.ts`)**: Top10·추천 카드 썸네일 위에 별 아이콘. `POST/DELETE /api/places/{id}/favorite/` 연동, 로그인 필요(`authorizedFetch` 재사용, `auth.ts`에서 export). 비로그인 상태로 누르면 `/login`으로 이동하며 "로그인이 필요한 기능입니다" 안내.
-  - **제약**: 목록 API(추천/Top10) 응답에 즐겨찾기 여부(`is_favorited`)가 없어서, 카드 별은 항상 빈 별로 시작한다. 이미 즐겨찾기한 명소를 다시 봐도 화면상으론 빈 별로 보임 — BE가 목록 응답에 `is_favorited`를 추가해주면 고칠 것.
+  - **~~제약~~ 해소 (2026-09-08, fix/fe/main-tab-favorite)**: 이전엔 목록 API(추천/Top10) 응답에 `is_favorited`가 없어서 카드 별이 항상 빈 별로 시작했고, 이미 저장한 명소를 다시 눌러 저장이 취소돼 버렸다. BE가 `GET /api/places/recommend/`·`GET /api/main/top-places/` 응답에 `is_favorited`를 추가(fix/be/main-tab-favorite)해서, `RecommendedSpots`·`TopPlacesCarousel`가 `<FavoriteButton initialFavorited={spot.is_favorited} />`로 넘긴다. 비로그인이면 BE가 전부 `false`로 준다.
 - **지역별 Top10 (예정, 착수 전 — 2026-09-05 논의)**: 위치 권한을 거부한 사용자에게 상단 전국 Top10(`TopPlacesCarousel`) 아래로, 특정 지역에 결과가 쏠리지 않게 "지역 안배된" Top10 리스트를 하나 더 보여주는 안을 논의했다.
   - 전국 Top10은 `TopPlacesView`(`BE/main/views.py`)가 즐겨찾기 수 내림차순 상위 10곳을 지역 구분 없이 반환하는 방식(기존과 동일, 변경 없음).
   - 지역 단위는 **시/도(17개 광역)** 기준으로 하기로 함(시/군/구 단위는 지역 수가 많아 "안배" 효과가 옅어져서 제외).

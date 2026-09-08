@@ -27,6 +27,9 @@ export type TopPlace = {
   address: string
   photo_url: string
   favorite_count: number
+  // 지금 로그인한 사람이 이 명소를 이미 즐겨찾기 했는지 (BE TopPlaceSerializer).
+  // 비로그인이면 항상 false. 카드 별을 빈 별/채운 별로 맞게 그리는 데 쓴다.
+  is_favorited: boolean
 }
 
 export function getBanners(): Promise<Banner[]> {
