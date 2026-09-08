@@ -1,0 +1,214 @@
+"""DB에 있는 명소(Place)를 돌면서 TourAPI에서 대표 사진(firstimage)을 찾아 photo_url에 채운다.
+
+이름이 정확히 일치하고 좌표가 가까운 관광정보만 인정한다. 못 찾은 명소는 손대지 않고
+넘어간다 ("존재하는 것만" 채운다). photo_url은 원래 관리자가 채우는 값이라, 비어 있는
+명소만 기본 대상이고 이미 채워진 값은 --overwrite를 줄 때만 교체한다.
+
+한 번 매칭한 명소는 TourAPI content_id를 PlaceSource(TOUR_API)에 저장해서, 다시 실행할 때
+이름으로 재검색하지 않고 그 id로 바로 최신 이미지를 받는다.
+
+TourAPI는 등록된 관광지·음식점 위주라, 소규모 카페 촬영지는 매칭이 안 되는 게 정상이다.
+그런 명소 사진은 다른 소스(Google Places 등)나 관리자 입력으로 채워야 한다.
+
+TourAPI 개발계정은 하루 1,000회만 부를 수 있다. 촬영지 대부분(카페·골목·민가)은
+TourAPI에 없어서 매칭률이 낮으니, 한도가 빠듯할 때는 --name-contains로 관광지 이름
+패턴이 든 명소부터 돌려 한도를 효율적으로 쓴다. 예: --name-contains 해수욕장,공원,박물관
+
+예)
+  python manage.py import_place_photos                 # photo_url 빈 명소 전체
+  python manage.py import_place_photos --place-id 3    # 한 명소만 (매칭 확인용)
+  python manage.py import_place_photos --place-id 3 --content-id 126508   # content_id 수동 지정
+  python manage.py import_place_photos --overwrite     # 이미 채워진 photo_url도 교체
+  python manage.py import_place_photos --dry-run       # 저장하지 않고 매칭 결과만 출력
+  python manage.py import_place_photos --limit 50 --sleep 0.3
+  python manage.py import_place_photos --name-contains 해수욕장,공원,궁,박물관,사,계곡,폭포,전망대,항,섬,마을
+"""
+
+import time
+
+from django.core.management.base import BaseCommand, CommandError
+from django.db.models import Q
+
+from places.models import Place, PlaceSource
+
+# --name-contains를 안 줬을 때 참고하라고 남겨두는, TourAPI 매칭이 잘 되는 관광지 이름 패턴.
+# 도움말에만 쓰고 기본 동작에는 영향을 주지 않는다 (아무 것도 안 주면 전체 대상).
+_SUGGESTED_TOURIST_NAME_PATTERNS = (
+    "해수욕장,해변,공원,궁,궁궐,museum,박물관,미술관,수목원,식물원,사찰,사,암,"
+    "폭포,계곡,저수지,호수,전망대,타워,전망,항,포구,등대,섬,도,마을,한옥,고택,"
+    "성,읍성,서원,향교,왕릉,릉,고분,유적,생태공원,둘레길,수변공원,아쿠아리움"
+)
+from places.place_photo_enrichment import (
+    PHOTO_MATCH_DISTANCE_METERS,
+    TOUR_API_SOURCE,
+    enrich_place_photo,
+)
+from places.sources import tour_api
+
+# 이만큼 연속으로 호출이 실패하면 API가 죽은 것으로 보고 실행을 멈춘다.
+_CONSECUTIVE_ERROR_LIMIT = 5
+
+
+class Command(BaseCommand):
+    help = "DB의 명소를 한국관광공사 TourAPI의 대표 이미지(firstimage)로 채운다."
+
+    def add_arguments(self, parser):
+        parser.add_argument("--place-id", type=int, help="이 명소 하나만 처리한다.")
+        parser.add_argument(
+            "--content-id",
+            help="--place-id와 함께 쓴다. 그 명소의 TourAPI content_id를 이 값으로 고정한다"
+            " (검색·매칭 대신 직접 지정 — 오매칭을 바로잡을 때).",
+        )
+        parser.add_argument(
+            "--only-missing",
+            action="store_true",
+            help="photo_url이 비어 있는 명소만 처리한다 (아무 옵션도 없을 때의 기본 동작).",
+        )
+        parser.add_argument(
+            "--overwrite",
+            action="store_true",
+            help="이미 채워진 photo_url이 있어도 TourAPI 이미지로 덮어쓴다 (기본: 빈 값만 채움).",
+        )
+        parser.add_argument(
+            "--dry-run",
+            action="store_true",
+            help="저장하지 않고 어떤 명소에 어떤 이미지가 매칭되는지만 출력한다.",
+        )
+        parser.add_argument(
+            "--distance",
+            type=int,
+            default=PHOTO_MATCH_DISTANCE_METERS,
+            help=f"이름이 같아도 좌표가 이 거리(m)보다 멀면 다른 장소로 본다 (기본: {PHOTO_MATCH_DISTANCE_METERS}).",
+        )
+        parser.add_argument(
+            "--name-contains",
+            help="쉼표로 구분한 낱말 목록. 이름에 그중 하나라도 들어간 명소만 처리한다"
+            " (대소문자 무시). TourAPI 한도가 빠듯할 때 관광지부터 채우는 용도."
+            f" 참고할 만한 값: {_SUGGESTED_TOURIST_NAME_PATTERNS}",
+        )
+        parser.add_argument("--limit", type=int, help="최대 이 개수만 처리한다.")
+        parser.add_argument(
+            "--sleep",
+            type=float,
+            default=0.1,
+            help="명소 하나 처리할 때마다 이 초만큼 쉰다 (TourAPI 초당 제한 완화용, 기본 0.1).",
+        )
+
+    def handle(self, *args, **options):
+        if options["content_id"]:
+            if not options["place_id"]:
+                raise CommandError("--content-id는 --place-id와 함께 써야 합니다.")
+            self._pin_content_id(options["place_id"], options["content_id"])
+
+        places = Place.objects.all().order_by("id")
+        if options["place_id"]:
+            places = places.filter(id=options["place_id"])
+        elif options["overwrite"]:
+            # 이미 채워진 것·실패로 기록된 것까지 전부 다시 시도한다.
+            pass
+        else:
+            # 빈 photo_url + 아직 TourAPI 매칭을 시도한 적 없는 명소만 (재실행 시 이어서).
+            # 매칭 실패도 PlaceSource(__no_match__)로 기록돼 여기서 걸러진다.
+            tried = PlaceSource.objects.filter(source=TOUR_API_SOURCE).values("place_id")
+            places = places.filter(photo_url="").exclude(id__in=tried)
+
+        name_contains = options["name_contains"]
+        if name_contains:
+            words = [w.strip() for w in name_contains.split(",") if w.strip()]
+            if words:
+                name_filter = Q()
+                for word in words:
+                    name_filter |= Q(name__icontains=word)
+                places = places.filter(name_filter)
+
+        if options["limit"]:
+            places = places[: options["limit"]]
+
+        overwrite = options["overwrite"]
+        dry_run = options["dry_run"]
+        max_distance = options["distance"]
+        sleep_seconds = options["sleep"]
+
+        counts = {"matched": 0, "matched_no_change": 0, "no_match": 0, "error": 0}
+        total = places.count()
+        self.stdout.write(f"대상 명소 {total}건" + (" (dry-run)" if dry_run else ""))
+
+        stop_reason = None
+        consecutive_errors = 0
+        for index, place in enumerate(places.iterator(), start=1):
+            try:
+                if dry_run:
+                    status, url = self._dry_run_one(place, max_distance)
+                else:
+                    status, url = enrich_place_photo(
+                        place, overwrite=overwrite, max_distance_meters=max_distance
+                    )
+            except tour_api.TourApiDailyLimitError as exc:
+                # 일일 한도 초과. 남은 건을 계속 돌려봐야 전부 같은 오류라, 여기서 멈추고
+                # 지금까지 채운 것만 남긴다. 다음 날 다시 실행하면 빈 것만 이어서 채운다.
+                stop_reason = str(exc)
+                break
+            except Exception as exc:  # 한 건 실패해도 나머지는 계속 처리한다
+                counts["error"] += 1
+                consecutive_errors += 1
+                self.stderr.write(f"[{place.id}] {place.name} - 오류: {exc}")
+                # 연속으로 계속 실패하면 API가 죽었거나 트래픽 한도에 걸린 것 — 몇 시간을
+                # 타임아웃으로 허비하지 않도록 멈춘다. 재실행하면 빈 것만 이어서 채운다.
+                if consecutive_errors >= _CONSECUTIVE_ERROR_LIMIT:
+                    stop_reason = f"{_CONSECUTIVE_ERROR_LIMIT}건 연속 실패 — API 응답 없음"
+                    break
+                continue
+
+            consecutive_errors = 0
+            counts[status] += 1
+            if status == "matched":
+                self.stdout.write(f"[{place.id}] {place.name} - {url}")
+
+            if sleep_seconds and index < total:
+                time.sleep(sleep_seconds)
+
+        self._print_summary(counts, dry_run, stop_reason)
+
+    def _pin_content_id(self, place_id, content_id):
+        try:
+            place = Place.objects.get(id=place_id)
+        except Place.DoesNotExist:
+            raise CommandError(f"명소 {place_id}이(가) 없습니다.")
+        PlaceSource.objects.filter(place=place, source=TOUR_API_SOURCE).delete()
+        PlaceSource.objects.update_or_create(
+            source=TOUR_API_SOURCE, source_id=str(content_id), defaults={"place": place}
+        )
+        self.stdout.write(f"[{place.id}] {place.name} - TourAPI content_id {content_id}로 고정")
+
+    def _dry_run_one(self, place, max_distance):
+        """저장하지 않고 어떤 이미지가 매칭되는지만 본다."""
+        from places.place_photo_enrichment import NO_MATCH_PREFIX, pick_photo_match
+
+        known = PlaceSource.objects.filter(place=place, source=TOUR_API_SOURCE).first()
+        if known is not None and known.source_id.startswith(NO_MATCH_PREFIX):
+            return "no_match", None
+        if known is not None:
+            detail = tour_api.get_detail(known.source_id)
+            url = (detail or {}).get("first_image", "")
+        else:
+            candidates = tour_api.search_keyword(place.name)
+            match = pick_photo_match(place, candidates, max_distance_meters=max_distance)
+            url = match["first_image"] if match else ""
+        if not url:
+            return "no_match", None
+        if place.photo_url == url:
+            return "matched_no_change", None
+        return "matched", url
+
+    def _print_summary(self, counts, dry_run, stop_reason):
+        verb = "매칭됨(저장 안 함)" if dry_run else "채움"
+        headline = f"중단 ({stop_reason})" if stop_reason else "완료"
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"\n{headline}\n"
+                f"  {verb}: {counts['matched']}건\n"
+                f"  매칭됐지만 바꿀 값 없음: {counts['matched_no_change']}건\n"
+                f"  맞는 관광정보 없음: {counts['no_match']}건\n"
+                f"  오류: {counts['error']}건"
+            )
+        )

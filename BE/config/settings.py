@@ -246,6 +246,11 @@ TMDB_API_KEY = os.environ.get("TMDB_API_KEY", "")
 TMDB_IMAGE_BASE_URL = os.environ.get("TMDB_IMAGE_BASE_URL", "https://image.tmdb.org/t/p")
 TMDB_POSTER_SIZE = os.environ.get("TMDB_POSTER_SIZE", "w500")
 
+# 한국관광공사 TourAPI(국문 관광정보) 일반 인증키. 등록된 관광지·음식점의 대표 이미지로
+# 명소(Place.photo_url)를 채우는 데 쓴다 (import_place_photos). 공공데이터포털에서 받은
+# "디코딩된 일반 인증키"를 그대로 넣는다.
+TOUR_API_KEY = os.environ.get("TOUR_API_KEY", "")
+
 # Claude(Anthropic) API 키와 모델. "이 장소로 AI 코스 추천받기"에서 주변 상권 후보 중
 # 식당·카페·그 외 장소를 골라 코스를 만드는 데 쓴다 (docs/DETAIL_SPEC.md 6-1 #31).
 # 모델은 이 값만 바꾸면 교체된다 — 기본은 값싸고 빠른 Haiku. 조합 품질이 아쉬우면
