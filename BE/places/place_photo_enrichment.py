@@ -1,16 +1,21 @@
-"""DB에 있는 명소(Place)의 대표 사진(photo_url)을 TourAPI에서 채우는 서비스 계층.
+"""DB에 있는 명소(Place)의 대표 사진(photo_url)을 외부 소스에서 채우는 서비스 계층.
+
+소스는 두 곳이다. 둘 다 아래 규칙은 똑같고, 실제 API 호출 모듈만 다르다.
+- TourAPI (places/sources/tour_api.py) — 등록된 관광지·음식점 위주. 1순위.
+- 한국어 위키백과 (places/sources/wikimedia.py) — TourAPI로 못 채운 명소 보강. 2순위.
 
 여기서 하는 일:
-1. TourAPI 검색 결과 중에서 "우리 Place와 같은 장소"를 가려낸다 (pick_photo_match).
+1. 검색 결과 중에서 "우리 Place와 같은 장소"를 가려낸다 (pick_photo_match).
    이름이 정확히 일치하고, 좌표가 있으면 거리가 가까운 후보만 인정한다 — 애매하면
    채우지 않는다. 틀린 사진이 빈 값보다 나쁘다 (work_enrichment.pick_tmdb_match와 같은 원칙).
-2. 매칭에 성공하면 그 TourAPI content_id를 PlaceSource(source="TOUR_API")에 남긴다.
-   다시 실행할 때는 이름으로 재검색하지 않고 그 content_id로 바로 대표 이미지를 받는다
-   (매칭이 흔들리거나 잘못 붙는 것을 막는다 — WorkSource와 같은 원리).
+2. 매칭에 성공하면 그 소스의 원본 번호(TourAPI content_id / 위키백과 pageid)를
+   PlaceSource(source="TOUR_API" 또는 "WIKIMEDIA")에 남긴다. 다시 실행할 때는 이름으로
+   재검색하지 않고 그 번호로 바로 대표 이미지를 받는다 (매칭이 흔들리거나 잘못 붙는 것을 막는다).
 3. 대표 이미지를 Place.photo_url에 반영한다. photo_url은 원래 관리자가 채우는 값이라
    (models.py 참고) 비어 있을 때만 넣고, 채워져 있으면 --overwrite를 줄 때만 덮어쓴다.
 
-실제 TourAPI 호출은 places/sources/tour_api.py에 있다. 이 모듈은 그 결과를 판단·저장만 한다.
+이 모듈은 소스 API 응답을 판단·저장만 한다. 두 소스 모듈은 같은 함수 이름
+(search_keyword, get_detail)과 같은 dict 모양을 내주므로 아래 로직이 그대로 공유된다.
 """
 
 import logging
@@ -18,13 +23,14 @@ import re
 
 from places.models import PlaceSource
 from places.services import haversine_distance_meters
-from places.sources import tour_api
+from places.sources import tour_api, wikimedia
 
 logger = logging.getLogger(__name__)
 
 # PlaceSource.source 값. KCISA·GYEONGGI_DATA_DREAM과 달리 명소의 "출처"가 아니라
 # "대표 사진을 어디서 가져왔는지"지만, (source, source_id) 구조가 그대로 맞아 재사용한다.
 TOUR_API_SOURCE = "TOUR_API"
+WIKIMEDIA_SOURCE = "WIKIMEDIA"
 
 # 매칭 실패("맞는 관광정보 없음")도 PlaceSource에 남겨서, 다시 실행할 때 같은 명소를
 # 또 검색하지 않게 한다. source_id는 (source, source_id) 유일 제약 때문에 명소별로 다르게
@@ -119,17 +125,43 @@ def enrich_place_photo(place, *, overwrite=False, max_distance_meters=PHOTO_MATC
 
     이 명소에 TOUR_API PlaceSource가 이미 있으면(한 번 매칭됐거나 관리자가 직접 지정)
     이름 검색·매칭을 건너뛰고 그 content_id로 바로 대표 이미지를 받는다.
+    자세한 규칙은 _enrich_place_photo_from 참고.
+    """
+    return _enrich_place_photo_from(
+        place, tour_api, TOUR_API_SOURCE, overwrite=overwrite, max_distance_meters=max_distance_meters
+    )
+
+
+def enrich_place_photo_from_wikimedia(
+    place, *, overwrite=False, max_distance_meters=PHOTO_MATCH_DISTANCE_METERS
+):
+    """Place 하나의 대표 사진을 한국어 위키백과 문서 대표 이미지에서 찾아 저장한다.
+
+    보통 TourAPI(enrich_place_photo)로 못 채운 명소에 이어서 돌린다. 규칙은 같고
+    소스만 다르다. 이 명소에 WIKIMEDIA PlaceSource가 이미 있으면 재검색 없이 그
+    pageid로 바로 대표 이미지를 받는다. 자세한 규칙은 _enrich_place_photo_from 참고.
+    """
+    return _enrich_place_photo_from(
+        place, wikimedia, WIKIMEDIA_SOURCE, overwrite=overwrite, max_distance_meters=max_distance_meters
+    )
+
+
+def _enrich_place_photo_from(place, source_client, source_name, *, overwrite, max_distance_meters):
+    """Place 하나의 대표 사진을 주어진 소스에서 찾아 저장한다.
+
+    source_client는 search_keyword(name) / get_detail(source_id)를 가진 모듈
+    (tour_api 또는 wikimedia). source_name은 PlaceSource.source에 남길 값.
 
     반환: (status, photo_url)
       status:
-        "matched"           - 대표 이미지를 새로 채웠다(또는 --overwrite로 바꿨다)
+        "matched"            - 대표 이미지를 새로 채웠다(또는 --overwrite로 바꿨다)
         "matched_no_change"  - 같은 장소는 알지만 이미 같은 값이거나 이미지가 없어 바꿀 게 없었다
-        "no_match"           - 이름·좌표가 맞는 TourAPI 관광정보를 못 찾았다
+        "no_match"           - 이름·좌표가 맞는 관광정보/문서를 못 찾았다
       photo_url: 이번에 저장한 URL (matched일 때만, 아니면 None)
 
     통신 오류·타임아웃 등 예외는 그대로 올린다 (호출하는 커맨드가 건별로 잡는다).
     """
-    known = PlaceSource.objects.filter(place=place, source=TOUR_API_SOURCE).first()
+    known = PlaceSource.objects.filter(place=place, source=source_name).first()
     if known is not None and known.source_id.startswith(NO_MATCH_PREFIX):
         if not overwrite:
             return "no_match", None
@@ -137,21 +169,21 @@ def enrich_place_photo(place, *, overwrite=False, max_distance_meters=PHOTO_MATC
         known = None
 
     if known is not None:
-        detail = tour_api.get_detail(known.source_id)
+        detail = source_client.get_detail(known.source_id)
         photo_url = (detail or {}).get("first_image", "")
     else:
-        candidates = tour_api.search_keyword(place.name)
+        candidates = source_client.search_keyword(place.name)
         match = pick_photo_match(place, candidates, max_distance_meters=max_distance_meters)
         if match is None:
             PlaceSource.objects.get_or_create(
-                source=TOUR_API_SOURCE,
+                source=source_name,
                 source_id=f"{NO_MATCH_PREFIX}{place.id}",
                 defaults={"place": place},
             )
             return "no_match", None
         photo_url = match["first_image"]
         PlaceSource.objects.get_or_create(
-            source=TOUR_API_SOURCE, source_id=match["content_id"], defaults={"place": place}
+            source=source_name, source_id=match["content_id"], defaults={"place": place}
         )
 
     if not photo_url or place.photo_url == photo_url:
