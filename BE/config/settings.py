@@ -251,6 +251,12 @@ TMDB_POSTER_SIZE = os.environ.get("TMDB_POSTER_SIZE", "w500")
 # "디코딩된 일반 인증키"를 그대로 넣는다.
 TOUR_API_KEY = os.environ.get("TOUR_API_KEY", "")
 
+# Claude(Anthropic) API 키와 모델. "이 장소로 AI 코스 추천받기"에서 주변 상권 후보 중
+# 식당·카페·그 외 장소를 골라 코스를 만드는 데 쓴다 (docs/DETAIL_SPEC.md 6-1 #31).
+# 모델은 이 값만 바꾸면 교체된다 — 기본은 값싸고 빠른 Haiku. 조합 품질이 아쉬우면
+# "claude-sonnet-5"로 올린다.
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+COURSE_AI_MODEL = os.environ.get("COURSE_AI_MODEL", "claude-haiku-4-5")
 
 # Firebase Authentication
 # 서비스 계정 키 파일 경로. 아직 준비되지 않았다면 파일이 없어도 서버는 정상 부팅되고,

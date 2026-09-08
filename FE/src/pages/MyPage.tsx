@@ -13,12 +13,16 @@ import { LanguageSheet } from '../components/LanguageSheet'
 import { Skeleton } from '../components/Skeleton'
 import { resetLocationConsent } from '../hooks/useGeolocation'
 import { uploadProfilePhoto } from '../lib/profilePhotoUpload'
+import { useAuthStore } from '../store/useAuthStore'
 
 const NICKNAME_MAX_LENGTH = 20
 
 export function MyPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  // 프로필 저장 시 이 화면의 로컬 상태(me)뿐 아니라 전역 스토어도 같이 갱신해야,
+  // 메인 화면 인사말처럼 다른 화면에서 쓰는 닉네임도 새로고침 없이 바로 반영된다.
+  const setMember = useAuthStore((state) => state.setMember)
 
   const [me, setMe] = useState<Member | undefined>(undefined)
   const [favorites, setFavorites] = useState<Favorite[] | undefined>(undefined)
@@ -102,6 +106,7 @@ export function MyPage() {
       await updateProfile({ nickname: nickname.trim(), profile_image_url: photoUrl })
       const updated = await getMe()
       setMe(updated)
+      setMember(updated)
       setEditing(false)
     } catch (error) {
       console.error('프로필 저장 실패', error)
@@ -127,14 +132,14 @@ export function MyPage() {
   }
 
   return (
-    <main className="flex min-h-dvh flex-col gap-8 pb-24">
+    <main className="flex min-h-dvh flex-col gap-6 pb-24">
       <header className="flex items-center justify-between px-4 pt-6">
         <Link to="/" className="font-brand text-2xl font-bold text-primary">여운</Link>
         <LanguageSheet />
       </header>
 
       {me === undefined ? (
-        <div className="mx-4 flex items-center gap-4 rounded-2xl bg-white p-4 shadow-[0_4px_12px_rgba(0,0,0,0.08)]">
+        <div className="mx-4 flex items-center gap-8 rounded-2xl bg-white px-6 py-4 shadow-[0_4px_12px_rgba(0,0,0,0.08)]">
           <Skeleton className="h-20 w-20 rounded-full" />
           <div className="flex flex-1 flex-col gap-2">
             <Skeleton className="h-4 w-24 rounded-sm" />
@@ -143,7 +148,7 @@ export function MyPage() {
         </div>
       ) : (
         <section className="px-4">
-          <div className="flex items-start gap-4 rounded-2xl bg-white p-4 shadow-[0_4px_12px_rgba(0,0,0,0.08)]">
+          <div className="flex items-center gap-8 rounded-2xl bg-white px-6 py-4 shadow-[0_4px_12px_rgba(0,0,0,0.08)]">
             <div className="relative shrink-0">
               {(editing ? photoUrl : me.profile_image_url) ? (
                 <img

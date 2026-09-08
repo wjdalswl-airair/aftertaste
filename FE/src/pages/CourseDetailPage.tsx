@@ -10,18 +10,13 @@ import { FavoriteButton } from '../components/FavoriteButton'
 import { Skeleton } from '../components/Skeleton'
 import { loadKakaoMaps } from '../lib/kakaoMap'
 import { useAuthStore } from '../store/useAuthStore'
+import { shortRegion } from '../utils/address'
 import { getDistanceKm } from '../utils/distance'
 
 const ROLE_LABEL: Record<CoursePlaceRole, string> = {
   RESTAURANT: '맛집',
   CAFE: '카페',
   OTHER: '주변 명소',
-}
-
-// anchor place의 address 앞 두 토큰을 짧은 지역명으로 쓴다 (예: "경기도 수원시..." → "경기 수원").
-// BE 응답엔 지역명 필드가 따로 없어서 임시로 이렇게 잘라 쓴다.
-function shortRegion(address: string): string {
-  return address.split(' ').slice(0, 2).join(' ')
 }
 
 function formatDate(isoString: string) {

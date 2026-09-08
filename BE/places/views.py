@@ -1,8 +1,10 @@
 import logging
+import random
 from datetime import timedelta
 
 from django.contrib.postgres.search import TrigramSimilarity
 from django.db.models import Count, Q
+from django.db.models.functions import Upper
 from django.utils import timezone
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework.exceptions import AuthenticationFailed
@@ -11,7 +13,14 @@ from rest_framework.views import APIView
 
 from config.api_messages import NOT_FOUND_MESSAGE
 from favorites.models import Favorite
-from places.models import Place, PlaceWork, SearchHistory, Work
+from places.models import (
+    Place,
+    PlaceTranslation,
+    PlaceWork,
+    SearchHistory,
+    Work,
+    WorkTranslation,
+)
 from reviews.models import Review
 from places.serializers import (
     AutocompleteResponseSerializer,
@@ -68,6 +77,17 @@ NEARBY_PLACES_LIMIT = 15
 VALID_SEARCH_TYPES = {"", "WORK", "DRAMA", "MOVIE"}
 
 
+def _name_match(keyword):
+    """대소문자 무시 부분일치(contains) + 오타 허용(trigram_similar).
+
+    .alias(u=Upper(<컬럼>))로 만든 별칭 `u`에 건다. 검색 조건을 UPPER(컬럼) 기준으로
+    통일해야 UPPER(컬럼) 식으로 만든 GIN 트라이그램 인덱스를 탄다 (Place.Meta 참고).
+    icontains는 UPPER(컬럼) LIKE라서 컬럼 원본 인덱스로는 못 타는 게 원래 문제였다.
+    """
+    kw = keyword.upper()
+    return Q(u__contains=kw) | Q(u__trigram_similar=kw)
+
+
 def _search_places(keyword):
     """명소 이름(원문 + 번역문)에서 비슷한 것까지 찾는다.
 
@@ -79,17 +99,23 @@ def _search_places(keyword):
 
     translations를 prefetch해서, 검색 결과를 직렬화할 때(pick_translated_text) 명소마다
     추가 쿼리가 나가지 않게 한다.
+
+    번역문 조건을 JOIN(translations__name__...)으로 붙이면 명소 하나가 번역 개수만큼
+    중복 행으로 불어나 .distinct()로 다시 접어야 하고, 그 정렬 비용이 크다. 대신 번역
+    테이블을 따로 뒤져 place_id 목록만 뽑아 pk__in 서브쿼리로 넘긴다 — 두 조회 모두
+    자기 테이블의 GIN 트라이그램 인덱스를 그대로 탄다.
     """
 
+    place_ids_by_translation = (
+        PlaceTranslation.objects.alias(u=Upper("name"))
+        .filter(_name_match(keyword))
+        .values("place_id")
+    )
+
     return (
-        Place.objects.filter(
-            Q(name__icontains=keyword)
-            | Q(name__trigram_similar=keyword)
-            | Q(translations__name__icontains=keyword)
-            | Q(translations__name__trigram_similar=keyword)
-        )
+        Place.objects.alias(u=Upper("name"))
+        .filter(_name_match(keyword) | Q(pk__in=place_ids_by_translation))
         .annotate(similarity=TrigramSimilarity("name", keyword))
-        .distinct()
         .order_by("-similarity", "name")
         .prefetch_related("translations")
     )
@@ -99,19 +125,22 @@ def _search_works(keyword, category=None):
     """작품 제목(원문 + 번역문)에서 비슷한 것까지 찾는다. category를 주면 그 구분만 본다.
 
     미승인 번역까지 검색 대상에 포함하는 이유는 _search_places와 같다.
+    번역 조건을 JOIN 대신 pk__in 서브쿼리로 넘기는 이유도 _search_places와 같다.
     """
 
-    qs = Work.objects.filter(
-        Q(title__icontains=keyword)
-        | Q(title__trigram_similar=keyword)
-        | Q(translations__title__icontains=keyword)
-        | Q(translations__title__trigram_similar=keyword)
+    work_ids_by_translation = (
+        WorkTranslation.objects.alias(u=Upper("title"))
+        .filter(_name_match(keyword))
+        .values("work_id")
+    )
+
+    qs = Work.objects.alias(u=Upper("title")).filter(
+        _name_match(keyword) | Q(pk__in=work_ids_by_translation)
     )
     if category:
         qs = qs.filter(category=category)
     return (
         qs.annotate(similarity=TrigramSimilarity("title", keyword))
-        .distinct()
         .order_by("-similarity", "title")
         .prefetch_related("translations")
     )
@@ -213,14 +242,29 @@ class SearchAutocompleteView(APIView):
 
         language = resolve_language(request)
 
+        # 검색(SearchView)과 같은 방식: UPPER(컬럼) 부분일치로 GIN 인덱스를 타고,
+        # 번역문 조건은 JOIN+distinct 대신 pk__in 서브쿼리로 넘긴다. 자동완성은 오타 허용
+        # (trigram_similar)까지는 안 하고 부분일치만 본다.
+        kw = keyword.upper()
+        place_ids_by_translation = (
+            PlaceTranslation.objects.alias(u=Upper("name"))
+            .filter(u__contains=kw)
+            .values("place_id")
+        )
+        work_ids_by_translation = (
+            WorkTranslation.objects.alias(u=Upper("title"))
+            .filter(u__contains=kw)
+            .values("work_id")
+        )
+
         places = (
-            Place.objects.filter(Q(name__icontains=keyword) | Q(translations__name__icontains=keyword))
-            .distinct()
+            Place.objects.alias(u=Upper("name"))
+            .filter(Q(u__contains=kw) | Q(pk__in=place_ids_by_translation))
             .prefetch_related("translations")
         )
         works = (
-            Work.objects.filter(Q(title__icontains=keyword) | Q(translations__title__icontains=keyword))
-            .distinct()
+            Work.objects.alias(u=Upper("title"))
+            .filter(Q(u__contains=kw) | Q(pk__in=work_ids_by_translation))
             .prefetch_related("translations")
         )
 
@@ -265,20 +309,48 @@ class PopularKeywordsView(APIView):
         return Response({"keywords": [row["keyword"] for row in rows]})
 
 
+def _places_by_ids_in_order(ids):
+    """id 목록을 받아 그 순서대로 Place 객체를 돌려준다.
+
+    번역(translations)을 함께 prefetch한다 — 추천 응답은 PlaceSearchSerializer가
+    명소마다 번역 이름을 고르므로(?lang=이 붙어 오면), prefetch가 없으면 결과 개수만큼
+    번역 쿼리가 따로 나간다(N+1). 배포 DB가 멀리 있어 이 N+1이 추천이 느렸던 주 원인이었다.
+    """
+    by_id = Place.objects.filter(id__in=ids).prefetch_related("translations").in_bulk()
+    return [by_id[pk] for pk in ids if pk in by_id]
+
+
+def _nearest_place_ids(latitude, longitude, count):
+    """좌표를 가진 명소를 (id·좌표만) 가볍게 훑어 가까운 순으로 count개의 id를 돌려준다."""
+    rows = Place.objects.filter(
+        latitude__isnull=False, longitude__isnull=False
+    ).values_list("id", "latitude", "longitude")
+    nearest = sorted(
+        rows, key=lambda row: haversine_distance_meters(latitude, longitude, row[1], row[2])
+    )[:count]
+    return [row[0] for row in nearest]
+
+
 def _nearest_places(latitude, longitude, count):
     """좌표를 가진 명소 중 현재 위치에서 가까운 순서로 count개를 돌려준다.
 
-    명소 수가 적어(수백~수천 건) 파이썬에서 전부 훑어 거리를 계산해도 충분하다.
-    좌표가 없는 명소는 거리를 잴 수 없으므로 대상에서 뺀다.
+    거리 계산에는 좌표만 필요하므로, 먼저 (id·좌표)만 가볍게 훑어 가까운 count개를 고른 뒤
+    그 명소만 실제로 불러온다. 좌표가 없는 명소는 거리를 잴 수 없어 제외한다.
+    (예전엔 명소 전체를 통째로 메모리에 올렸는데, 배포 DB가 멀리 있어 전송·객체 생성
+    비용이 컸다.)
     """
-    places = list(Place.objects.filter(latitude__isnull=False, longitude__isnull=False))
-    places.sort(key=lambda p: haversine_distance_meters(latitude, longitude, p.latitude, p.longitude))
-    return places[:count]
+    return _places_by_ids_in_order(_nearest_place_ids(latitude, longitude, count))
 
 
 def _random_places(count):
-    """위치 정보가 없을 때(위치 권한 거부) 명소를 무작위로 count개 고른다."""
-    return list(Place.objects.order_by("?")[:count])
+    """위치 정보가 없을 때(위치 권한 거부) 명소를 무작위로 count개 고른다.
+
+    ORDER BY random()은 매 호출마다 테이블 전체를 정렬한다. 대신 id만 받아와
+    파이썬에서 표본을 뽑고, 그 명소만 불러온다.
+    """
+    ids = list(Place.objects.values_list("id", flat=True))
+    chosen = random.sample(ids, min(count, len(ids)))
+    return _places_by_ids_in_order(chosen)
 
 
 def _personalized_places(member, latitude, longitude, count):

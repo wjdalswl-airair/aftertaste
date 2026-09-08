@@ -39,7 +39,7 @@ export function BookmarksPage() {
                   <img
                     src={favorite.place.photo_url}
                     alt=""
-                    className="h-[74px] w-[75px] rounded-2xl object-cover"
+                    className="h-[74px] w-[75px] rounded-xl object-cover"
                   />
                   <div className="flex-1">
                     <p className="text-sm text-ink">{favorite.place.name}</p>
@@ -54,7 +54,7 @@ export function BookmarksPage() {
                 </Link>
               ) : favorite.course ? (
                 <Link key={favorite.id} to={`/courses/${favorite.course.id}`} className="flex items-center gap-3">
-                  <div className="h-[74px] w-[75px] shrink-0 rounded-2xl bg-accent/15" />
+                  <div className="h-[74px] w-[75px] shrink-0 rounded-xl bg-accent/15" />
                   <div className="flex-1">
                     <p className="text-sm text-ink">{favorite.course.title}</p>
                     <p className="text-[11px] text-ink-secondary">{favorite.course.place_name}</p>
@@ -85,7 +85,7 @@ function BookmarksSkeleton() {
     <div className="flex flex-col gap-4">
       {[0, 1, 2].map((i) => (
         <div key={i} className="flex items-center gap-3">
-          <Skeleton className="h-[74px] w-[75px] rounded-2xl" />
+          <Skeleton className="h-[74px] w-[75px] rounded-xl" />
           <div className="flex flex-1 flex-col gap-2">
             <Skeleton className="h-3 w-1/2 rounded-sm" />
             <Skeleton className="h-3 w-1/3 rounded-sm" />

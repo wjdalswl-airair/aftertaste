@@ -1,4 +1,9 @@
 {
+  "bottomNav": {
+    "home": "Home",
+    "search": "Search",
+    "profile": "Profile"
+  },
   "mainPage": {
     "greeting": {
       "hello": "Hello",
@@ -50,20 +55,24 @@
     "shareCopied": "Link copied",
     "location": "Location",
     "mainWorks": "Featured in",
+    "mainWorksMore": "Show more",
+    "mainWorksLess": "Show less",
     "photoTips": "Photo tips",
     "businessHours": "Hours",
     "recommendedTime": "Best time to visit",
     "etiquette": "Etiquette",
-    "rateButton": "Rate",
     "reviewButton": "Write a review",
     "reviewsTitle": "Visitor reviews",
     "reviewsEmpty": "No reviews yet",
     "reviewsMore": "See more",
     "courseCta": "Get an AI course from this spot",
+    "courseCtaLoading": "AI is building your course...",
+    "courseAiError": "Couldn't create a course. Please try again.",
     "mapTitle": "Map",
     "mapUnavailable": "Map unavailable",
     "noCoordinates": "No location data",
-    "directions": "Directions"
+    "directions": "Directions",
+    "currentLocation": "Current location"
   },
   "workDetail": {
     "notFound": "Not found",
@@ -71,6 +80,8 @@
     "director": "Director",
     "releaseDate": "Release date",
     "storyTitle": "The story",
+    "storyMore": "Show more",
+    "storyLess": "Show less",
     "detailButton": "See more",
     "placesTitle": "Filming spots in \"{{title}}\"",
     "placesEmpty": "No filming spots yet"

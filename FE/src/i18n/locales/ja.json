@@ -1,4 +1,9 @@
 {
+  "bottomNav": {
+    "home": "ホーム",
+    "search": "検索",
+    "profile": "プロフィール"
+  },
   "mainPage": {
     "greeting": {
       "hello": "こんにちは",
@@ -50,20 +55,24 @@
     "shareCopied": "リンクをコピーしました",
     "location": "位置",
     "mainWorks": "主な出演作品",
+    "mainWorksMore": "もっと見る",
+    "mainWorksLess": "閉じる",
     "photoTips": "撮影のヒント",
     "businessHours": "営業時間",
     "recommendedTime": "おすすめの訪問時間",
     "etiquette": "注意事項",
-    "rateButton": "評価する",
     "reviewButton": "レビューを書く",
     "reviewsTitle": "訪問者レビュー",
     "reviewsEmpty": "まだレビューがありません",
     "reviewsMore": "もっと見る",
     "courseCta": "この場所からAIコースを受け取る",
+    "courseCtaLoading": "AIがコースを作成中...",
+    "courseAiError": "コースを作成できませんでした。もう一度お試しください。",
     "mapTitle": "地図",
     "mapUnavailable": "地図を表示できません",
     "noCoordinates": "位置情報がありません",
-    "directions": "道案内"
+    "directions": "道案内",
+    "currentLocation": "現在地"
   },
   "workDetail": {
     "notFound": "見つかりません",
@@ -71,6 +80,8 @@
     "director": "監督",
     "releaseDate": "公開日",
     "storyTitle": "この作品のストーリー",
+    "storyMore": "もっと見る",
+    "storyLess": "閉じる",
     "detailButton": "詳しく見る",
     "placesTitle": "「{{title}}」の撮影地",
     "placesEmpty": "まだ登録された撮影地がありません"

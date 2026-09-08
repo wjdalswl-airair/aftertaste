@@ -191,6 +191,7 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
   1. Top10/추천 카드의 부제(작품명)를 Figma는 보여주지만, 두 API 응답에 작품명이 없어 **`address`로 대신 표시** 중이다.
   2. 추천 카드의 거리 뱃지(예: "거리 1.2km")도 Figma엔 있지만, API 응답에 좌표가 없어 만들지 못했다.
   3. Hero 캡션의 명소/작품명은 `review.place`(id)로 `GET /api/places/{id}/`를 한 번 더 호출해서 채운다. 이 상세 응답의 `works` 필드 정확한 구조를 아직 검증 못 해서(`src/api/spots.ts`의 `PlaceDetail` 타입이 추정치), 실제로 작품명이 안 나올 수 있다 — 필드가 없으면 명소 이름만 보인다.
+     - **성능 주의 (2026-09-08 측정)**: 이 API는 BE가 주변 상권을 카카오에 실시간으로 물어봐서(`_fetch_nearby_places`) 단독으로도 약 1.3초 걸리는 무거운 API다 — 배너·추천 API(각 ~0.4초)의 3배 수준. 명소 이름 한 줄 때문에 히어로 슬라이드 전체를 기다리게 하지 않도록, `Hero.tsx`는 이 호출을 기다리지 않고 먼저 `place: null`로 슬라이드를 보여준 뒤 응답이 오면 그때 이름을 채워 넣는다(체감 속도 개선, 실제 요청 시간 자체는 그대로).
 
 ### S-03. 검색 결과 — `pages/SearchPage.tsx` (Phase 3, 구현 완료 — 2026-08-30)
 - 컴포넌트: 검색창(자동완성), 전체/드라마/영화 필터 칩, 작품/명소 섹션, 추천 검색어, 최근 검색어
@@ -227,7 +228,7 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
   2. 모델의 `photo_tips`(사진 팁) — 목업엔 없지만 실제 데이터라 정보 카드에 추가했다.
   3. 목업 "주요 촬영작"은 등장 작품 제목만 콤마로 나열한다. API는 작품별 `scene_description`(장면 설명)도 주지만, 목업에 보여줄 자리가 없어서 **화면엔 아직 안 넣었다** — 필요하면 나중에 UI 추가.
   4. "이 장소로 AI 코스 추천받기" CTA, 지도 위 "주변 코스 추천받기" 라벨은 코스(S-08, 훨씬 뒤 Phase)라 정적으로만 보이고 실제 동작 없음.
-  5. "별점 남기기"/"리뷰 남기기" 버튼은 로그인 여부만 확인(비로그인 시 `/login`). 실제 작성 기능은 Phase5.
+  5. **"별점 남기기" 버튼은 없앴다 (2026-09-06).** BE `Review` 모델의 `content`가 필수 필드라(`BE/reviews/models.py`) 별점만 저장하는 API 자체가 없어서, "별점만 남기는" 흐름을 만들 수 없었다. "리뷰 남기기" 버튼 하나만 남기고, 이 명소에 내가 쓴 리뷰가 하나라도 있으면(작성자 닉네임 비교 — 리뷰 API에 본인 여부 플래그가 없어서 임시로 이렇게 판단, 다른 화면과 동일한 방식) 별점 모달 없이 바로 작성 화면(`/spots/{id}/reviews/new`)으로 보내고, 없으면 먼저 `RatingModal`에서 별점을 고른 뒤 작성 화면으로 넘어간다(로그인 필요, 비로그인 시 `/login`).
   6. **`latitude`/`longitude`는 문자열로 온다** — `Place` 모델이 `DecimalField`라 DRF가 정밀도 보존을 위해 숫자가 아니라 문자열(`"37.579617"`)로 직렬화한다(테스트용 데이터로 직접 확인). `NearbyPlace`의 좌표는 `FloatField`라 그대로 숫자로 온다 — 같은 화면 안에서 좌표 타입이 다르니 헷갈리지 않게 `SpotDetailPage.tsx`에서 `Number()`로 변환해서 쓴다.
 - **카카오맵 키**: `.env`의 `VITE_KAKAO_JS_KEY`(JS 키, `VITE_KAKAO_...` 이름은 이번에 새로 정함 — BE의 `KAKAO_API_KEY`는 REST 키라 다른 키다)를 `index.html`에서 Vite `%ENV%` 치환으로 읽는다. 키가 없으면 `src/lib/kakaoMap.ts`의 `loadKakaoMaps()`가 `null`을 돌려줘서, 지도 자리에 "지도를 표시할 수 없어요" 폴백을 보여주고 나머지 화면은 정상 동작한다.
 - 카카오맵 SDK는 npm 타입 패키지가 없어 `src/types/kakao.d.ts`에 실제 쓰는 만큼만(`Map`/`Marker`/`LatLng`/`InfoWindow`/`load`) 최소 ambient 타입을 직접 선언했다.
@@ -283,7 +284,10 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 - `CoursePlace`에도 거리·anchor place 좌표가 없어서, 코스 상세 화면은 `getCourseDetail`과 별개로 `getPlaceDetail(course.place_id)`를 추가로 불러서 anchor 좌표·주소·작품명을 채운다.
 - 코스 상세의 "지역" 표시(예: "경기 수원")는 anchor place `address`의 앞 두 토큰을 자른 임시 값이다 — BE에 지역명 필드가 따로 없다. `MyCourseListPage`(내가 만든 코스 목록)는 이 추가 조회(N+1)까지는 안 하고 대신 `place_name`을 보여준다(Phase7 "내가 쓴 리뷰" 갭과 같은 타협).
 - "내가 만든 코스인지" 판단은 리뷰와 동일하게 닉네임 비교로 임시 처리했다(`creator_nickname === member.nickname`) — 정확한 방법 아님, 기존 갭과 동일.
-- 명소 상세(Phase4)의 "이 장소로 AI 코스 추천받기" 버튼을 활성화했다: 이 명소에 이미 코스가 있으면(로그인 불필요) 첫 번째 코스 상세로, 없으면 로그인 확인 후 생성 화면으로 보낸다.
+- 명소 상세(Phase4)의 "이 장소로 AI 코스 추천받기" 버튼: 이 명소에 이미 코스가 있으면(로그인 불필요) 첫 번째 코스 상세로 이동한다.
+- **AI 코스 추천 연동 (2026-09-08, GitHub 이슈 #38)**: 코스가 없으면 로그인 확인 후 `POST /api/places/{place_id}/courses/ai-recommend/`(`src/api/courses.ts`의 `aiRecommendCourse`)를 호출해 Claude가 주변 상권 중 식당 1+카페 1+그 외 1로 코스를 자동 생성한다(성공 시 201, 생성된 코스 상세로 바로 이동). 이전엔 수동 생성 화면(`/spots/{placeId}/courses/new`, `CourseCreatePage.tsx`)으로 보냈으나 이걸로 대체했다 — 그 라우트/페이지 자체는 남아있지만 지금은 도달할 진입점이 없다.
+  - 버튼 클릭 시 로딩 중엔 "AI가 코스를 만드는 중..."으로 문구가 바뀌고 비활성화된다.
+  - 에러(400 이미 코스 있음 / 422 주변 후보 부족 / 503 AI 호출 실패)는 BE가 주는 한국어 `detail` 메시지를 그대로 버튼 아래에 보여준다 — FE에서 상태 코드별로 문구를 따로 만들지 않는다.
 
 ### S-09. 공유 — 명소 상세/코스 화면 내부 기능 (Phase 4·8에서 이미 구현됨, Phase9은 확인만)
 - 링크 복사만 구현 (PRD 5장). 별도 공유 API 없음 — `navigator.clipboard.writeText(location.href)`.
