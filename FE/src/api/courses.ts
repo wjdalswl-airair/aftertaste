@@ -71,3 +71,10 @@ export function deleteCourse(courseId: number): Promise<void> {
 export function getMyCourses(): Promise<Course[]> {
   return authorizedFetch<{ courses: Course[] }>('/api/account/courses/').then((res) => res.courses)
 }
+
+// AI(Claude)가 주변 상권 중에서 식당 1 + 카페 1 + 그 외 1을 골라 코스를 만들어준다. 로그인 필요.
+// 실패하면 BE가 상황별 한국어 메시지를 detail로 준다(400 이미 코스 있음 / 422 후보 부족 / 503 AI 호출 실패) —
+// authorizedFetch가 그 메시지를 그대로 Error.message로 던지므로 호출부에서 그대로 보여주면 된다.
+export function aiRecommendCourse(placeId: number): Promise<Course> {
+  return authorizedFetch<Course>(`/api/places/${placeId}/courses/ai-recommend/`, { method: 'POST' })
+}

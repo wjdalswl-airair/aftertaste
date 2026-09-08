@@ -191,6 +191,7 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
   1. Top10/추천 카드의 부제(작품명)를 Figma는 보여주지만, 두 API 응답에 작품명이 없어 **`address`로 대신 표시** 중이다.
   2. 추천 카드의 거리 뱃지(예: "거리 1.2km")도 Figma엔 있지만, API 응답에 좌표가 없어 만들지 못했다.
   3. Hero 캡션의 명소/작품명은 `review.place`(id)로 `GET /api/places/{id}/`를 한 번 더 호출해서 채운다. 이 상세 응답의 `works` 필드 정확한 구조를 아직 검증 못 해서(`src/api/spots.ts`의 `PlaceDetail` 타입이 추정치), 실제로 작품명이 안 나올 수 있다 — 필드가 없으면 명소 이름만 보인다.
+     - **성능 주의 (2026-09-08 측정)**: 이 API는 BE가 주변 상권을 카카오에 실시간으로 물어봐서(`_fetch_nearby_places`) 단독으로도 약 1.3초 걸리는 무거운 API다 — 배너·추천 API(각 ~0.4초)의 3배 수준. 명소 이름 한 줄 때문에 히어로 슬라이드 전체를 기다리게 하지 않도록, `Hero.tsx`는 이 호출을 기다리지 않고 먼저 `place: null`로 슬라이드를 보여준 뒤 응답이 오면 그때 이름을 채워 넣는다(체감 속도 개선, 실제 요청 시간 자체는 그대로).
 
 ### S-03. 검색 결과 — `pages/SearchPage.tsx` (Phase 3, 구현 완료 — 2026-08-30)
 - 컴포넌트: 검색창(자동완성), 전체/드라마/영화 필터 칩, 작품/명소 섹션, 추천 검색어, 최근 검색어
@@ -283,7 +284,10 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 - `CoursePlace`에도 거리·anchor place 좌표가 없어서, 코스 상세 화면은 `getCourseDetail`과 별개로 `getPlaceDetail(course.place_id)`를 추가로 불러서 anchor 좌표·주소·작품명을 채운다.
 - 코스 상세의 "지역" 표시(예: "경기 수원")는 anchor place `address`의 앞 두 토큰을 자른 임시 값이다 — BE에 지역명 필드가 따로 없다. `MyCourseListPage`(내가 만든 코스 목록)는 이 추가 조회(N+1)까지는 안 하고 대신 `place_name`을 보여준다(Phase7 "내가 쓴 리뷰" 갭과 같은 타협).
 - "내가 만든 코스인지" 판단은 리뷰와 동일하게 닉네임 비교로 임시 처리했다(`creator_nickname === member.nickname`) — 정확한 방법 아님, 기존 갭과 동일.
-- 명소 상세(Phase4)의 "이 장소로 AI 코스 추천받기" 버튼을 활성화했다: 이 명소에 이미 코스가 있으면(로그인 불필요) 첫 번째 코스 상세로, 없으면 로그인 확인 후 생성 화면으로 보낸다.
+- 명소 상세(Phase4)의 "이 장소로 AI 코스 추천받기" 버튼: 이 명소에 이미 코스가 있으면(로그인 불필요) 첫 번째 코스 상세로 이동한다.
+- **AI 코스 추천 연동 (2026-09-08, GitHub 이슈 #38)**: 코스가 없으면 로그인 확인 후 `POST /api/places/{place_id}/courses/ai-recommend/`(`src/api/courses.ts`의 `aiRecommendCourse`)를 호출해 Claude가 주변 상권 중 식당 1+카페 1+그 외 1로 코스를 자동 생성한다(성공 시 201, 생성된 코스 상세로 바로 이동). 이전엔 수동 생성 화면(`/spots/{placeId}/courses/new`, `CourseCreatePage.tsx`)으로 보냈으나 이걸로 대체했다 — 그 라우트/페이지 자체는 남아있지만 지금은 도달할 진입점이 없다.
+  - 버튼 클릭 시 로딩 중엔 "AI가 코스를 만드는 중..."으로 문구가 바뀌고 비활성화된다.
+  - 에러(400 이미 코스 있음 / 422 주변 후보 부족 / 503 AI 호출 실패)는 BE가 주는 한국어 `detail` 메시지를 그대로 버튼 아래에 보여준다 — FE에서 상태 코드별로 문구를 따로 만들지 않는다.
 
 ### S-09. 공유 — 명소 상세/코스 화면 내부 기능 (Phase 4·8에서 이미 구현됨, Phase9은 확인만)
 - 링크 복사만 구현 (PRD 5장). 별도 공유 API 없음 — `navigator.clipboard.writeText(location.href)`.

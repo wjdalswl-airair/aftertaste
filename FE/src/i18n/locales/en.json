@@ -66,6 +66,8 @@
     "reviewsEmpty": "No reviews yet",
     "reviewsMore": "See more",
     "courseCta": "Get an AI course from this spot",
+    "courseCtaLoading": "AI is building your course...",
+    "courseAiError": "Couldn't create a course. Please try again.",
     "mapTitle": "Map",
     "mapUnavailable": "Map unavailable",
     "noCoordinates": "No location data",

@@ -13,7 +13,7 @@ import {
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { getPlaceCourses } from '../api/courses'
+import { aiRecommendCourse, getPlaceCourses } from '../api/courses'
 import { getPlaceDetail, type PlaceDetail, type PlaceWork } from '../api/spots'
 import { BottomNav } from '../components/BottomNav'
 import { FavoriteButton } from '../components/FavoriteButton'
@@ -35,6 +35,8 @@ export function SpotDetailPage() {
   // undefined: 로딩 중, null: 존재하지 않거나 실패
   const [place, setPlace] = useState<PlaceDetail | null | undefined>(undefined)
   const [showRatingModal, setShowRatingModal] = useState(false)
+  const [courseAiLoading, setCourseAiLoading] = useState(false)
+  const [courseAiError, setCourseAiError] = useState<string | null>(null)
 
   useEffect(() => {
     setPlace(undefined)
@@ -72,16 +74,31 @@ export function SpotDetailPage() {
     setShowRatingModal(true)
   }
 
-  // 이 명소를 기준으로 한 코스가 이미 있으면(로그인 불필요) 그중 첫 번째를 보여주고,
-  // 없으면 로그인 확인 후 코스 생성 화면으로 보낸다.
+  // 이 명소를 기준으로 한 코스가 이미 있으면(로그인 불필요) 그중 첫 번째로 보내고,
+  // 없으면 로그인 확인 후 AI(Claude)가 주변 상권으로 코스를 자동으로 만들어준다
+  // (GitHub 이슈 #38 — 기존엔 수동 생성 화면으로 보냈으나, BE에 AI 추천 엔드포인트가 생겨서 교체).
   async function handleCourseClick() {
+    if (courseAiLoading) {
+      return
+    }
     const courses = await getPlaceCourses(Number(placeId)).catch(() => [])
     if (courses.length > 0) {
       navigate(`/courses/${courses[0].id}`)
       return
     }
-    if (requireLogin()) {
-      navigate(`/spots/${placeId}/courses/new`)
+    if (!requireLogin()) {
+      return
+    }
+
+    setCourseAiError(null)
+    setCourseAiLoading(true)
+    try {
+      const course = await aiRecommendCourse(Number(placeId))
+      navigate(`/courses/${course.id}`)
+    } catch (error) {
+      setCourseAiError(error instanceof Error ? error.message : t('spotDetail.courseAiError'))
+    } finally {
+      setCourseAiLoading(false)
     }
   }
 
@@ -201,11 +218,13 @@ export function SpotDetailPage() {
             <button
               type="button"
               onClick={handleCourseClick}
-              className="flex w-full items-center justify-center gap-1.5 rounded-2xl bg-primary py-3 text-sm font-medium text-white"
+              disabled={courseAiLoading}
+              className="flex w-full items-center justify-center gap-1.5 rounded-2xl bg-primary py-3 text-sm font-medium text-white disabled:opacity-60"
             >
               <Sparkles size={16} />
-              {t('spotDetail.courseCta')}
+              {courseAiLoading ? t('spotDetail.courseCtaLoading') : t('spotDetail.courseCta')}
             </button>
+            {courseAiError && <p className="mt-2 text-center text-xs text-primary">{courseAiError}</p>}
           </div>
 
           <section className="px-4">

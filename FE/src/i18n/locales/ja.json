@@ -66,6 +66,8 @@
     "reviewsEmpty": "まだレビューがありません",
     "reviewsMore": "もっと見る",
     "courseCta": "この場所からAIコースを受け取る",
+    "courseCtaLoading": "AIがコースを作成中...",
+    "courseAiError": "コースを作成できませんでした。もう一度お試しください。",
     "mapTitle": "地図",
     "mapUnavailable": "地図を表示できません",
     "noCoordinates": "位置情報がありません",
