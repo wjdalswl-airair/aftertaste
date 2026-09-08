@@ -17,6 +17,7 @@ from main.serializers import (
     TopPlaceSerializer,
 )
 from places.models import Place
+from places.views import favorited_place_ids_for
 from reviews.models import Review
 from reviews.serializers import ReviewSerializer
 
@@ -113,9 +114,13 @@ class TopPlacesView(APIView):
         responses={200: TopPlaceListResponseSerializer},
     )
     def get(self, request):
-        places = (
+        places = list(
             Place.objects.annotate(favorite_count=Count("favorited_by"))
             .filter(favorite_count__gt=0)
             .order_by("-favorite_count", "id")[:TOP_PLACES_COUNT]
         )
-        return Response({"places": TopPlaceSerializer(places, many=True).data})
+        # 카드 별을 "이미 찜함/아직 안 찜함"으로 정확히 그리게 한다 (fix/be/main-tab-favorite).
+        context = {"favorited_place_ids": favorited_place_ids_for(request.user, places)}
+        return Response(
+            {"places": TopPlaceSerializer(places, many=True, context=context).data}
+        )

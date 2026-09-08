@@ -8,21 +8,31 @@ from reviews.serializers import ReviewSerializer
 
 
 class PlaceSearchSerializer(serializers.ModelSerializer):
-    """검색 결과의 명소 섹션에 쓰는 최소 정보. 상세 정보는 명소 상세 API(Phase 2-5) 몫이다.
+    """검색 결과·추천·Top10의 명소 카드에 쓰는 최소 정보. 상세 정보는 명소 상세 API(Phase 2-5) 몫이다.
 
     name은 context의 language에 승인된 번역이 있으면 그 값을, 없으면 한국어 원문을 돌려준다
     (뷰가 context={"language": ...}를 넣어줘야 한다. 안 넣으면 항상 한국어 원문).
+
+    is_favorited는 "지금 로그인한 사람이 이 명소를 이미 즐겨찾기 했는지"다. 목록 뷰가
+    context["favorited_place_ids"]에 그 사람의 즐겨찾기 place_id 집합을 넣어줘야 한다
+    (명소마다 따로 조회하면 N+1이라 뷰에서 한 번에 모아 넘긴다). 안 넣으면 항상 False다
+    — 메인 화면 카드 별이 늘 빈 별로 시작해서, 이미 찜한 곳을 다시 눌러 취소돼 버리던 문제를
+    막기 위한 필드다 (fix/be/main-tab-favorite).
     """
 
     name = serializers.SerializerMethodField()
+    is_favorited = serializers.SerializerMethodField()
 
     class Meta:
         model = Place
-        fields = ["id", "name", "address", "photo_url"]
+        fields = ["id", "name", "address", "photo_url", "is_favorited"]
         read_only_fields = fields
 
     def get_name(self, obj):
         return pick_translated_text(obj, "name", self.context.get("language"))
+
+    def get_is_favorited(self, obj):
+        return obj.id in self.context.get("favorited_place_ids", set())
 
 
 class WorkSearchSerializer(serializers.ModelSerializer):

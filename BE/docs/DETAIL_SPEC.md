@@ -276,6 +276,7 @@ PRD에 "탈퇴해도 리뷰는 익명으로 남긴다"고 되어 있습니다. �
 - 같은 명소를 두 번 저장할 수 없다.
 - Phase 3에서는 명소만 저장한다. (코스 저장은 Phase 4)
 - 저장 개수 제한, 폴더·태그 분류는 넣지 않는다.
+- **명소 카드가 나오는 목록 API는 응답 명소마다 `is_favorited`(지금 로그인한 사람이 이미 저장했는지)를 함께 준다** — `GET /api/places/recommend/`, `GET /api/main/top-places/`. 비로그인이면 전부 `false`. 이게 없으면 메인 화면 별이 늘 빈 별로 시작해서, 이미 저장한 곳을 다시 눌러 저장이 취소돼 버린다 (2026-09-08, fix/be/main-tab-favorite). 명소 상세(`GET /api/places/<id>/`)는 예전부터 `is_favorited`를 준다.
 
 **예외 상황**
 
