@@ -22,12 +22,15 @@ export function Hero() {
 
   useEffect(() => {
     Promise.all([getHallOfFame().catch(() => null), getRecommendedSpots().catch(() => [])]).then(
-      async ([review, spots]) => {
+      ([review, spots]) => {
         const built: Slide[] = []
 
+        // 명소 이름·작품명은 GET /api/places/{id}/를 한 번 더 불러야 하는데, 이 API가 주변
+        // 상권을 실시간으로 카카오에 물어봐서 유독 느리다(약 1.3초, 2026-09-08 측정). 이걸
+        // 기다렸다가 슬라이드를 보여주면 사진·리뷰가 이미 있는데도 배너 전체가 그만큼 늦게
+        // 뜬다 — 그래서 place는 일단 null로 먼저 보여주고, 도착하면 그때 채워 넣는다.
         if (review) {
-          const place = await getPlaceDetail(review.place).catch(() => null)
-          built.push({ type: 'hallOfFame', review, place })
+          built.push({ type: 'hallOfFame', review, place: null })
         }
         if (spots[0]) {
           built.push({ type: 'recommend', spot: spots[0] })
@@ -38,6 +41,16 @@ export function Hero() {
           getBanners()
             .then(setBanners)
             .catch(() => setBanners([]))
+        }
+
+        if (review) {
+          getPlaceDetail(review.place)
+            .then((place) => {
+              setSlides((prev) =>
+                prev?.map((slide) => (slide.type === 'hallOfFame' ? { ...slide, place } : slide)),
+              )
+            })
+            .catch(() => {})
         }
       },
     )
