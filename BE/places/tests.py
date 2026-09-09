@@ -1544,7 +1544,51 @@ class RecommendationViewRandomFallbackTest(RecommendTestData):
         response = self.client.get(RECOMMEND_URL)
 
         place = response.data["places"][0]
-        self.assertEqual(set(place.keys()), {"id", "name", "address", "photo_url"})
+        self.assertEqual(
+            set(place.keys()), {"id", "name", "address", "photo_url", "is_favorited"}
+        )
+
+
+class RecommendationViewIsFavoritedTest(RecommendTestData):
+    """fix/be/main-tab-favorite: 추천 카드에 "내가 이미 찜했는지"(is_favorited)가 실려 나온다.
+
+    메인 화면 별이 늘 빈 별로 시작해서, 이미 찜한 곳을 다시 눌러 취소돼 버리던 문제를 막는다.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.member = create_member("rec-fav-uid")
+        self.saved = create_place_with_source("찜한명소", "TEST_SOURCE", "REC_FAV_1")
+        self.not_saved = create_place_with_source("안찜한명소", "TEST_SOURCE", "REC_FAV_2")
+        Favorite.objects.create(member=self.member, place=self.saved)
+
+    def test_anonymous_user_gets_is_favorited_false_for_all(self):
+        response = self.client.get(RECOMMEND_URL)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(all(p["is_favorited"] is False for p in response.data["places"]))
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_logged_in_user_sees_true_only_for_saved_place(self, mock_verify):
+        mock_verify.return_value = make_decoded_token("rec-fav-uid")
+
+        response = self.client.get(RECOMMEND_URL, **self.auth_header)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        by_id = {p["id"]: p["is_favorited"] for p in response.data["places"]}
+        self.assertIs(by_id[self.saved.id], True)
+        self.assertIs(by_id[self.not_saved.id], False)
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_other_members_favorite_does_not_leak(self, mock_verify):
+        other = create_member("rec-fav-other")
+        Favorite.objects.create(member=other, place=self.not_saved)
+        mock_verify.return_value = make_decoded_token("rec-fav-uid")
+
+        response = self.client.get(RECOMMEND_URL, **self.auth_header)
+
+        by_id = {p["id"]: p["is_favorited"] for p in response.data["places"]}
+        self.assertIs(by_id[self.not_saved.id], False)
 
 
 class RecommendationViewFewerThanCountTest(RecommendTestData):

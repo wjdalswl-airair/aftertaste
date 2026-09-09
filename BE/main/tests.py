@@ -283,3 +283,46 @@ class TopPlacesViewTest(TestCase):
         response = self.client.get(TOP_PLACES_URL, HTTP_AUTHORIZATION="Bearer fake-token")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
+def _decoded_token(uid):
+    return {
+        "uid": uid,
+        "email": f"{uid}@example.com",
+        "name": "테스터",
+        "picture": "http://example.com/pic.jpg",
+        "firebase": {"sign_in_provider": "google.com"},
+    }
+
+
+class TopPlacesViewIsFavoritedTest(TestCase):
+    """fix/be/main-tab-favorite: Top10 카드에 "내가 이미 찜했는지"(is_favorited)가 실려 나온다."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.auth_header = {"HTTP_AUTHORIZATION": "Bearer fake-token"}
+        self.member = create_member("top-fav-uid")
+        self.saved = create_place("찜한명소")
+        self.not_saved = create_place("안찜한명소")
+        # 둘 다 Top10에 들어오게 다른 회원이 한 번씩 찜해 favorite_count > 0 으로 만든다.
+        for i, place in enumerate((self.saved, self.not_saved)):
+            Favorite.objects.create(member=create_member(f"top-seed-{i}"), place=place)
+        # 그리고 이 회원이 saved만 찜한다.
+        Favorite.objects.create(member=self.member, place=self.saved)
+
+    def test_anonymous_user_gets_is_favorited_false(self):
+        response = self.client.get(TOP_PLACES_URL)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(all(p["is_favorited"] is False for p in response.data["places"]))
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_logged_in_user_sees_true_only_for_saved_place(self, mock_verify):
+        mock_verify.return_value = _decoded_token("top-fav-uid")
+
+        response = self.client.get(TOP_PLACES_URL, **self.auth_header)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        by_id = {p["id"]: p["is_favorited"] for p in response.data["places"]}
+        self.assertIs(by_id[self.saved.id], True)
+        self.assertIs(by_id[self.not_saved.id], False)

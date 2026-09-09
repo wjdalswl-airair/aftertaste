@@ -309,6 +309,24 @@ class PopularKeywordsView(APIView):
         return Response({"keywords": [row["keyword"] for row in rows]})
 
 
+def favorited_place_ids_for(user, places):
+    """user가 places 중 이미 즐겨찾기 한 명소의 id 집합.
+
+    카드마다 따로 조회하면 명소 수만큼 쿼리가 나가므로(N+1), 한 번에 모아서
+    PlaceSearchSerializer/TopPlaceSerializer의 context로 넘긴다. 비로그인이면 빈 집합.
+    """
+    if not user or not user.is_authenticated:
+        return set()
+    place_ids = [place.id for place in places]
+    if not place_ids:
+        return set()
+    return set(
+        Favorite.objects.filter(member=user, place_id__in=place_ids).values_list(
+            "place_id", flat=True
+        )
+    )
+
+
 def _places_by_ids_in_order(ids):
     """id 목록을 받아 그 순서대로 Place 객체를 돌려준다.
 
@@ -474,8 +492,13 @@ class RecommendationView(APIView):
         # SearchView·PlaceDetailView와 같은 방식으로 응답 언어를 정한다: ?lang= → 로그인
         # 회원의 언어 → 한국어 원문. 이걸 안 넘기면 추천 목록만 항상 한국어로 나갔다.
         language = resolve_language(request)
+        context = {
+            "language": language,
+            # 카드 별을 "이미 찜함/아직 안 찜함"으로 정확히 그리게 한다 (fix/be/main-tab-favorite).
+            "favorited_place_ids": favorited_place_ids_for(request.user, places),
+        }
         return Response(
-            {"places": PlaceSearchSerializer(places, many=True, context={"language": language}).data}
+            {"places": PlaceSearchSerializer(places, many=True, context=context).data}
         )
 
 

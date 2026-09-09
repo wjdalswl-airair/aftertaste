@@ -32,14 +32,23 @@ class HallOfFameResponseSerializer(serializers.Serializer):
 
 
 class TopPlaceSerializer(serializers.ModelSerializer):
-    """Top10 캐러셀에 보여줄 명소 정보. favorite_count는 뷰의 annotate로 채워진다."""
+    """Top10 캐러셀에 보여줄 명소 정보. favorite_count는 뷰의 annotate로 채워진다.
+
+    is_favorited는 "지금 로그인한 사람이 이 명소를 이미 즐겨찾기 했는지"다. 뷰가
+    context["favorited_place_ids"]에 그 사람의 즐겨찾기 place_id 집합을 넣어줘야 하고,
+    안 넣으면 항상 False다 (PlaceSearchSerializer.is_favorited와 같은 규칙, fix/be/main-tab-favorite).
+    """
 
     favorite_count = serializers.IntegerField(read_only=True)
+    is_favorited = serializers.SerializerMethodField()
 
     class Meta:
         model = Place
-        fields = ["id", "name", "address", "photo_url", "favorite_count"]
+        fields = ["id", "name", "address", "photo_url", "favorite_count", "is_favorited"]
         read_only_fields = fields
+
+    def get_is_favorited(self, obj):
+        return obj.id in self.context.get("favorited_place_ids", set())
 
 
 class TopPlaceListResponseSerializer(serializers.Serializer):
