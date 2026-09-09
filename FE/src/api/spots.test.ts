@@ -4,7 +4,13 @@ vi.mock('../lib/firebase', () => ({
   auth: { currentUser: null },
 }))
 
-const spot = { id: 1, name: '경복궁', address: '서울', photo_url: 'https://a.com/1.png' }
+const spot = {
+  id: 1,
+  name: '경복궁',
+  address: '서울',
+  photo_url: 'https://a.com/1.png',
+  is_favorited: false,
+}
 
 describe('getRecommendedSpots', () => {
   afterEach(() => {

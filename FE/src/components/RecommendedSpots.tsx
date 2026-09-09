@@ -66,7 +66,7 @@ export function RecommendedSpots() {
                 <Link key={spot.id} to={`/spots/${spot.id}`} className="w-[110px] flex-shrink-0 snap-center">
                   <div className="relative">
                     <img src={spot.photo_url} alt="" className="aspect-square w-full rounded-md object-cover" />
-                    <FavoriteButton placeId={spot.id} />
+                    <FavoriteButton placeId={spot.id} initialFavorited={spot.is_favorited} />
                   </div>
                   <p className="mt-1 truncate text-xs text-ink">{spot.name}</p>
                   <p className="truncate text-[11px] text-ink-secondary">{spot.address}</p>
