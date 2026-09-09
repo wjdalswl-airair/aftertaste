@@ -454,7 +454,7 @@ PRD에 "탈퇴해도 리뷰는 익명으로 남긴다"고 되어 있습니다. �
 | # | 확인 필요했던 것 | 결정 |
 |---|---|---|
 | 1-1 | 여러 출처를 함께 쓸 경우 원본 데이터 식별 | 명소마다 `출처` + `출처 안에서의 원본 번호`를 같이 저장한다. 출처가 늘어나도 구조를 안 바꿔도 된다 |
-| 2 | 사진을 어디에 보관할지 | **Firebase Storage**에 올리고, 명소·리뷰에는 그 파일의 URL만 저장한다 |
+| 2 | 사진을 어디에 보관할지 | **Firebase Storage**에 올리고, 명소·리뷰에는 그 파일의 URL만 저장한다.<br>**URL 길이 (2026-09-09)**: Firebase Storage 다운로드 URL은 버킷명 + 사용자 uid + 토큰(UUID)이 붙어 200자를 쉽게 넘는다(한글 파일명이면 URL 인코딩으로 더 길어짐). Django `URLField` 기본값 200으로는 `bulk_create` 때 DB에서 잘려 리뷰 저장이 통째로 실패했다. 사진·이미지 URL 필드(`ReviewPhoto.photo_url`, `Member.profile_image_url`, `Place.photo_url`, `Work.poster_url`, `Banner.image_url`)는 전부 `max_length=500`(`config.constants.PHOTO_URL_MAX_LENGTH`)으로 통일하고, 시리얼라이저에서도 같은 한도로 검증해 초과 시 400을 준다 |
 | 3 | 서로 다른 출처가 같은 물리적 장소를 가리키는지 판단하는 기준 | 카카오맵 지오코딩으로 좌표를 얻은 뒤, 100m 이내면 같은 명소로 판단해 병합한다. 이를 위해 명소가 여러 출처를 가질 수 있도록 모델을 나눴다 (`Place` + `PlaceSource`) (2026-08-17) |
 | 4 | 경기 데이터 드림처럼 원본에 고유번호가 없는 출처의 `source_id`를 뭘로 쓸지 | 시군명·촬영연도·촬영구분명·작품명·촬영장소명 5개 필드를 합친 문자열을 쓴다 (`places/services.py:build_composite_source_id`) (2026-08-17) |
 | 5 | 100m 거리 매칭으로 새 출처가 기존 명소에 연결될 때 이름·주소·좌표를 새 값으로 덮어쓸지 | 덮어쓰지 않는다. `PlaceSource`만 추가하고 기존 값은 그대로 둔다 — 여러 출처 값이 겹칠 때 뭘 우선할지(7장 참고)가 정해지기 전까지는 아무것도 안 건드리는 쪽이 안전하다 (`places/services.py:save_place_from_source`) (2026-08-17) |

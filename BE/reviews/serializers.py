@@ -1,6 +1,7 @@
 from django.db import transaction
 from rest_framework import serializers
 
+from config.constants import PHOTO_URL_MAX_LENGTH
 from reviews.models import REVIEW_MAX_PHOTOS, Review, ReviewPhoto
 
 
@@ -68,8 +69,13 @@ class ReviewWriteSerializer(serializers.ModelSerializer):
     (모델 max_length와 저장 전 검증이 어긋나지 않도록, DB에 넣기 전 여기서 막는다).
     """
 
+    # child에 max_length를 걸어 너무 긴 URL은 400으로 막는다 — 안 걸면 bulk_create가
+    # 모델 검증을 건너뛰어 DB에서 "value too long"으로 500이 난다 (ReviewPhoto.photo_url 주석 참고).
     photo_urls = serializers.ListField(
-        child=serializers.URLField(), required=False, allow_empty=True, write_only=True
+        child=serializers.URLField(max_length=PHOTO_URL_MAX_LENGTH),
+        required=False,
+        allow_empty=True,
+        write_only=True,
     )
 
     class Meta:

@@ -2,7 +2,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 from accounts.models import Member
-from config.constants import LANGUAGE_CODE_MAX_LENGTH
+from config.constants import LANGUAGE_CODE_MAX_LENGTH, PHOTO_URL_MAX_LENGTH
 from places.models import Place
 
 # 리뷰 글자 수·사진 장수 제한 (docs/DETAIL_SPEC.md 6-1 #14).
@@ -51,7 +51,9 @@ class ReviewPhoto(models.Model):
     """
 
     review = models.ForeignKey(Review, on_delete=models.CASCADE, related_name="photos")
-    photo_url = models.URLField()
+    # Firebase Storage 다운로드 URL이 200자를 넘어서 기본 URLField로는 저장이 실패했다
+    # (config.constants.PHOTO_URL_MAX_LENGTH 주석 참고).
+    photo_url = models.URLField(max_length=PHOTO_URL_MAX_LENGTH)
 
     def __str__(self):
         return f"{self.review} 사진"
