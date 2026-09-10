@@ -3,7 +3,7 @@ from django.db import models
 from django.db.models.functions import Upper
 
 from accounts.models import Member
-from config.constants import LANGUAGE_CODE_MAX_LENGTH
+from config.constants import LANGUAGE_CODE_MAX_LENGTH, PHOTO_URL_MAX_LENGTH
 
 
 class Place(models.Model):
@@ -20,7 +20,9 @@ class Place(models.Model):
 
     # 관리자가 직접 채우는 값 (가져오기로 덮어쓰지 않는다)
     description = models.TextField(blank=True)
-    photo_url = models.URLField(blank=True)
+    # TourAPI·위키미디어·Firebase Storage에서 온 URL 모두 200자를 넘을 수 있다
+    # (config.constants.PHOTO_URL_MAX_LENGTH 주석 참고).
+    photo_url = models.URLField(max_length=PHOTO_URL_MAX_LENGTH, blank=True)
     business_hours = models.CharField(max_length=200, blank=True)
     # 목업/여운 API 명세서의 명소 상세 필드 (docs/DETAIL_SPEC.md 3-3, 6-1 #25, 2026-08-28).
     # 전부 관리자 전용이고 번역하지 않는다(항상 한국어 원문, business_hours와 같은 취급).
@@ -85,7 +87,7 @@ class Work(models.Model):
     release_date = models.DateField(null=True, blank=True)
     main_cast = models.CharField(max_length=300, blank=True)
     director = models.CharField(max_length=100, blank=True)
-    poster_url = models.URLField(blank=True)
+    poster_url = models.URLField(max_length=PHOTO_URL_MAX_LENGTH, blank=True)
 
     class Meta:
         constraints = [

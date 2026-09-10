@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from accounts.models import Member
+from config.constants import PHOTO_URL_MAX_LENGTH
 from courses.models import Course
 from reviews.models import Review
 
@@ -69,7 +70,9 @@ class MemberProfileUpdateSerializer(serializers.ModelSerializer):
     빈 문자열이나 null을 보내면 사진을 지운다(사진 제공에 동의하지 않은 소셜 계정처럼 원래 사진이 없을 수도 있다).
     """
 
-    profile_image_url = serializers.URLField(required=False, allow_null=True, allow_blank=True)
+    profile_image_url = serializers.URLField(
+        max_length=PHOTO_URL_MAX_LENGTH, required=False, allow_null=True, allow_blank=True
+    )
 
     class Meta:
         model = Member

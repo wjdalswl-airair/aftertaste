@@ -3,6 +3,7 @@
 DETAIL_SPEC.md 2-3, 3-5, 6-1 #13,#14 / PHASES/PHASE3.md 2번(리뷰) 완료 기준 체크리스트를 근거로 만들었다.
 """
 
+import urllib.parse
 from unittest.mock import patch
 
 from django.test import TestCase
@@ -11,6 +12,7 @@ from rest_framework.test import APIClient
 
 from accounts.firebase import InvalidFirebaseToken
 from accounts.models import Member
+from config.constants import PHOTO_URL_MAX_LENGTH
 from places.models import Place
 from reviews.models import (
     REVIEW_CONTENT_MAX_LENGTH,
@@ -20,6 +22,20 @@ from reviews.models import (
     ReviewLike,
     ReviewReport,
 )
+
+
+def firebase_photo_url(filename="KakaoTalk_Photo_20260109_143022.png"):
+    """실제 Firebase Storage 다운로드 URL과 같은 형태의 긴 URL을 만든다.
+
+    버킷명 + 사용자 uid + 토큰(UUID)이 붙어 URLField 기본 한도(200자)를 넘는다 —
+    예전엔 이런 URL이 bulk_create 때 DB에서 잘려 리뷰 저장이 통째로 실패했다.
+    """
+    path = urllib.parse.quote(f"reviews/kakao:5075673135/1788955795543-{filename}", safe="")
+    return (
+        "https://firebasestorage.googleapis.com/v0/b/"
+        f"aftertaste-ae114.firebasestorage.app/o/{path}"
+        "?alt=media&token=6f9d6d6e-6f1a-4a2f-9b3c-1a2b3c4d5e6f"
+    )
 
 
 def reviews_url(place_id):
@@ -307,6 +323,42 @@ class ReviewWriteTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(Review.objects.filter(place=self.place).count(), 0)
 
+    # 사진 URL 길이 (Firebase Storage 다운로드 URL은 200자를 넘는다)
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_long_firebase_photo_url_is_saved_not_truncated(self, mock_verify):
+        mock_verify.return_value = make_decoded_token("review-writer-uid")
+        url = firebase_photo_url()
+        self.assertGreater(len(url), 200)  # 기본 URLField 한도를 넘는 실제 길이인지 확인
+
+        response = self.client.post(
+            reviews_url(self.place.id),
+            {"rating": 5, "content": "긴 URL 사진", "language": "ko", "photo_urls": [url]},
+            format="json",
+            **self.auth_header,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        review = Review.objects.get(pk=response.data["reviewId"])
+        self.assertEqual(review.photos.count(), 1)
+        self.assertEqual(review.photos.first().photo_url, url)
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_photo_url_over_max_length_is_rejected_not_db_error(self, mock_verify):
+        mock_verify.return_value = make_decoded_token("review-writer-uid")
+        too_long_url = firebase_photo_url("x" * PHOTO_URL_MAX_LENGTH)
+        self.assertGreater(len(too_long_url), PHOTO_URL_MAX_LENGTH)
+
+        response = self.client.post(
+            reviews_url(self.place.id),
+            {"rating": 5, "content": "너무 긴 URL", "language": "ko", "photo_urls": [too_long_url]},
+            format="json",
+            **self.auth_header,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(Review.objects.filter(place=self.place).count(), 0)
+
 
 class ReviewEditDeleteTests(TestCase):
     def setUp(self):
@@ -391,6 +443,23 @@ class ReviewEditDeleteTests(TestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_editing_photos_accepts_long_firebase_url(self, mock_verify):
+        """리뷰 수정도 작성과 같은 저장 경로(bulk_create)라 긴 URL이 그대로 저장돼야 한다."""
+        mock_verify.return_value = make_decoded_token("owner-uid")
+        url = firebase_photo_url()
+
+        response = self.client.patch(
+            review_detail_url(self.review.id),
+            {"photo_urls": [url]},
+            format="json",
+            HTTP_AUTHORIZATION="Bearer fake-token",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(self.review.photos.count(), 1)
+        self.assertEqual(self.review.photos.first().photo_url, url)
 
 
 class ReviewLikeTests(TestCase):

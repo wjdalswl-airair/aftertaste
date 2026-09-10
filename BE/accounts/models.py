@@ -1,6 +1,6 @@
 from django.db import models
 
-from config.constants import LANGUAGE_CODE_MAX_LENGTH
+from config.constants import LANGUAGE_CODE_MAX_LENGTH, PHOTO_URL_MAX_LENGTH
 
 # 닉네임 최대 길이 (docs/DETAIL_SPEC.md 6-1 #21). 소셜 로그인으로 받은 이름이 이보다
 # 길면 이 길이에 맞춰 잘라서 저장한다 (accounts/views.py LoginView 참고).
@@ -17,7 +17,9 @@ class Member(models.Model):
     email = models.EmailField(null=True, blank=True)
     # 닉네임은 최대 20자 (docs/DETAIL_SPEC.md 6-1 #21, 목업 "3/20")
     nickname = models.CharField(max_length=NICKNAME_MAX_LENGTH, null=True, blank=True)
-    profile_image_url = models.URLField(null=True, blank=True)
+    # 프로필 사진도 리뷰 사진과 같은 Firebase Storage URL이라 200자를 넘을 수 있다
+    # (config.constants.PHOTO_URL_MAX_LENGTH 주석 참고).
+    profile_image_url = models.URLField(max_length=PHOTO_URL_MAX_LENGTH, null=True, blank=True)
 
     # 자리만 만들어 둔다. 실제로 값을 채우는 화면은 Phase 2.
     nationality = models.CharField(max_length=50, null=True, blank=True)
