@@ -505,7 +505,10 @@ class RecommendationView(APIView):
 def _fetch_nearby_places(place):
     """명소 좌표를 기준으로 카카오 카테고리 검색 API를 호출해 주변 상권 목록을 가져온다.
 
-    음식점(FD6)·카페(CE7)·관광명소(AT4) 세 카테고리를 각각 따로 검색해서 합친다.
+    음식점(FD6)·카페(CE7)·관광명소(AT4) 세 카테고리를 각각 최대 NEARBY_PLACES_LIMIT개씩
+    따로 검색해서 합친다(중복 제거 후 최대 3배). 카테고리별 개수를 유지해야 AI 코스 추천이
+    식당·카페·그 외에서 각각 한 곳씩 고를 수 있다 — 예전엔 합친 목록을 다시 15개로 잘라서
+    앞 카테고리(음식점)만 남고 카페·그 외가 0개가 되는 일이 잦았다.
     좌표가 없는 명소는 검색할 수 없으므로 빈 목록을 준다.
     카테고리 하나가 실패해도(네트워크 오류, 타임아웃, 키 미설정 등) 나머지 카테고리와
     명소 상세 전체는 깨지지 않도록, 카테고리별로 예외를 잡고 계속 진행한다.
@@ -539,7 +542,7 @@ def _fetch_nearby_places(place):
             seen_keys.add(dedup_key)
             results.append(item)
 
-    return results[:NEARBY_PLACES_LIMIT]
+    return results
 
 
 class PlaceDetailView(APIView):

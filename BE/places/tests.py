@@ -1401,7 +1401,7 @@ class PopularKeywordsTest(TestCase):
 # Phase 2-4 (위치기반 추천 — 비로그인 분기만) checklist tests. See docs/PHASES/PHASE2.md 2-4.
 # ---------------------------------------------------------------------------
 
-from places.views import RECOMMEND_COUNT
+from places.views import NEARBY_PLACES_LIMIT, RECOMMEND_COUNT
 
 RECOMMEND_URL = "/api/places/recommend/"
 
@@ -1868,28 +1868,35 @@ class PlaceDetailViewNearbyPlacesTest(PlaceDetailTestData):
         self.assertEqual(response.data["nearby_places"][0]["place_name"], "복합공간")
 
     @patch("places.views.kakao_geocoding.search_by_category")
-    def test_nearby_places_are_capped_at_fifteen(self, mock_search):
-        # 카테고리마다 서로 다른 id를 써야 한다. 같은 id를 쓰면 중복 제거만으로도
-        # 15개 이하로 줄어들어서, 정작 자르는(cap) 코드가 없어도 테스트가 통과해버린다.
+    def test_nearby_places_keep_every_category_not_capped_at_fifteen_total(self, mock_search):
+        # 카테고리당 개수는 카카오 요청의 size로 제한한다(NEARBY_PLACES_LIMIT). 합친 목록을
+        # 다시 자르지는 않는다 — 예전엔 15개로 잘라서 앞 카테고리(음식점)만 남고 카페·관광명소가
+        # 0개가 됐고, 그러면 AI 코스 추천이 "후보 부족"으로 실패했다.
+        # 카테고리마다 서로 다른 id를 써야 중복 제거로만 줄어드는 착시를 피한다.
         food_results = [
             _fake_kakao_result(f"식당{i}", f"서울 종로구 {i}", 37.58, 126.98, "음식점", kakao_id=f"F{i}")
-            for i in range(20)
+            for i in range(NEARBY_PLACES_LIMIT)
         ]
         cafe_results = [
             _fake_kakao_result(f"카페{i}", f"서울 종로구 {i}", 37.58, 126.98, "카페", kakao_id=f"C{i}")
-            for i in range(20)
+            for i in range(NEARBY_PLACES_LIMIT)
         ]
         tourist_results = [
             _fake_kakao_result(f"명소{i}", f"서울 종로구 {i}", 37.58, 126.98, "관광명소", kakao_id=f"A{i}")
-            for i in range(20)
+            for i in range(NEARBY_PLACES_LIMIT)
         ]
         mock_search.side_effect = [food_results, cafe_results, tourist_results]
 
         response = self.client.get(DETAIL_URL_TEMPLATE.format(self.place.id))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        # 서로 겹치지 않는 60개(20+20+20) 중 15개로 정확히 잘려야 한다.
-        self.assertEqual(len(response.data["nearby_places"]), 15)
+        for call in mock_search.call_args_list:
+            self.assertEqual(call.kwargs["size"], NEARBY_PLACES_LIMIT)
+        nearby = response.data["nearby_places"]
+        # 세 카테고리가 각각 15개씩 다 살아 있어야 한다 (합 45개).
+        self.assertEqual(len(nearby), 3 * NEARBY_PLACES_LIMIT)
+        categories = {p["category_name"] for p in nearby}
+        self.assertEqual(categories, {"음식점", "카페", "관광명소"})
 
 
 # ---------------------------------------------------------------------------
