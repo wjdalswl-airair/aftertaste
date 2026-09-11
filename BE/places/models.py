@@ -23,6 +23,9 @@ class Place(models.Model):
     # TourAPI·위키미디어·Firebase Storage에서 온 URL 모두 200자를 넘을 수 있다
     # (config.constants.PHOTO_URL_MAX_LENGTH 주석 참고).
     photo_url = models.URLField(max_length=PHOTO_URL_MAX_LENGTH, blank=True)
+    # 저작권 무료 사이트에서 수동으로 찾은 사진일 때 사진가·출처 표시 (2026-09-12, docs/DETAIL_SPEC.md 6-1 #31).
+    # TourAPI/위키미디어 사진은 지금 이 필드를 안 쓴다(출처 표시 의무가 없거나 URL 자체로 충분).
+    photo_credit = models.CharField(max_length=200, blank=True)
     business_hours = models.CharField(max_length=200, blank=True)
     # 목업/여운 API 명세서의 명소 상세 필드 (docs/DETAIL_SPEC.md 3-3, 6-1 #25, 2026-08-28).
     # 전부 관리자 전용이고 번역하지 않는다(항상 한국어 원문, business_hours와 같은 취급).
