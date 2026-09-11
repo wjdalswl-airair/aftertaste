@@ -173,7 +173,7 @@ class PlaceDetailSerializer(serializers.ModelSerializer):
     """GET /api/places/<id>/ 응답. 명소 기본 정보 + 등장 작품 + 주변 상권 + 리뷰를 한 화면 분량으로 담는다.
 
     name/description은 PlaceSearchSerializer.name과 같은 규칙으로 번역문을 고른다.
-    address/business_hours/recommended_time/photo_tips/etiquette는 번역 대상이 아니라
+    address/business_hours/recommended_time/photo_tips/etiquette/photo_credit은 번역 대상이 아니라
     항상 한국어 그대로 나간다.
     """
 
@@ -194,6 +194,7 @@ class PlaceDetailSerializer(serializers.ModelSerializer):
             "name",
             "address",
             "photo_url",
+            "photo_credit",
             "business_hours",
             "recommended_time",
             "photo_tips",

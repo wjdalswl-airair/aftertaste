@@ -3,6 +3,7 @@
 
 screenshots/
 실패경험.md
+*.csv
 
 ### Django ###
 *.log
