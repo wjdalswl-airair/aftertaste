@@ -19,11 +19,14 @@ class ReviewPhotoSerializer(serializers.ModelSerializer):
 
 
 class ReviewSerializer(serializers.ModelSerializer):
-    """리뷰 하나를 보여줄 때 쓰는 읽기 전용 표현 (목록·상세 공통)."""
+    """리뷰 하나를 보여줄 때 쓰는 읽기 전용 표현 (목록·상세·전체 피드 공통)."""
 
     author_nickname = serializers.SerializerMethodField()
+    author_profile_image_url = serializers.SerializerMethodField()
+    place_name = serializers.CharField(source="place.name", read_only=True)
+    place_photo_url = serializers.CharField(source="place.photo_url", read_only=True)
     photos = ReviewPhotoSerializer(many=True, read_only=True)
-    like_count = serializers.IntegerField(source="likes.count", read_only=True)
+    like_count = serializers.SerializerMethodField()
     is_liked_by_me = serializers.SerializerMethodField()
 
     class Meta:
@@ -31,7 +34,10 @@ class ReviewSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "place",
+            "place_name",
+            "place_photo_url",
             "author_nickname",
+            "author_profile_image_url",
             "rating",
             "content",
             "language",
@@ -47,6 +53,19 @@ class ReviewSerializer(serializers.ModelSerializer):
         # 탈퇴한 사람이 쓴 리뷰는 작성자 자리에 "탈퇴한 사용자"로 보인다 (DETAIL_SPEC 3-5).
         return "탈퇴한 사용자" if obj.member.is_withdrawn else obj.member.nickname
 
+    def get_author_profile_image_url(self, obj):
+        # author_nickname과 같은 이유로, 탈퇴한 사람의 프로필 사진은 보여주지 않는다.
+        if obj.member.is_withdrawn:
+            return None
+        return obj.member.profile_image_url or None
+
+    def get_like_count(self, obj):
+        # GET /api/reviews/(전체 피드)는 annotate(annotated_like_count=Count("likes"))로 미리
+        # 센 값을 그대로 쓴다 — 명소마다 흩어진 리뷰를 한 번에 모으는 쿼리라 매번 obj.likes.count()를
+        # 부르면 N+1이 커진다. 그 외(명소별 목록·내 리뷰)는 지금처럼 그때그때 센다(DETAIL_SPEC 6-1 #32).
+        annotated = getattr(obj, "annotated_like_count", None)
+        return annotated if annotated is not None else obj.likes.count()
+
     def get_is_liked_by_me(self, obj):
         request = self.context.get("request")
         if not request or not request.user.is_authenticated:
@@ -59,6 +78,15 @@ class ReviewListResponseSerializer(serializers.Serializer):
     (main 앱의 *ResponseSerializer, places의 SearchResponseSerializer와 같은 방식).
     실제 뷰 응답 모양과 Swagger 문서를 일치시키기 위한 것이다."""
 
+    reviews = ReviewSerializer(many=True)
+
+
+class ReviewFeedResponseSerializer(serializers.Serializer):
+    """GET /api/reviews/(전체 명소 리뷰 피드) 응답 형태. 명소·내 리뷰 목록과 달리 페이지네이션이 있다."""
+
+    count = serializers.IntegerField()
+    next = serializers.CharField(allow_null=True)
+    previous = serializers.CharField(allow_null=True)
     reviews = ReviewSerializer(many=True)
 
 
