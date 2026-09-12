@@ -102,7 +102,7 @@ from django.utils import timezone
 from accounts.firebase import InvalidFirebaseToken
 from accounts.models import Member
 from favorites.models import Favorite
-from places.models import Place
+from places.models import Place, PlaceTranslation, PlaceWork, Work
 from reviews.models import Review, ReviewLike, ReviewPhoto
 
 HALL_OF_FAME_URL = "/api/main/hall-of-fame/"
@@ -183,11 +183,55 @@ class HallOfFameViewTest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["review"]["id"], visible_review.id)
 
-    def test_no_reviews_this_week_returns_null_review_not_error(self):
+    def test_no_reviews_this_week_returns_null_review_and_null_place(self):
         response = self.client.get(HALL_OF_FAME_URL)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIsNone(response.data["review"])
+        self.assertIsNone(response.data["place"])
+
+    def test_response_includes_place_name_and_first_work_for_caption(self):
+        """캡션용 명소 이름·대표 작품을 응답에 바로 담는다 — 프론트가 명소 상세를 다시
+        부르지 않아도 되게 (DETAIL_SPEC 6-1 #20-1, 2026-09-09)."""
+        author = create_member("hof-caption")
+        review = create_review_with_photo(author, self.place)
+        add_likes(review, 1, "hof-caption-like")
+        work = Work.objects.create(title="폭싹 속았수다", category=Work.Category.DRAMA)
+        PlaceWork.objects.create(place=self.place, work=work)
+
+        response = self.client.get(HALL_OF_FAME_URL)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["review"]["id"], review.id)
+        self.assertEqual(response.data["place"]["id"], self.place.id)
+        self.assertEqual(response.data["place"]["name"], "명예의전당명소")
+        self.assertEqual(response.data["place"]["work"]["title"], "폭싹 속았수다")
+        self.assertEqual(response.data["place"]["work"]["category"], "DRAMA")
+
+    def test_place_work_is_null_when_place_has_no_linked_work(self):
+        author = create_member("hof-nowork")
+        review = create_review_with_photo(author, self.place)
+        add_likes(review, 1, "hof-nowork-like")
+
+        response = self.client.get(HALL_OF_FAME_URL)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data["place"]["work"])
+
+    def test_place_caption_uses_translation_when_lang_given(self):
+        author = create_member("hof-lang")
+        review = create_review_with_photo(author, self.place)
+        add_likes(review, 1, "hof-lang-like")
+        work = Work.objects.create(title="폭싹 속았수다", category=Work.Category.DRAMA)
+        PlaceWork.objects.create(place=self.place, work=work)
+        PlaceTranslation.objects.create(
+            place=self.place, language="en", name="Hall of Fame Spot", is_approved=True
+        )
+
+        response = self.client.get(HALL_OF_FAME_URL, {"lang": "en"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["place"]["name"], "Hall of Fame Spot")
 
     def test_review_from_before_this_week_is_excluded(self):
         """이번 주 월요일 0시 이전에 쓰인 리뷰는 좋아요가 많아도 후보에서 빠진다."""
