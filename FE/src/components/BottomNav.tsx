@@ -1,10 +1,13 @@
-import { Home, Search, User } from 'lucide-react'
+import { Home, Map, Search, Star, User } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation } from 'react-router-dom'
 
+// 순서: 홈(큐레이션 진입점) → 지도·검색(명소 찾기) → 리뷰(다녀온 뒤 보는 콘텐츠) → 프로필(계정, 관례상 맨 끝).
 const TABS = [
   { to: '/', labelKey: 'bottomNav.home', icon: Home },
+  { to: '/map', labelKey: 'bottomNav.map', icon: Map },
   { to: '/search', labelKey: 'bottomNav.search', icon: Search },
+  { to: '/reviews', labelKey: 'bottomNav.review', icon: Star },
   { to: '/mypage', labelKey: 'bottomNav.profile', icon: User },
 ]
 
