@@ -99,7 +99,7 @@ export function ReviewFormPage() {
 
   return (
     <main className="flex min-h-dvh flex-col gap-6 pb-24">
-      <header className="grid min-h-16 grid-cols-[24px_1fr_24px] items-center px-4 pt-6">
+      <header className="grid min-h-16 grid-cols-[24px_1fr_24px] items-center px-4 pt-4">
         <button type="button" onClick={() => navigate(-1)} aria-label="뒤로가기">
           <ArrowLeft size={24} className="text-ink" />
         </button>
@@ -130,7 +130,17 @@ export function ReviewFormPage() {
             {photoUrls.length} / {PHOTO_MAX_COUNT}
           </p>
         </div>
-        <div className="flex gap-2 overflow-x-auto">
+        <div className="flex gap-2 overflow-x-auto pt-2">
+          {photoUrls.length < PHOTO_MAX_COUNT && (
+            <label className="flex h-[74px] w-[75px] shrink-0 items-center justify-center rounded-lg bg-accent/15">
+              <input type="file" accept="image/*" className="hidden" onChange={handlePhotoSelect} disabled={uploading} />
+              {uploading ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              ) : (
+                <Plus size={22} className="text-primary" />
+              )}
+            </label>
+          )}
           {photoUrls.map((url) => (
             <div key={url} className="relative h-[74px] w-[75px] shrink-0">
               <img src={url} alt="" className="h-full w-full rounded-lg object-cover" />
@@ -144,16 +154,6 @@ export function ReviewFormPage() {
               </button>
             </div>
           ))}
-          {photoUrls.length < PHOTO_MAX_COUNT && (
-            <label className="flex h-[74px] w-[75px] shrink-0 items-center justify-center rounded-lg bg-accent/15">
-              <input type="file" accept="image/*" className="hidden" onChange={handlePhotoSelect} disabled={uploading} />
-              {uploading ? (
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              ) : (
-                <Plus size={22} className="text-primary" />
-              )}
-            </label>
-          )}
         </div>
         {photoError && <p className="mt-2 text-xs text-[#e0574a]">{t('reviewForm.photoUploadError')}</p>}
       </div>

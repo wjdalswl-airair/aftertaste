@@ -133,7 +133,7 @@ export function MyPage() {
 
   return (
     <main className="flex min-h-dvh flex-col gap-6 pb-24">
-      <header className="flex items-center justify-between px-4 pt-6">
+      <header className="flex items-center justify-between px-4 pt-4">
         <Link to="/" className="font-brand text-2xl font-bold text-primary">여운</Link>
         <LanguageSheet />
       </header>

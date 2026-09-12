@@ -7,9 +7,11 @@ import { CourseCreatePage } from './pages/CourseCreatePage'
 import { CourseDetailPage } from './pages/CourseDetailPage'
 import { LoginPage } from './pages/LoginPage'
 import { MainPage } from './pages/MainPage'
+import { MapPage } from './pages/MapPage'
 import { MyCourseListPage } from './pages/MyCourseListPage'
 import { MyPage } from './pages/MyPage'
 import { ReviewDetailPage } from './pages/ReviewDetailPage'
+import { ReviewFeedPage } from './pages/ReviewFeedPage'
 import { ReviewFormPage } from './pages/ReviewFormPage'
 import { ReviewListPage } from './pages/ReviewListPage'
 import { SearchPage } from './pages/SearchPage'
@@ -25,7 +27,9 @@ function App() {
       <Routes>
         <Route path="/" element={<MainPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/map" element={<MapPage />} />
         <Route path="/search" element={<SearchPage />} />
+        <Route path="/reviews" element={<ReviewFeedPage />} />
         <Route path="/spots/:placeId" element={<SpotDetailPage />} />
         <Route path="/spots/:placeId/reviews" element={<ReviewListPage />} />
         <Route path="/spots/:placeId/reviews/:reviewId" element={<ReviewDetailPage />} />

@@ -1061,6 +1061,7 @@ class WithdrawalTests(TestCase):
             firebase_uid="withdraw-review-author-uid",
             provider=Member.Provider.GOOGLE,
             nickname="탈퇴할작성자",
+            profile_image_url="https://firebasestorage.googleapis.com/profile.jpg",
             agreed_terms_at="2026-01-01T00:00:00Z",
         )
         place = Place.objects.create(name="경복궁", address="서울시 종로구")
@@ -1075,6 +1076,7 @@ class WithdrawalTests(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["reviews"][0]["author_nickname"], "탈퇴한 사용자")
+        self.assertIsNone(response.data["reviews"][0]["author_profile_image_url"])
 
     def test_new_member_after_relogin_cannot_see_old_favorites_or_reviews(self):
         from favorites.models import Favorite

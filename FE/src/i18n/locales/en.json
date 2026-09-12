@@ -1,8 +1,22 @@
 {
   "bottomNav": {
     "home": "Home",
+    "map": "Map",
     "search": "Search",
+    "review": "Review",
     "profile": "Profile"
+  },
+  "mapPage": {
+    "title": "Map",
+    "comingSoon": "Coming soon"
+  },
+  "reviewFeedPage": {
+    "title": "All Reviews",
+    "sortLatest": "Latest",
+    "sortPopular": "Popular",
+    "loadMore": "Load more",
+    "loadingMore": "Loading...",
+    "empty": "No reviews yet"
   },
   "mainPage": {
     "greeting": {

@@ -1,4 +1,5 @@
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
+import { compressImage } from './compressImage'
 import { auth, storage } from './firebase'
 
 // 프로필 사진을 Firebase Storage에 올리고 다운로드 URL을 돌려준다.
@@ -10,8 +11,9 @@ export async function uploadProfilePhoto(file: File): Promise<string> {
     throw new Error('로그인이 필요합니다')
   }
 
+  const compressed = await compressImage(file)
   const path = `profile/${uid}/${Date.now()}-${file.name}`
   const fileRef = ref(storage, path)
-  await uploadBytes(fileRef, file)
+  await uploadBytes(fileRef, compressed)
   return getDownloadURL(fileRef)
 }

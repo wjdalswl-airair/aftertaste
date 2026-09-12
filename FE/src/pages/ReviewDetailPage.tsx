@@ -1,5 +1,5 @@
 import { ArrowLeft, Heart, MoreHorizontal } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { deleteReview, getPlaceReviews, likeReview, reportReview, unlikeReview, type ReviewItem } from '../api/reviews'
@@ -20,6 +20,9 @@ export function ReviewDetailPage() {
   const [place, setPlace] = useState<PlaceDetail | undefined>(undefined)
   const [reviewCount, setReviewCount] = useState<number | undefined>(undefined)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [activePhotoIndex, setActivePhotoIndex] = useState(0)
+  const photoScrollRef = useRef<HTMLDivElement>(null)
+  const photoScrollEndTimer = useRef<number>(undefined)
 
   useEffect(() => {
     getPlaceDetail(Number(placeId))
@@ -29,9 +32,22 @@ export function ReviewDetailPage() {
       .then((reviews) => {
         setReviewCount(reviews.length)
         setReview(reviews.find((item) => item.id === Number(reviewId)) ?? null)
+        setActivePhotoIndex(0)
       })
       .catch(() => setReview(null))
   }, [placeId, reviewId])
+
+  // 사진 슬라이드가 완전히 멈춘 뒤에만 활성 인덱스를 확정한다 (Hero.tsx와 같은 이유).
+  function handlePhotoScroll() {
+    window.clearTimeout(photoScrollEndTimer.current)
+    photoScrollEndTimer.current = window.setTimeout(() => {
+      if (!photoScrollRef.current) {
+        return
+      }
+      const index = Math.round(photoScrollRef.current.scrollLeft / photoScrollRef.current.clientWidth)
+      setActivePhotoIndex(index)
+    }, 100)
+  }
 
   function handleToggleLike() {
     if (!review) {
@@ -81,7 +97,7 @@ export function ReviewDetailPage() {
 
   return (
     <main className="flex min-h-dvh flex-col gap-6 pb-24">
-      <header className="grid min-h-16 grid-cols-[24px_1fr_24px] items-center px-4 pt-6">
+      <header className="grid min-h-16 grid-cols-[24px_1fr_24px] items-center px-4 pt-4">
         <button type="button" onClick={() => navigate(-1)} aria-label="뒤로가기">
           <ArrowLeft size={24} className="text-ink" />
         </button>
@@ -100,7 +116,7 @@ export function ReviewDetailPage() {
             <Skeleton className="h-3 w-20 rounded-sm" />
           </div>
 
-          <Skeleton className="h-[280px] w-full rounded-none" />
+          <Skeleton className="h-[360px] w-full rounded-none" />
 
           <div className="flex items-center justify-between px-4">
             <div className="flex items-center gap-2">
@@ -125,7 +141,15 @@ export function ReviewDetailPage() {
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between px-4 py-3">
             <div className="flex items-center gap-3">
-              <div className="h-[40px] w-[40px] rounded-full bg-divider" />
+              {review.author_profile_image_url ? (
+                <img
+                  src={review.author_profile_image_url}
+                  alt=""
+                  className="h-[40px] w-[40px] rounded-full object-cover"
+                />
+              ) : (
+                <div className="h-[40px] w-[40px] rounded-full bg-divider" />
+              )}
               <p className="font-medium text-ink">{review.author_nickname}</p>
             </div>
             <button type="button" onClick={handleOpenMenu} aria-label="더보기">
@@ -133,11 +157,38 @@ export function ReviewDetailPage() {
             </button>
           </div>
 
-          {review.photos[0] ? (
-            <img src={review.photos[0].photo_url} alt="" className="h-[280px] w-full object-cover" />
+          {review.photos.length > 0 ? (
+            <div className="relative">
+              <div
+                ref={photoScrollRef}
+                onScroll={handlePhotoScroll}
+                className="scrollbar-hide flex snap-x snap-mandatory overflow-x-auto"
+              >
+                {review.photos.map((photo) => (
+                  <img
+                    key={photo.id}
+                    src={photo.photo_url}
+                    alt=""
+                    className="h-[360px] w-full flex-shrink-0 snap-center object-cover"
+                  />
+                ))}
+              </div>
+              {review.photos.length > 1 && (
+                <div className="absolute inset-x-0 top-3 flex justify-center gap-1.5">
+                  {review.photos.map((photo, index) => (
+                    <div
+                      key={photo.id}
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        index === activePhotoIndex ? 'bg-white' : 'bg-white/40'
+                      }`}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
           ) : (
             // 사진이 없을 때 보여줄 기본 샘플 이미지 — 파일 정해지면 여기에 넣는다. 지금은 빈 박스.
-            <div className="h-[280px] w-full bg-divider" />
+            <div className="h-[360px] w-full bg-divider" />
           )}
 
           <div className="flex items-end justify-between px-4">

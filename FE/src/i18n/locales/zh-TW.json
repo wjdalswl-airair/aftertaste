@@ -1,8 +1,22 @@
 {
   "bottomNav": {
     "home": "首頁",
+    "map": "地圖",
     "search": "搜尋",
+    "review": "評價",
     "profile": "我的"
+  },
+  "mapPage": {
+    "title": "地圖",
+    "comingSoon": "敬請期待"
+  },
+  "reviewFeedPage": {
+    "title": "全部評價",
+    "sortLatest": "最新",
+    "sortPopular": "最熱門",
+    "loadMore": "查看更多",
+    "loadingMore": "載入中...",
+    "empty": "尚無評價"
   },
   "mainPage": {
     "greeting": {
