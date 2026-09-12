@@ -190,8 +190,11 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 - **BE 데이터가 없어서 생긴 제약 — BE 확인 필요 (2026-08-30)**:
   1. Top10/추천 카드의 부제(작품명)를 Figma는 보여주지만, 두 API 응답에 작품명이 없어 **`address`로 대신 표시** 중이다.
   2. 추천 카드의 거리 뱃지(예: "거리 1.2km")도 Figma엔 있지만, API 응답에 좌표가 없어 만들지 못했다.
-  3. Hero 캡션의 명소/작품명은 `review.place`(id)로 `GET /api/places/{id}/`를 한 번 더 호출해서 채운다. 이 상세 응답의 `works` 필드 정확한 구조를 아직 검증 못 해서(`src/api/spots.ts`의 `PlaceDetail` 타입이 추정치), 실제로 작품명이 안 나올 수 있다 — 필드가 없으면 명소 이름만 보인다.
-     - **성능 주의 (2026-09-08 측정)**: 이 API는 BE가 주변 상권을 카카오에 실시간으로 물어봐서(`_fetch_nearby_places`) 단독으로도 약 1.3초 걸리는 무거운 API다 — 배너·추천 API(각 ~0.4초)의 3배 수준. 명소 이름 한 줄 때문에 히어로 슬라이드 전체를 기다리게 하지 않도록, `Hero.tsx`는 이 호출을 기다리지 않고 먼저 `place: null`로 슬라이드를 보여준 뒤 응답이 오면 그때 이름을 채워 넣는다(체감 속도 개선, 실제 요청 시간 자체는 그대로).
+  3. ~~Hero 캡션의 명소/작품명은 `review.place`(id)로 `GET /api/places/{id}/`를 한 번 더 호출해서 채운다.~~ **(2026-09-12 제거, issue #44)** 이 API가 주변 상권을 카카오에 실시간으로 물어봐서(`_fetch_nearby_places`) 단독으로 약 1.3초 걸리는 무거운 API라(배너·추천 API의 3배 수준), 캡션 한 줄 때문에 히어로 전체가 늦게 뜨는 문제가 있었다. `GET /api/main/hall-of-fame/`(`refactor/be/response-speed-up`) 응답에 캡션용 최소 명소 정보를 바로 담도록 BE를 바꿔서, FE는 이제 두 번째 호출 없이 한 번에 받는다.
+     - 응답 형태: `{ review: {...} | null, place: { id, name, work: { title, category } | null } | null }` — `review`가 null이면 `place`도 null.
+     - `getHallOfFame()`이 `lang` 쿼리파라미터를 붙여 캡션 번역을 요청한다(다른 명소 API와 동일 패턴). BE가 요청 언어에 맞는 번역이 있으면 그 값을, 없으면 한국어 원문을 돌려준다.
+     - `Hero.tsx`는 더 이상 `getPlaceDetail`을 호출하지 않는다 — `place`는 처음부터 최종 값으로 온다(중간에 null→값으로 채워지는 단계 없음).
+     - **배포 순서 주의**: BE 응답은 하위호환(기존 `review` 필드는 그대로, `place`만 추가)이라 BE를 먼저 배포해도 구버전 FE는 안 깨진다. 하지만 반대로 새 FE를 BE보다 먼저 배포하면 `place`가 없어 캡션의 명소 이름이 안 보이는 리그레션이 생기므로, 반드시 BE 배포 확인 후 FE를 배포한다.
 
 ### S-03. 검색 결과 — `pages/SearchPage.tsx` (Phase 3, 구현 완료 — 2026-08-30)
 - 컴포넌트: 검색창(자동완성), 전체/드라마/영화 필터 칩, 작품/명소 섹션, 추천 검색어, 최근 검색어

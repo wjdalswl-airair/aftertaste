@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { getBanners, getHallOfFame, type Banner, type HallOfFameReview } from '../api/main'
-import { getPlaceDetail, getRecommendedSpots, type PlaceDetail, type RecommendedSpot } from '../api/spots'
+import { getBanners, getHallOfFame, type Banner, type HallOfFamePlace, type HallOfFameReview } from '../api/main'
+import { getRecommendedSpots, type RecommendedSpot } from '../api/spots'
 import { Skeleton } from './Skeleton'
 
 type Slide =
-  | { type: 'hallOfFame'; review: HallOfFameReview; place: PlaceDetail | null }
+  | { type: 'hallOfFame'; review: HallOfFameReview; place: HallOfFamePlace | null }
   | { type: 'recommend'; spot: RecommendedSpot }
 
 const AUTO_ADVANCE_MS = 4000
@@ -22,15 +22,11 @@ export function Hero() {
 
   useEffect(() => {
     Promise.all([getHallOfFame().catch(() => null), getRecommendedSpots().catch(() => [])]).then(
-      ([review, spots]) => {
+      ([hallOfFame, spots]) => {
         const built: Slide[] = []
 
-        // 명소 이름·작품명은 GET /api/places/{id}/를 한 번 더 불러야 하는데, 이 API가 주변
-        // 상권을 실시간으로 카카오에 물어봐서 유독 느리다(약 1.3초, 2026-09-08 측정). 이걸
-        // 기다렸다가 슬라이드를 보여주면 사진·리뷰가 이미 있는데도 배너 전체가 그만큼 늦게
-        // 뜬다 — 그래서 place는 일단 null로 먼저 보여주고, 도착하면 그때 채워 넣는다.
-        if (review) {
-          built.push({ type: 'hallOfFame', review, place: null })
+        if (hallOfFame) {
+          built.push({ type: 'hallOfFame', review: hallOfFame.review, place: hallOfFame.place })
         }
         if (spots[0]) {
           built.push({ type: 'recommend', spot: spots[0] })
@@ -41,16 +37,6 @@ export function Hero() {
           getBanners()
             .then(setBanners)
             .catch(() => setBanners([]))
-        }
-
-        if (review) {
-          getPlaceDetail(review.place)
-            .then((place) => {
-              setSlides((prev) =>
-                prev?.map((slide) => (slide.type === 'hallOfFame' ? { ...slide, place } : slide)),
-              )
-            })
-            .catch(() => {})
         }
       },
     )
@@ -157,7 +143,7 @@ function HallOfFameSlide({
   slide: Extract<Slide, { type: 'hallOfFame' }>
   title: string
 }) {
-  const work = slide.place?.works?.[0]?.work
+  const work = slide.place?.work
   const workPrefix = work?.category === 'MOVIE' ? '영화' : work?.category === 'DRAMA' ? '드라마' : null
 
   return (
