@@ -1,4 +1,5 @@
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from django.db.models import Count
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -7,7 +8,9 @@ from rest_framework.views import APIView
 from config.api_messages import NOT_FOUND_MESSAGE
 from places.models import Place
 from reviews.models import REVIEW_REPORT_HIDE_THRESHOLD, Review, ReviewLike, ReviewReport
+from reviews.pagination import ReviewFeedPagination
 from reviews.serializers import (
+    ReviewFeedResponseSerializer,
     ReviewListResponseSerializer,
     ReviewReportSerializer,
     ReviewSerializer,
@@ -18,6 +21,52 @@ from reviews.serializers import (
 def _visible_reviews(place):
     """관리자가 감추지 않은 리뷰만, 최신순으로 돌려준다."""
     return place.reviews.filter(is_hidden=False).order_by("-created_at")
+
+
+class ReviewFeedListView(APIView):
+    """전체 명소의 리뷰를 모아 보여주는 피드(커뮤니티 탭). 로그인 불필요 (DETAIL_SPEC 6-1 #32).
+
+    명소 1곳에 한정된 PlaceReviewListCreateView.get, 로그인한 내 리뷰에 한정된
+    MyReviewListView와 달리 전체 명소를 가로지르는 목록이라, 이 엔드포인트에만
+    페이지네이션(ReviewFeedPagination)을 붙인다. 비로그인 조회를 막지 않는 이유는
+    PlaceReviewListCreateView.perform_authentication과 같다.
+    """
+
+    pagination_class = ReviewFeedPagination
+
+    def perform_authentication(self, request):
+        try:
+            request.user
+        except AuthenticationFailed:
+            pass
+
+    @extend_schema(
+        summary="전체 리뷰 피드 조회",
+        description="관리자가 감추지 않은 모든 명소의 리뷰를 정렬·페이지네이션해 반환한다. 로그인이 필요 없다.",
+        parameters=[
+            OpenApiParameter(name="ordering", type=str, required=False, description="latest(기본, 최신순) 또는 popular(좋아요순)"),
+            OpenApiParameter(name="page", type=int, required=False, description="페이지 번호(1부터)"),
+            OpenApiParameter(name="page_size", type=int, required=False, description="페이지당 개수(기본 20, 최대 50)"),
+        ],
+        responses={200: ReviewFeedResponseSerializer},
+    )
+    def get(self, request):
+        reviews = (
+            Review.objects.filter(is_hidden=False)
+            .select_related("place", "member")
+            .prefetch_related("photos")
+        )
+        if request.query_params.get("ordering") == "popular":
+            reviews = reviews.annotate(annotated_like_count=Count("likes")).order_by(
+                "-annotated_like_count", "-created_at"
+            )
+        else:
+            reviews = reviews.order_by("-created_at")
+
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(reviews, request, view=self)
+        serializer = ReviewSerializer(page, many=True, context={"request": request})
+        return paginator.get_paginated_response(serializer.data)
 
 
 class PlaceReviewListCreateView(APIView):

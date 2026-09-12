@@ -59,6 +59,7 @@ def place_detail_url(place_id):
 
 
 MY_REVIEWS_URL = "/api/account/reviews/"
+REVIEW_FEED_URL = "/api/reviews/"
 
 
 def make_decoded_token(uid):
@@ -729,3 +730,113 @@ class PlaceDetailReviewSummaryTests(TestCase):
         self.assertEqual(len(response.data["reviews"]), 2)
         self.assertEqual(response.data["review_average_rating"], 3.0)
         self.assertEqual(response.data["review_count"], 2)
+
+
+class ReviewFeedTests(TestCase):
+    """전체 명소 리뷰 피드 GET /api/reviews/ (커뮤니티 탭, DETAIL_SPEC 6-1 #32)."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.place1 = Place.objects.create(name="경복궁", address="서울시 종로구", photo_url="http://example.com/gbg.jpg")
+        self.place2 = Place.objects.create(name="남산타워", address="서울시 용산구")
+        self.member1 = create_member("feed-member1-uid", nickname="닉네임1")
+        self.member2 = create_member("feed-member2-uid", nickname="닉네임2")
+
+    def test_anonymous_can_view_feed(self):
+        Review.objects.create(member=self.member1, place=self.place1, rating=5, content="좋아요", language="ko")
+
+        response = self.client.get(REVIEW_FEED_URL)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["reviews"]), 1)
+
+    def test_feed_aggregates_reviews_across_different_places(self):
+        Review.objects.create(member=self.member1, place=self.place1, rating=5, content="명소1 리뷰", language="ko")
+        Review.objects.create(member=self.member2, place=self.place2, rating=4, content="명소2 리뷰", language="ko")
+
+        response = self.client.get(REVIEW_FEED_URL)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 2)
+        place_ids = {r["place"] for r in response.data["reviews"]}
+        self.assertEqual(place_ids, {self.place1.id, self.place2.id})
+
+    def test_hidden_review_excluded_from_feed(self):
+        Review.objects.create(member=self.member1, place=self.place1, rating=5, content="보임", language="ko")
+        Review.objects.create(
+            member=self.member2, place=self.place2, rating=1, content="감춰짐", language="ko", is_hidden=True
+        )
+
+        response = self.client.get(REVIEW_FEED_URL)
+
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["reviews"][0]["content"], "보임")
+
+    def test_default_ordering_is_latest_first(self):
+        older = Review.objects.create(member=self.member1, place=self.place1, rating=3, content="먼저 씀", language="ko")
+        newer = Review.objects.create(member=self.member2, place=self.place2, rating=3, content="나중에 씀", language="ko")
+
+        response = self.client.get(REVIEW_FEED_URL)
+
+        ids = [r["id"] for r in response.data["reviews"]]
+        self.assertEqual(ids, [newer.id, older.id])
+
+    def test_popular_ordering_sorts_by_like_count_desc(self):
+        low_likes = Review.objects.create(member=self.member1, place=self.place1, rating=3, content="적게 좋아요", language="ko")
+        high_likes = Review.objects.create(member=self.member2, place=self.place2, rating=3, content="많이 좋아요", language="ko")
+        ReviewLike.objects.create(review=high_likes, member=self.member1)
+        ReviewLike.objects.create(review=high_likes, member=self.member2)
+        ReviewLike.objects.create(review=low_likes, member=self.member1)
+
+        response = self.client.get(REVIEW_FEED_URL, {"ordering": "popular"})
+
+        ids = [r["id"] for r in response.data["reviews"]]
+        self.assertEqual(ids, [high_likes.id, low_likes.id])
+        by_id = {r["id"]: r["like_count"] for r in response.data["reviews"]}
+        self.assertEqual(by_id[high_likes.id], 2)
+        self.assertEqual(by_id[low_likes.id], 1)
+
+    def test_feed_includes_place_and_author_summary_fields(self):
+        self.member1.profile_image_url = "http://example.com/profile1.jpg"
+        self.member1.save(update_fields=["profile_image_url"])
+        Review.objects.create(member=self.member1, place=self.place1, rating=5, content="필드 확인", language="ko")
+
+        response = self.client.get(REVIEW_FEED_URL)
+
+        review_data = response.data["reviews"][0]
+        self.assertEqual(review_data["place_name"], "경복궁")
+        self.assertEqual(review_data["place_photo_url"], "http://example.com/gbg.jpg")
+        self.assertEqual(review_data["author_nickname"], "닉네임1")
+        self.assertEqual(review_data["author_profile_image_url"], "http://example.com/profile1.jpg")
+
+    def test_withdrawn_author_profile_image_hidden(self):
+        self.member1.is_withdrawn = True
+        self.member1.profile_image_url = "http://example.com/profile1.jpg"
+        self.member1.save(update_fields=["is_withdrawn", "profile_image_url"])
+        Review.objects.create(member=self.member1, place=self.place1, rating=5, content="탈퇴 회원 글", language="ko")
+
+        response = self.client.get(REVIEW_FEED_URL)
+
+        review_data = response.data["reviews"][0]
+        self.assertEqual(review_data["author_nickname"], "탈퇴한 사용자")
+        self.assertIsNone(review_data["author_profile_image_url"])
+
+    def test_feed_is_paginated(self):
+        for i in range(3):
+            Review.objects.create(member=self.member1, place=self.place1, rating=3, content=f"리뷰{i}", language="ko")
+
+        response = self.client.get(REVIEW_FEED_URL, {"page_size": 2})
+
+        self.assertEqual(response.data["count"], 3)
+        self.assertEqual(len(response.data["reviews"]), 2)
+        self.assertIsNotNone(response.data["next"])
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_feed_reflects_is_liked_by_me_for_current_user(self, mock_verify):
+        mock_verify.return_value = make_decoded_token("feed-member1-uid")
+        review = Review.objects.create(member=self.member2, place=self.place1, rating=5, content="좋아요됨", language="ko")
+        ReviewLike.objects.create(review=review, member=self.member1)
+
+        response = self.client.get(REVIEW_FEED_URL, HTTP_AUTHORIZATION="Bearer fake-token")
+
+        self.assertTrue(response.data["reviews"][0]["is_liked_by_me"])
