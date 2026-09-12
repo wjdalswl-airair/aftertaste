@@ -54,8 +54,11 @@
 - [ ] 리뷰 사진이 올라가고 다시 보인다
 - [ ] 공유 링크를 다른 기기에서 열면 로그인 없이 보인다
 
+## 정해진 것
+
+- **배포처: Render.** BE·FE·DB(PostgreSQL) 모두 Render에서 호스팅하고, `master` 브랜치에 push하면 자동 배포된다. 외부 DB 리전은 싱가포르. `ALLOWED_HOSTS`는 Render가 주는 `RENDER_EXTERNAL_HOSTNAME`을 자동으로 인식하고, 그 외 도메인은 `DJANGO_ALLOWED_HOSTS`/`CORS_ALLOWED_ORIGINS` 환경변수로 추가한다 (`config/settings.py`).
+- 로컬에서 만든 데이터를 배포 DB(외부 URL)에 `loaddata`로 적재 완료 (2026-09-06).
+
 ## 아직 안 정한 것
 
-- 어디에 배포할지 (서버를 어디에 둘지)
-- 실제 서비스 주소를 무엇으로 할지
 - 개인정보·위치정보 처리 방침 문서 (PRD N-02에서 미정)
