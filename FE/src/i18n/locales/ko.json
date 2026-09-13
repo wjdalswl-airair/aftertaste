@@ -12,11 +12,13 @@
   },
   "reviewFeedPage": {
     "title": "모든 리뷰",
+    "searchPlaceholder": "촬영지, 작품을 검색해 보세요",
     "sortLatest": "최신순",
     "sortPopular": "인기순",
     "loadMore": "더보기",
     "loadingMore": "불러오는 중...",
-    "empty": "아직 등록된 리뷰가 없어요"
+    "empty": "아직 등록된 리뷰가 없어요",
+    "searchEmpty": "검색 결과가 없어요"
   },
   "mainPage": {
     "greeting": {
@@ -48,7 +50,7 @@
   },
   "searchPage": {
     "title": "무엇을\n찾고 계신가요?",
-    "placeholder": "촬영지, 작품을 검색해보세요",
+    "placeholder": "촬영지, 작품을 검색해 보세요",
     "searchButton": "검색",
     "clearButton": "지우기",
     "popularKeywordsTitle": "추천 검색어",
@@ -112,7 +114,12 @@
   "reviewForm": {
     "title": "리뷰 작성",
     "editTitle": "리뷰 수정",
+    "leaveConfirm": "작성 중인 내용이 사라져요. 나가시겠어요?",
+    "leaveConfirmStay": "계속 작성",
+    "leaveConfirmLeave": "나가기",
     "ratingLabel": "별점",
+    "workLabel": "작품",
+    "workPlaceholder": "작품 제목을 검색해 보세요",
     "photoLabel": "사진 첨부",
     "photoUploadError": "사진 업로드에 실패했어요. 다시 시도해주세요.",
     "contentLabel": "방문 후기",

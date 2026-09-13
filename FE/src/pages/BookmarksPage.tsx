@@ -20,7 +20,7 @@ export function BookmarksPage() {
   }, [])
 
   return (
-    <main className="flex min-h-dvh flex-col gap-6 pb-24">
+    <main className="flex min-h-dvh flex-col gap-4 pb-24">
       <header className="grid min-h-16 grid-cols-[24px_1fr_24px] items-center px-4 pt-4">
         <button type="button" onClick={() => navigate(-1)} aria-label="뒤로가기">
           <ArrowLeft size={24} className="text-ink" />

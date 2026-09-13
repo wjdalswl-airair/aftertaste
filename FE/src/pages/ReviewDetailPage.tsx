@@ -1,4 +1,4 @@
-import { ArrowLeft, Heart, MoreHorizontal } from 'lucide-react'
+import { ArrowLeft, Flag, Heart, MoreHorizontal } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router-dom'
@@ -96,7 +96,7 @@ export function ReviewDetailPage() {
   const isMine = Boolean(member && review && member.nickname === review.author_nickname)
 
   return (
-    <main className="flex min-h-dvh flex-col gap-6 pb-24">
+    <main className="flex min-h-dvh flex-col gap-4 pb-24">
       <header className="grid min-h-16 grid-cols-[24px_1fr_24px] items-center px-4 pt-4">
         <button type="button" onClick={() => navigate(-1)} aria-label="뒤로가기">
           <ArrowLeft size={24} className="text-ink" />
@@ -139,7 +139,7 @@ export function ReviewDetailPage() {
 
       {review && (
         <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center justify-between px-4 py-1.5">
             <div className="flex items-center gap-3">
               {review.author_profile_image_url ? (
                 <img
@@ -152,8 +152,12 @@ export function ReviewDetailPage() {
               )}
               <p className="font-medium text-ink">{review.author_nickname}</p>
             </div>
-            <button type="button" onClick={handleOpenMenu} aria-label="더보기">
-              <MoreHorizontal size={22} className="text-ink" />
+            <button type="button" onClick={handleOpenMenu} aria-label={isMine ? '더보기' : '신고하기'}>
+              {isMine ? (
+                <MoreHorizontal size={22} className="text-ink" />
+              ) : (
+                <Flag size={18} className="text-ink" />
+              )}
             </button>
           </div>
 

@@ -12,11 +12,13 @@
   },
   "reviewFeedPage": {
     "title": "全部评价",
+    "searchPlaceholder": "搜索拍摄地或作品",
     "sortLatest": "最新",
     "sortPopular": "最热",
     "loadMore": "查看更多",
     "loadingMore": "加载中...",
-    "empty": "暂无评价"
+    "empty": "暂无评价",
+    "searchEmpty": "没有搜索结果"
   },
   "mainPage": {
     "greeting": {
@@ -112,7 +114,12 @@
   "reviewForm": {
     "title": "写评论",
     "editTitle": "编辑评论",
+    "leaveConfirm": "已填写的内容将丢失，确定要离开吗？",
+    "leaveConfirmStay": "继续编辑",
+    "leaveConfirmLeave": "离开",
     "ratingLabel": "评分",
+    "workLabel": "作品",
+    "workPlaceholder": "搜索作品标题",
     "photoLabel": "添加照片",
     "photoUploadError": "照片上传失败，请重试。",
     "contentLabel": "访问感受",

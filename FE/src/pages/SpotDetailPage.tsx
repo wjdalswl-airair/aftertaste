@@ -103,7 +103,7 @@ export function SpotDetailPage() {
   }
 
   return (
-    <main className="flex min-h-dvh flex-col gap-6 pb-24">
+    <main className="flex min-h-dvh flex-col gap-4 pb-24">
       <header className="grid min-h-16 grid-cols-[24px_1fr_24px] items-center px-4 pt-4">
         <button type="button" onClick={() => navigate(-1)} aria-label="뒤로가기">
           <ArrowLeft size={24} className="text-ink" />
@@ -420,33 +420,47 @@ function SpotMap({ place }: { place: PlaceDetail }) {
 
 function SpotDetailSkeleton() {
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       <Skeleton className="mx-4 h-[230px] rounded-2xl" />
 
       <div className="flex flex-col gap-6 px-4">
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1">
           <Skeleton className="h-3 w-1/3 rounded-sm" />
           <Skeleton className="h-6 w-2/3 rounded-sm" />
         </div>
-        <Skeleton className="h-56 w-full rounded-2xl" />
-        <div className="flex gap-2.5">
-          <Skeleton className="h-11 flex-1 rounded-full" />
-          <Skeleton className="h-11 flex-1 rounded-full" />
+
+        <div className="flex flex-col gap-4 rounded-2xl bg-accent/15 p-5">
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-3.5 w-full rounded-sm" />
+          ))}
         </div>
+
+        <Skeleton className="h-11 w-full rounded-full" />
       </div>
 
       <div className="flex flex-col gap-3 px-4">
         <Skeleton className="h-5 w-1/3 rounded-sm" />
         <div className="flex gap-3">
           {[0, 1, 2].map((i) => (
-            <Skeleton key={i} className="h-[110px] w-[110px] shrink-0 rounded-xl" />
+            <div key={i} className="flex w-[110px] shrink-0 flex-col gap-2">
+              <Skeleton className="h-[110px] w-full rounded-xl" />
+              <Skeleton className="ml-3 h-3 w-16 rounded-sm" />
+              <Skeleton className="ml-3 h-3 w-20 rounded-sm" />
+            </div>
           ))}
         </div>
       </div>
 
+      <div className="px-4">
+        <Skeleton className="h-11 w-full rounded-2xl" />
+      </div>
+
       <div className="flex flex-col gap-3 px-4">
         <Skeleton className="h-5 w-1/3 rounded-sm" />
-        <Skeleton className="h-[280px] w-full rounded-2xl" />
+        <div className="flex flex-col gap-3">
+          <Skeleton className="h-[240px] w-full rounded-2xl" />
+          <Skeleton className="h-11 w-full rounded-full" />
+        </div>
       </div>
     </div>
   )

@@ -12,11 +12,13 @@
   },
   "reviewFeedPage": {
     "title": "All Reviews",
+    "searchPlaceholder": "Search filming spots or works",
     "sortLatest": "Latest",
     "sortPopular": "Popular",
     "loadMore": "Load more",
     "loadingMore": "Loading...",
-    "empty": "No reviews yet"
+    "empty": "No reviews yet",
+    "searchEmpty": "No search results"
   },
   "mainPage": {
     "greeting": {
@@ -112,7 +114,12 @@
   "reviewForm": {
     "title": "Write a review",
     "editTitle": "Edit review",
+    "leaveConfirm": "Your review will be lost. Leave anyway?",
+    "leaveConfirmStay": "Keep editing",
+    "leaveConfirmLeave": "Leave",
     "ratingLabel": "Rating",
+    "workLabel": "Work",
+    "workPlaceholder": "Search for a work title",
     "photoLabel": "Photos",
     "photoUploadError": "Couldn't upload the photo. Please try again.",
     "contentLabel": "Your review",

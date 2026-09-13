@@ -1,13 +1,14 @@
 import { ArrowLeft, Plus, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { createReview, getPlaceReviews, updateReview } from '../api/reviews'
-import { getPlaceDetail, type PlaceDetail } from '../api/spots'
+import { getPlaceDetail, type PlaceDetail, type WorkInfo } from '../api/spots'
 import { BottomNav } from '../components/BottomNav'
 import { Skeleton } from '../components/Skeleton'
 import { uploadReviewPhoto } from '../lib/reviewPhotoUpload'
 import { useLocaleStore } from '../store/useLocaleStore'
+import { shortRegion } from '../utils/address'
 
 const CONTENT_MAX_LENGTH = 500
 const PHOTO_MAX_COUNT = 5
@@ -29,12 +30,52 @@ export function ReviewFormPage() {
   const [uploading, setUploading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [photoError, setPhotoError] = useState(false)
+  // 작품 태그: DB 전체가 아니라 "이 명소(place.works)에서 촬영한 작품"으로만 후보를 제한한다.
+  // ReviewInput에 아직 작품 필드가 없어서(리뷰는 place에만 연결) 등록은 화면에만 보이고 제출 시 서버로 보내지 않는다.
+  const [workQuery, setWorkQuery] = useState('')
+  const [selectedWorks, setSelectedWorks] = useState<WorkInfo[]>([])
+
+  // 나가기 확인 모달: 헤더 뒤로가기·브라우저 뒤로가기·BottomNav 탭 이동을 전부 이 모달로 가로챈다.
+  // 확인을 누르면 pendingLeaveAction에 담아둔 실제 이동을 실행한다.
+  const [leaveModalOpen, setLeaveModalOpen] = useState(false)
+  const pendingLeaveAction = useRef<(() => void) | null>(null)
+
+  function requestLeave(action: () => void) {
+    pendingLeaveAction.current = action
+    setLeaveModalOpen(true)
+  }
+
+  function handleCancelLeave() {
+    setLeaveModalOpen(false)
+    pendingLeaveAction.current = null
+  }
+
+  function handleConfirmLeave() {
+    setLeaveModalOpen(false)
+    const action = pendingLeaveAction.current
+    pendingLeaveAction.current = null
+    action?.()
+  }
 
   useEffect(() => {
     getPlaceDetail(Number(placeId))
       .then(setPlace)
       .catch(() => setPlace(undefined))
   }, [placeId])
+
+  // 브라우저 자체 뒤로가기 버튼도 가로챈다: 진입 시 같은 주소를 한 번 더 쌓아두고(더미),
+  // 뒤로가기를 누르면 더미가 사라진 자리를 popstate로 감지해 즉시 다시 채워 넣어(자리 유지)
+  // 실제로는 화면이 안 바뀐 것처럼 만든 뒤 모달을 띄운다. 확인을 누르면 더미+원본 두 칸을
+  // 한 번에 건너뛰어(go(-2)) 진짜 이전 화면으로 이동한다.
+  useEffect(() => {
+    window.history.pushState(null, '', window.location.href)
+    function handlePopState() {
+      window.history.pushState(null, '', window.location.href)
+      requestLeave(() => window.history.go(-2))
+    }
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
 
   useEffect(() => {
     if (!reviewId) {
@@ -51,6 +92,15 @@ export function ReviewFormPage() {
       })
       .catch(() => {})
   }, [placeId, reviewId])
+
+  function handleSelectWork(work: WorkInfo) {
+    setSelectedWorks((prev) => (prev.some((item) => item.id === work.id) ? prev : [...prev, work]))
+    setWorkQuery('')
+  }
+
+  function handleRemoveWork(workId: number) {
+    setSelectedWorks((prev) => prev.filter((item) => item.id !== workId))
+  }
 
   async function handlePhotoSelect(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -97,10 +147,22 @@ export function ReviewFormPage() {
 
   const canSubmit = rating > 0 && content.trim().length > 0 && !submitting
 
+  const trimmedWorkQuery = workQuery.trim().toLowerCase()
+  const workSuggestions =
+    trimmedWorkQuery === ''
+      ? []
+      : (place?.works.map((placeWork) => placeWork.work) ?? []).filter(
+          (work) => !selectedWorks.some((item) => item.id === work.id) && work.title.toLowerCase().includes(trimmedWorkQuery),
+        )
+
+  function handleBack() {
+    requestLeave(() => navigate(-1))
+  }
+
   return (
-    <main className="flex min-h-dvh flex-col gap-6 pb-24">
+    <main className="flex min-h-dvh flex-col gap-4 pb-24">
       <header className="grid min-h-16 grid-cols-[24px_1fr_24px] items-center px-4 pt-4">
-        <button type="button" onClick={() => navigate(-1)} aria-label="뒤로가기">
+        <button type="button" onClick={handleBack} aria-label="뒤로가기">
           <ArrowLeft size={24} className="text-ink" />
         </button>
         <p className="text-center text-lg font-bold text-ink">
@@ -113,7 +175,7 @@ export function ReviewFormPage() {
           <img src={place.photo_url} alt="" className="h-[74px] w-[75px] rounded-2xl object-cover" />
           <div>
             <p className="text-[15px] font-bold text-ink">{place.name}</p>
-            {place.works[0] && <p className="text-xs text-ink-secondary">{place.works[0].work.title}</p>}
+            <p className="text-xs text-ink-secondary">{shortRegion(place.address)}</p>
           </div>
         </div>
       ) : (
@@ -122,6 +184,46 @@ export function ReviewFormPage() {
           <Skeleton className="h-4 w-32 rounded-sm" />
         </div>
       )}
+
+      <div className="px-4">
+        <p className="mb-2 text-lg font-bold text-ink">{t('reviewForm.workLabel')}</p>
+        <input
+          type="text"
+          value={workQuery}
+          onChange={(event) => setWorkQuery(event.target.value)}
+          placeholder={t('reviewForm.workPlaceholder')}
+          className="w-full rounded-lg bg-accent/15 p-4 text-sm text-ink outline-none placeholder:text-ink-tertiary"
+        />
+        {workQuery.trim() && workSuggestions.length > 0 && (
+          <div className="mt-1 flex flex-col">
+            {workSuggestions.map((work) => (
+              <button
+                key={work.id}
+                type="button"
+                onClick={() => handleSelectWork(work)}
+                className="py-2 text-left text-sm text-ink"
+              >
+                {work.title}
+              </button>
+            ))}
+          </div>
+        )}
+        {selectedWorks.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {selectedWorks.map((work) => (
+              <span
+                key={work.id}
+                className="flex items-center gap-1 rounded-full border border-ink-secondary px-3 py-1.5 text-xs font-bold text-ink-secondary"
+              >
+                #{work.title}
+                <button type="button" onClick={() => handleRemoveWork(work.id)} aria-label={`${work.title} 삭제`}>
+                  <X size={12} />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
 
       <div className="px-4">
         <div className="mb-2 flex items-baseline gap-2">
@@ -185,7 +287,44 @@ export function ReviewFormPage() {
         </button>
       </div>
 
-      <BottomNav />
+      <BottomNav
+        guardNavigation={(to) => {
+          requestLeave(() => navigate(to))
+          return false
+        }}
+      />
+
+      {leaveModalOpen && <LeaveConfirmModal onCancel={handleCancelLeave} onConfirm={handleConfirmLeave} />}
     </main>
+  )
+}
+
+function LeaveConfirmModal({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: () => void }) {
+  const { t } = useTranslation()
+  return (
+    <div className="fixed inset-0 z-50 mx-auto w-full max-w-[480px]">
+      <button type="button" aria-label="닫기" className="absolute inset-0 bg-black/40" onClick={onCancel} />
+      <div className="absolute inset-0 flex items-center justify-center px-6" onClick={onCancel}>
+        <div className="w-full rounded-3xl bg-white px-6 py-8 text-center" onClick={(event) => event.stopPropagation()}>
+          <p className="text-sm text-ink">{t('reviewForm.leaveConfirm')}</p>
+          <div className="mt-6 flex gap-2">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="flex-1 rounded-full border border-divider py-3 text-sm font-bold text-ink-secondary"
+            >
+              {t('reviewForm.leaveConfirmStay')}
+            </button>
+            <button
+              type="button"
+              onClick={onConfirm}
+              className="flex-1 rounded-full bg-primary py-3 text-sm font-bold text-white"
+            >
+              {t('reviewForm.leaveConfirmLeave')}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }

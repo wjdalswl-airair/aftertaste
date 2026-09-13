@@ -11,7 +11,13 @@ const TABS = [
   { to: '/mypage', labelKey: 'bottomNav.profile', icon: User },
 ]
 
-export function BottomNav() {
+type BottomNavProps = {
+  // 탭 이동을 그대로 보내지 않고 먼저 확인하고 싶은 화면(예: 작성 중인 폼)에서 넘겨준다.
+  // false를 반환하면 이동을 막고(preventDefault), 실제 이동은 호출한 쪽이 알아서 처리한다.
+  guardNavigation?: (to: string) => boolean
+}
+
+export function BottomNav({ guardNavigation }: BottomNavProps = {}) {
   const { t } = useTranslation()
   const location = useLocation()
 
@@ -27,6 +33,11 @@ export function BottomNav() {
                 <Link
                   key={to}
                   to={to}
+                  onClick={(event) => {
+                    if (guardNavigation && !guardNavigation(to)) {
+                      event.preventDefault()
+                    }
+                  }}
                   className={`flex flex-col items-center gap-0.5 ${active ? 'text-primary' : 'text-ink-tertiary'}`}
                 >
                   <Icon size={20} />

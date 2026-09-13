@@ -12,11 +12,13 @@
   },
   "reviewFeedPage": {
     "title": "すべてのレビュー",
+    "searchPlaceholder": "撮影地や作品を検索",
     "sortLatest": "最新順",
     "sortPopular": "人気順",
     "loadMore": "もっと見る",
     "loadingMore": "読み込み中...",
-    "empty": "まだレビューがありません"
+    "empty": "まだレビューがありません",
+    "searchEmpty": "検索結果がありません"
   },
   "mainPage": {
     "greeting": {
@@ -112,7 +114,12 @@
   "reviewForm": {
     "title": "レビューを書く",
     "editTitle": "レビューを編集",
+    "leaveConfirm": "作成中の内容が消えます。移動しますか？",
+    "leaveConfirmStay": "続けて作成",
+    "leaveConfirmLeave": "移動する",
     "ratingLabel": "評価",
+    "workLabel": "作品",
+    "workPlaceholder": "作品タイトルを検索してください",
     "photoLabel": "写真添付",
     "photoUploadError": "写真のアップロードに失敗しました。もう一度お試しください。",
     "contentLabel": "訪問レビュー",
