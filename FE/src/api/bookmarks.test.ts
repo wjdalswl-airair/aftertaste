@@ -45,6 +45,20 @@ describe('src/api/bookmarks.ts', () => {
 
       await expect(addFavorite(1)).rejects.toThrow('서버 오류')
     })
+
+    it('본문 없는 200/201 응답도 성공으로 처리한다 (BE PlaceFavoriteView가 본문 없이 200/201만 주는 경우, fix/fe/review-favorite)', async () => {
+      const { addFavorite } = await import('./bookmarks')
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          status: 201,
+          json: () => Promise.reject(new SyntaxError('Unexpected end of JSON input')),
+        }),
+      )
+
+      await expect(addFavorite(1)).resolves.toBeUndefined()
+    })
   })
 
   describe('removeFavorite', () => {

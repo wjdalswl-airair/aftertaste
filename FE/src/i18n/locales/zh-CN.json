@@ -20,7 +20,9 @@
     "loadMore": "查看更多",
     "loadingMore": "加载中...",
     "empty": "暂无评价",
-    "searchEmpty": "没有搜索结果"
+    "searchEmpty": "没有搜索结果",
+    "workFilterLabel": "#{{title}} 的评价",
+    "workFilterClear": "查看全部评价"
   },
   "mainPage": {
     "greeting": {
@@ -124,6 +126,8 @@
     "workPlaceholder": "搜索作品标题",
     "photoLabel": "添加照片",
     "photoUploadError": "照片上传失败，请重试。",
+    "photoUnsupportedFormat": "不支持此照片格式，请改用 JPEG 或 PNG 格式重试。",
+    "photoTooLarge": "照片文件过大，请选择其他照片。",
     "contentLabel": "访问感受",
     "contentPlaceholder": "请分享您在这里的体验",
     "submitButton": "提交"

@@ -1,5 +1,5 @@
 import { Plus } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from 'react-router-dom'
 import { deleteAccount, getMe, logout, updateProfile, type Member } from '../api/auth'
@@ -12,7 +12,8 @@ import { BottomSheet } from '../components/BottomSheet'
 import { LanguageSheet } from '../components/LanguageSheet'
 import { Skeleton } from '../components/Skeleton'
 import { resetLocationConsent } from '../hooks/useGeolocation'
-import { uploadProfilePhoto } from '../lib/profilePhotoUpload'
+import { PhotoTooLargeError, UnsupportedImageError } from '../lib/compressImage'
+import { deleteProfilePhoto, uploadProfilePhoto } from '../lib/profilePhotoUpload'
 import { useAuthStore } from '../store/useAuthStore'
 
 const NICKNAME_MAX_LENGTH = 20
@@ -36,10 +37,26 @@ export function MyPage() {
   const [nickname, setNickname] = useState('')
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
-  const [photoError, setPhotoError] = useState(false)
+  const [photoError, setPhotoError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
   const [confirmingWithdraw, setConfirmingWithdraw] = useState(false)
+
+  // 편집 중 새로 올린 프로필 사진 중, 저장 전에 다시 다른 사진으로 바꿔서 버려진 것만 추적한다.
+  // 편집 시작 시 baseline으로 깔아둔 me.profile_image_url(기존 저장된 사진)은 여기 안 들어간다 —
+  // 저장 전까지는 실제 프로필이 그 사진을 그대로 쓰고 있어서 지우면 안 된다.
+  const previousDraftPhotoUrl = useRef<string | null>(null)
+
+  // 프로필 사진을 새로 골라놓고 저장(handleSaveProfile)까진 안 한 채로 이 화면을 벗어나면,
+  // 그 임시 업로드본을 정리한다. previousDraftPhotoUrl은 저장에 성공하면 null로 비워지므로
+  // (handleSaveProfile 참고), 여기 남아있다는 건 저장 안 된 채로 나간다는 뜻이다.
+  useEffect(() => {
+    return () => {
+      if (previousDraftPhotoUrl.current) {
+        deleteProfilePhoto(previousDraftPhotoUrl.current)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     getMe()
@@ -74,7 +91,8 @@ export function MyPage() {
     }
     setNickname(me.nickname)
     setPhotoUrl(me.profile_image_url)
-    setPhotoError(false)
+    setPhotoError(null)
+    previousDraftPhotoUrl.current = null
     setEditing(true)
   }
 
@@ -85,13 +103,24 @@ export function MyPage() {
       return
     }
     setUploadingPhoto(true)
-    setPhotoError(false)
+    setPhotoError(null)
     try {
       const url = await uploadProfilePhoto(file)
+      // 저장 전에 또 다른 사진으로 바꾸는 경우 — 직전 임시 업로드본은 이제 어디서도 안 쓰이니 지운다.
+      if (previousDraftPhotoUrl.current) {
+        deleteProfilePhoto(previousDraftPhotoUrl.current)
+      }
+      previousDraftPhotoUrl.current = url
       setPhotoUrl(url)
     } catch (error) {
       console.error('프로필 사진 업로드 실패', error)
-      setPhotoError(true)
+      if (error instanceof UnsupportedImageError) {
+        setPhotoError(t('reviewForm.photoUnsupportedFormat'))
+      } else if (error instanceof PhotoTooLargeError) {
+        setPhotoError(t('reviewForm.photoTooLarge'))
+      } else {
+        setPhotoError(t('reviewForm.photoUploadError'))
+      }
     } finally {
       setUploadingPhoto(false)
     }
@@ -101,6 +130,7 @@ export function MyPage() {
     if (!me || saving) {
       return
     }
+    const oldPhotoUrl = me.profile_image_url
     setSaving(true)
     try {
       await updateProfile({ nickname: nickname.trim(), profile_image_url: photoUrl })
@@ -108,6 +138,12 @@ export function MyPage() {
       setMe(updated)
       setMember(updated)
       setEditing(false)
+      // 저장이 실제로 끝난 뒤에만 예전 프로필 사진을 지운다 — 저장 전에 지우면 저장이 실패했을 때
+      // 프로필 사진이 사라진 채로 남는다.
+      if (oldPhotoUrl && oldPhotoUrl !== photoUrl) {
+        deleteProfilePhoto(oldPhotoUrl)
+      }
+      previousDraftPhotoUrl.current = null
     } catch (error) {
       console.error('프로필 저장 실패', error)
     } finally {
@@ -200,9 +236,7 @@ export function MyPage() {
                 {t('myPage.createdCoursesLabel', { count: me.created_courses_count })}
               </p>
 
-              {editing && photoError && (
-                <p className="mt-1 text-xs text-[#e0574a]">{t('reviewForm.photoUploadError')}</p>
-              )}
+              {editing && photoError && <p className="mt-1 text-xs text-[#e0574a]">{photoError}</p>}
 
               <button
                 type="button"
@@ -271,6 +305,7 @@ export function MyPage() {
                   <img
                     src={review.photos[0].photo_url}
                     alt=""
+                    loading="lazy"
                     className="h-[110px] w-full rounded-xl object-cover"
                   />
                 ) : (

@@ -6,6 +6,11 @@ export type ReviewPhoto = {
   photo_url: string
 }
 
+export type ReviewWorkTag = {
+  id: number
+  title: string
+}
+
 export type ReviewItem = {
   id: number
   place: number
@@ -17,6 +22,7 @@ export type ReviewItem = {
   content: string
   language: string
   photos: ReviewPhoto[]
+  works: ReviewWorkTag[]
   like_count: number
   is_liked_by_me: boolean
   created_at: string
@@ -28,6 +34,10 @@ export type ReviewInput = {
   content: string
   language: string
   photo_urls: string[]
+  // 리뷰에 태그할 작품 해시태그(issue #60). 빈 배열이면 태그를 지운다, PATCH에서 아예 안 보내면
+  // 기존 태그를 그대로 둔다(photo_urls와 다르게 optional) — createReview/updateReview 호출부에서
+  // 필요할 때만 넣는다.
+  work_ids?: number[]
 }
 
 // 명소 리뷰 목록. 로그인 여부와 상관없이 조회 가능.
@@ -47,13 +57,19 @@ export type ReviewFeedPage = {
 // 하단 탭 "리뷰"의 전체 피드. 명소 구분 없이 리뷰를 모아 보여준다. 로그인 여부와 상관없이 조회 가능.
 // next가 null이 아니면 다음 페이지가 더 있다는 뜻 — FE는 next URL을 그대로 안 쓰고 page 번호를 직접 증가시켜 부른다
 // (publicFetch가 항상 BASE_URL을 붙이는 구조라, 서버가 돌려주는 절대 URL을 그대로 넘기면 안 맞는다).
-export function getReviewFeed(params: { ordering?: ReviewFeedOrdering; page?: number } = {}): Promise<ReviewFeedPage> {
+export function getReviewFeed(
+  params: { ordering?: ReviewFeedOrdering; page?: number; workId?: number } = {},
+): Promise<ReviewFeedPage> {
   const query = new URLSearchParams()
   if (params.ordering) {
     query.set('ordering', params.ordering)
   }
   if (params.page) {
     query.set('page', String(params.page))
+  }
+  // 리뷰 상세의 작품 해시태그를 눌러 "이 작품 리뷰만 보기"로 올 때 쓴다 (issue #60 서버 필터).
+  if (params.workId) {
+    query.set('work_id', String(params.workId))
   }
   const qs = query.toString()
   return publicFetch<ReviewFeedPage>(`/api/reviews/${qs ? `?${qs}` : ''}`)

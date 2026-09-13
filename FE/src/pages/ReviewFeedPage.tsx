@@ -1,16 +1,25 @@
-import { Heart, Search } from 'lucide-react'
+import { Heart, Search, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { getReviewFeed, type ReviewFeedOrdering, type ReviewItem } from '../api/reviews'
 import { BottomNav } from '../components/BottomNav'
 import { Skeleton } from '../components/Skeleton'
 
 export function ReviewFeedPage() {
   const { t } = useTranslation()
+  const [searchParams, setSearchParams] = useSearchParams()
+  // 리뷰 상세의 작품 해시태그를 눌러 들어오면 work_id로 "이 작품 리뷰만 보기" 필터가 걸린다
+  // (issue #60 서버 필터, DETAIL_SPEC.md S-07 참고). work_title은 필터 칩에 보여줄 이름표일 뿐,
+  // 실제 필터링은 work_id로 한다.
+  const workIdParam = searchParams.get('work_id')
+  const workId = workIdParam ? Number(workIdParam) : undefined
+  const workTitle = searchParams.get('work_title') ?? ''
+
   const [ordering, setOrdering] = useState<ReviewFeedOrdering>('latest')
-  // 촬영지(place_name) 기준으로만 검색한다. 작품 기준은 리뷰 응답에 작품 정보가 없어서
-  // BE 지원 전까지는 불가능하다 — 검색은 BE 파라미터 없이 이미 불러온 리뷰를 FE에서 걸러 보여준다.
+  // 촬영지(place_name)와 태그된 작품(works[].title) 둘 다로 검색한다(작품 태그는 issue #60로
+  // ReviewSerializer에 추가됨). BE 파라미터 없이 이미 불러온 리뷰를 FE에서 걸러 보여준다 —
+  // 그래서 아직 안 불러온 뒷 페이지의 리뷰는 "더보기"로 더 불러와야 검색 대상에 들어온다.
   const [searchQuery, setSearchQuery] = useState('')
   // undefined: 로딩 중, []: 확인 끝났는데 리뷰 없음
   const [reviews, setReviews] = useState<ReviewItem[] | undefined>(undefined)
@@ -20,7 +29,7 @@ export function ReviewFeedPage() {
 
   useEffect(() => {
     setReviews(undefined)
-    getReviewFeed({ ordering, page: 1 })
+    getReviewFeed({ ordering, page: 1, workId })
       .then((result) => {
         setReviews(result.reviews)
         setHasMore(result.next !== null)
@@ -30,12 +39,12 @@ export function ReviewFeedPage() {
         setReviews([])
         setHasMore(false)
       })
-  }, [ordering])
+  }, [ordering, workId])
 
   function handleLoadMore() {
     setLoadingMore(true)
     const nextPage = page + 1
-    getReviewFeed({ ordering, page: nextPage })
+    getReviewFeed({ ordering, page: nextPage, workId })
       .then((result) => {
         setReviews((prev) => [...(prev ?? []), ...result.reviews])
         setHasMore(result.next !== null)
@@ -45,9 +54,16 @@ export function ReviewFeedPage() {
       .finally(() => setLoadingMore(false))
   }
 
+  function handleClearWorkFilter() {
+    setSearchParams({})
+  }
+
   const normalizedQuery = searchQuery.trim().toLowerCase()
   const visibleReviews = reviews?.filter(
-    (review) => normalizedQuery === '' || review.place_name.toLowerCase().includes(normalizedQuery),
+    (review) =>
+      normalizedQuery === '' ||
+      review.place_name.toLowerCase().includes(normalizedQuery) ||
+      review.works.some((work) => work.title.toLowerCase().includes(normalizedQuery)),
   )
 
   return (
@@ -59,16 +75,27 @@ export function ReviewFeedPage() {
       </header>
 
       <div className="px-4 pb-2">
-        <div className="flex items-center gap-2 rounded-full bg-accent/15 px-4 py-2.5">
-          <Search size={16} className="text-ink-tertiary" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder={t('reviewFeedPage.searchPlaceholder')}
-            className="flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-tertiary"
-          />
-        </div>
+        {workId ? (
+          <div className="flex items-center gap-2 rounded-lg bg-accent/15 p-4">
+            <span className="flex-1 truncate text-sm text-ink">
+              {t('reviewFeedPage.workFilterLabel', { title: workTitle })}
+            </span>
+            <button type="button" onClick={handleClearWorkFilter} aria-label={t('reviewFeedPage.workFilterClear')}>
+              <X size={16} className="text-ink-tertiary" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 rounded-lg bg-accent/15 p-4">
+            <Search size={16} className="text-ink-tertiary" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder={t('reviewFeedPage.searchPlaceholder')}
+              className="flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-tertiary"
+            />
+          </div>
+        )}
       </div>
 
       <div className="flex gap-6 px-4">
@@ -138,6 +165,7 @@ function ReviewFeedCard({ review }: { review: ReviewItem }) {
       <img
         src={review.photos[0]?.photo_url ?? review.place_photo_url}
         alt=""
+        loading="lazy"
         className="block h-auto w-full object-cover"
       />
       <div className="absolute bottom-2 right-2 flex items-center gap-1 rounded-full bg-black/40 px-1.5 py-0.5">

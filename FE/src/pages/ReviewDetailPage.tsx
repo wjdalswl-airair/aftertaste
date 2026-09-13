@@ -166,14 +166,17 @@ export function ReviewDetailPage() {
               <div
                 ref={photoScrollRef}
                 onScroll={handlePhotoScroll}
-                className="scrollbar-hide flex snap-x snap-mandatory overflow-x-auto"
+                className="scrollbar-hide flex items-start snap-x snap-mandatory overflow-x-auto"
               >
-                {review.photos.map((photo) => (
+                {review.photos.map((photo, index) => (
                   <img
                     key={photo.id}
                     src={photo.photo_url}
                     alt=""
-                    className="h-[360px] w-full flex-shrink-0 snap-center object-cover"
+                    // 첫 장은 화면에 바로 보이니 즉시 로드하고, 옆으로 스와이프해야 보이는
+                    // 나머지 사진만 지연 로딩한다.
+                    loading={index === 0 ? 'eager' : 'lazy'}
+                    className="block w-full flex-shrink-0 snap-center"
                   />
                 ))}
               </div>
@@ -208,7 +211,21 @@ export function ReviewDetailPage() {
             </div>
           </div>
 
-          <p className="px-4 text-base font-medium leading-[1.5] text-ink">{review.content}</p>
+          <p className="px-4 text-base leading-[1.5] text-ink">{review.content}</p>
+
+          {review.works.length > 0 && (
+            <div className="flex flex-wrap gap-2 px-4">
+              {review.works.map((work) => (
+                <Link
+                  key={work.id}
+                  to={`/reviews?work_id=${work.id}&work_title=${encodeURIComponent(work.title)}`}
+                  className="rounded-full border border-ink-secondary px-3 py-1.5 text-xs font-bold text-ink-secondary"
+                >
+                  #{work.title}
+                </Link>
+              ))}
+            </div>
+          )}
        </div>
       )}
 

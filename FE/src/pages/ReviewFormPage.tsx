@@ -2,11 +2,12 @@ import { ArrowLeft, Plus, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { createReview, getPlaceReviews, updateReview } from '../api/reviews'
+import { createReview, getPlaceReviews, updateReview, type ReviewWorkTag } from '../api/reviews'
 import { getPlaceDetail, type PlaceDetail, type WorkInfo } from '../api/spots'
 import { BottomNav } from '../components/BottomNav'
 import { Skeleton } from '../components/Skeleton'
-import { uploadReviewPhoto } from '../lib/reviewPhotoUpload'
+import { PhotoTooLargeError, UnsupportedImageError } from '../lib/compressImage'
+import { deleteReviewPhoto, uploadReviewPhoto } from '../lib/reviewPhotoUpload'
 import { useLocaleStore } from '../store/useLocaleStore'
 import { shortRegion } from '../utils/address'
 
@@ -29,11 +30,16 @@ export function ReviewFormPage() {
   const [photoUrls, setPhotoUrls] = useState<string[]>([])
   const [uploading, setUploading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [photoError, setPhotoError] = useState(false)
+  const [photoError, setPhotoError] = useState<string | null>(null)
   // 작품 태그: DB 전체가 아니라 "이 명소(place.works)에서 촬영한 작품"으로만 후보를 제한한다.
-  // ReviewInput에 아직 작품 필드가 없어서(리뷰는 place에만 연결) 등록은 화면에만 보이고 제출 시 서버로 보내지 않는다.
+  // 제출 시 work_ids로 서버에 저장된다(issue #60, BE reviews/serializers.py:ReviewWriteSerializer).
   const [workQuery, setWorkQuery] = useState('')
-  const [selectedWorks, setSelectedWorks] = useState<WorkInfo[]>([])
+  const [selectedWorks, setSelectedWorks] = useState<ReviewWorkTag[]>([])
+
+  // 이 화면에서 새로 업로드한 사진의 URL만 담아둔다. 수정 화면에 처음부터 있던 기존 리뷰 사진은
+  // 여기 안 들어간다 — 아직 저장(제출) 전이라 실제 리뷰가 그 사진을 그대로 쓰고 있어서, 지우기를
+  // 눌러도 Storage에서 바로 지우면 안 된다(저장 안 해도 리뷰 사진이 깨짐).
+  const newlyUploadedPhotoUrls = useRef<Set<string>>(new Set())
 
   // 나가기 확인 모달: 헤더 뒤로가기·브라우저 뒤로가기·BottomNav 탭 이동을 전부 이 모달로 가로챈다.
   // 확인을 누르면 pendingLeaveAction에 담아둔 실제 이동을 실행한다.
@@ -54,6 +60,9 @@ export function ReviewFormPage() {
     setLeaveModalOpen(false)
     const action = pendingLeaveAction.current
     pendingLeaveAction.current = null
+    // 제출 안 하고 나가는 거라, 이번 화면에서 새로 올렸지만 끝내 저장 안 된 사진을 정리한다.
+    newlyUploadedPhotoUrls.current.forEach((url) => deleteReviewPhoto(url))
+    newlyUploadedPhotoUrls.current.clear()
     action?.()
   }
 
@@ -88,6 +97,7 @@ export function ReviewFormPage() {
           setRating(existing.rating)
           setContent(existing.content)
           setPhotoUrls(existing.photos.map((photo) => photo.photo_url))
+          setSelectedWorks(existing.works)
         }
       })
       .catch(() => {})
@@ -109,14 +119,21 @@ export function ReviewFormPage() {
       return
     }
     setUploading(true)
-    setPhotoError(false)
+    setPhotoError(null)
     try {
       const url = await uploadReviewPhoto(file)
+      newlyUploadedPhotoUrls.current.add(url)
       setPhotoUrls((prev) => [...prev, url])
     } catch (error) {
       // 업로드 실패해도 나머지 흐름은 그대로 진행 — 사용자가 다시 시도할 수 있게 안내만 띄운다.
       console.error('리뷰 사진 업로드 실패', error)
-      setPhotoError(true)
+      if (error instanceof UnsupportedImageError) {
+        setPhotoError(t('reviewForm.photoUnsupportedFormat'))
+      } else if (error instanceof PhotoTooLargeError) {
+        setPhotoError(t('reviewForm.photoTooLarge'))
+      } else {
+        setPhotoError(t('reviewForm.photoUploadError'))
+      }
     } finally {
       setUploading(false)
     }
@@ -124,6 +141,10 @@ export function ReviewFormPage() {
 
   function handleRemovePhoto(url: string) {
     setPhotoUrls((prev) => prev.filter((item) => item !== url))
+    if (newlyUploadedPhotoUrls.current.has(url)) {
+      newlyUploadedPhotoUrls.current.delete(url)
+      deleteReviewPhoto(url)
+    }
   }
 
   async function handleSubmit() {
@@ -131,7 +152,13 @@ export function ReviewFormPage() {
       return
     }
     setSubmitting(true)
-    const input = { rating, content: content.trim(), language, photo_urls: photoUrls }
+    const input = {
+      rating,
+      content: content.trim(),
+      language,
+      photo_urls: photoUrls,
+      work_ids: selectedWorks.map((work) => work.id),
+    }
     try {
       if (isEdit) {
         await updateReview(Number(reviewId), input)
@@ -257,7 +284,7 @@ export function ReviewFormPage() {
             </div>
           ))}
         </div>
-        {photoError && <p className="mt-2 text-xs text-[#e0574a]">{t('reviewForm.photoUploadError')}</p>}
+        {photoError && <p className="mt-2 text-xs text-[#e0574a]">{photoError}</p>}
       </div>
 
       <div className="px-4">

@@ -20,7 +20,9 @@
     "loadMore": "查看更多",
     "loadingMore": "載入中...",
     "empty": "尚無評價",
-    "searchEmpty": "沒有搜尋結果"
+    "searchEmpty": "沒有搜尋結果",
+    "workFilterLabel": "#{{title}} 的評價",
+    "workFilterClear": "查看全部評價"
   },
   "mainPage": {
     "greeting": {
@@ -124,6 +126,8 @@
     "workPlaceholder": "搜尋作品標題",
     "photoLabel": "新增照片",
     "photoUploadError": "照片上傳失敗，請再試一次。",
+    "photoUnsupportedFormat": "不支援此照片格式，請改用 JPEG 或 PNG 格式再試一次。",
+    "photoTooLarge": "照片檔案過大，請選擇其他照片。",
     "contentLabel": "造訪心得",
     "contentPlaceholder": "請分享您在這裡的體驗",
     "submitButton": "送出"

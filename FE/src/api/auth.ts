@@ -47,7 +47,15 @@ export async function authorizedFetch<T>(path: string, options: RequestInit = {}
     return undefined as T
   }
 
-  return response.json() as Promise<T>
+  try {
+    return (await response.json()) as T
+  } catch {
+    // 즐겨찾기/좋아요 POST(BE PlaceFavoriteView·ReviewLikeView 등)처럼 200/201인데 본문이
+    // 빈 응답도 있다 — 이걸 실패로 보고 던지면 호출부의 낙관적 업데이트가 바로 롤백돼서
+    // "채워진 하트가 다시 빈 하트로 돌아오는" 버그가 생긴다(fix/fe/review-favorite). 204와
+    // 같은 뜻으로 본다.
+    return undefined as T
+  }
 }
 
 // Firebase idToken으로 로그인한다. 이미 있는 회원이면 그대로 조회되고,

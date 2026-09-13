@@ -90,7 +90,7 @@ export function MapPage() {
       <div className="px-4">
         <div className="relative">
           <div className="absolute inset-x-3 top-3 z-10">
-            <div className="flex items-center gap-2 rounded-full bg-white px-4 py-2.5 shadow-md">
+            <div className="flex items-center gap-2 rounded-lg bg-white p-4 shadow-md">
               <Search size={16} className="text-ink-tertiary" />
               <input
                 type="text"
