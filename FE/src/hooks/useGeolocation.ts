@@ -57,6 +57,16 @@ export function resetLocationConsent() {
   }
 }
 
+// 마이페이지 "위치 권한 설정하기"에서 쓴다 — 브라우저가 이미 허용/거부로 확정해놨어도,
+// 다음 useGeolocation 판단 시점 한 번은 무조건 커스텀 설명 모달부터 보여준다(2026-09-13,
+// 사용자 결정). 이미 허용된 상태라면 모달에서 "허용"을 눌러도 브라우저 네이티브 팝업은
+// 다시 안 뜨고 바로 위치를 가져오지만, 최소한 버튼을 누른 것에 대한 반응(모달)은 항상 보인다.
+let forceNextPrompt = false
+
+export function requestLocationConsentPrompt() {
+  forceNextPrompt = true
+}
+
 // 우리 커스텀 동의와 별개로, 브라우저/OS가 이 사이트의 위치 권한을 이미 확정해놨는지 확인한다.
 // 'granted'/'denied'면 이미 결정된 것 — 이제 와서 우리 모달에서 뭘 눌러도 브라우저 네이티브
 // 팝업은 다시 안 뜬다. 'prompt'면 아직 미결정. Permissions API를 지원 안 하는 브라우저(구형
@@ -96,6 +106,12 @@ export function useGeolocation() {
       // 뭐라고 돼 있든(예: localStorage를 지웠지만 브라우저 권한은 남아있는 경우) 무시한다.
       const nativeState = await queryNativeGeolocationPermission()
       if (cancelled) {
+        return
+      }
+
+      if (forceNextPrompt) {
+        forceNextPrompt = false
+        setShowConsentModal(true)
         return
       }
 

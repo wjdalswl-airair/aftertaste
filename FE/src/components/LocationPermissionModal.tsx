@@ -1,5 +1,6 @@
 import { X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router-dom'
 
 type LocationPermissionModalProps = {
   onAllow: () => void
@@ -8,7 +9,10 @@ type LocationPermissionModalProps = {
 
 // 위치 권한을 브라우저에 물어보기 전에 뜨는 설명 모달 (Figma node-id 102:702).
 // "허용"을 눌러야 그때 useGeolocation이 실제 브라우저 네이티브 권한 팝업을 띄운다.
-// 이용약관 문구는 Figma 목업에 이동 경로가 정해져 있지 않아 텍스트로만 보여준다(실제 링크 아님).
+// "위치기반 서비스 이용약관 보기"는 실제 약관 페이지(/terms/location)로 이동하는 링크다
+// (2026-09-13 — 처음엔 Figma 목업에 이동 경로가 없어 텍스트로만 뒀는데, 약관 페이지가
+// 생긴 뒤 실제 링크로 바꿨다). 로그인 여부와 상관없이 볼 수 있어야 해서 이 라우트는
+// `RequireAuth` 밖에 있다(App.tsx 참고).
 export function LocationPermissionModal({ onAllow, onDeny }: LocationPermissionModalProps) {
   const { t } = useTranslation()
 
@@ -31,7 +35,9 @@ export function LocationPermissionModal({ onAllow, onDeny }: LocationPermissionM
             <p className="mt-2 whitespace-pre-line text-xs leading-relaxed text-[#9c8a80]">
               {t('locationConsent.body')}
             </p>
-            <p className="mt-5 text-center text-xs font-medium text-primary">{t('locationConsent.terms')} →</p>
+            <Link to="/terms/location" className="mt-5 block text-center text-xs font-medium text-primary">
+              {t('locationConsent.terms')} →
+            </Link>
           </div>
 
           <div className="mt-5 flex gap-3">

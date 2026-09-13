@@ -14,7 +14,11 @@ import { BottomSheet } from '../components/BottomSheet'
 import { LanguageSheet } from '../components/LanguageSheet'
 import { PlaceholderImage } from '../components/PlaceholderImage'
 import { Skeleton } from '../components/Skeleton'
-import { queryNativeGeolocationPermission, resetLocationConsent } from '../hooks/useGeolocation'
+import {
+  queryNativeGeolocationPermission,
+  requestLocationConsentPrompt,
+  resetLocationConsent,
+} from '../hooks/useGeolocation'
 import { PhotoTooLargeError, UnsupportedImageError } from '../lib/compressImage'
 import { deleteProfilePhoto, uploadProfilePhoto } from '../lib/profilePhotoUpload'
 import { useAuthStore } from '../store/useAuthStore'
@@ -167,6 +171,7 @@ export function MyPage() {
       return
     }
     resetLocationConsent()
+    requestLocationConsentPrompt()
     navigate('/')
   }
 
@@ -193,8 +198,8 @@ export function MyPage() {
             className="flex items-center bg-contain bg-center bg-no-repeat px-6 py-4"
             style={{ backgroundImage: `url(${profileCardBg})`, aspectRatio: '1748 / 687' }}
           >
-            <div className="mx-auto flex w-[77%] items-center gap-12">
-              <Skeleton className="h-20 w-20 rounded-full" />
+            <div className="mx-auto flex w-[85%] items-center gap-5 min-[376px]:gap-9 min-[441px]:gap-10">
+              <Skeleton className="h-14 w-14 rounded-full min-[376px]:h-16 min-[376px]:w-16 min-[441px]:h-20 min-[441px]:w-20" />
               <div className="flex flex-1 flex-col gap-2">
                 <Skeleton className="h-4 w-24 rounded-sm" />
                 <Skeleton className="h-3 w-32 rounded-sm" />
@@ -206,16 +211,16 @@ export function MyPage() {
             className="flex items-center bg-contain bg-center bg-no-repeat px-6 py-4"
             style={{ backgroundImage: `url(${profileCardBg})`, aspectRatio: '1748 / 687' }}
           >
-            <div className="mx-auto flex w-[77%] items-center gap-12">
+            <div className="mx-auto flex w-[85%] items-center gap-5 min-[376px]:gap-9 min-[441px]:gap-10">
               <div className="relative shrink-0">
                 {(editing ? photoUrl : me.profile_image_url) ? (
                   <img
                     src={(editing ? photoUrl : me.profile_image_url) ?? undefined}
                     alt=""
-                    className="h-20 w-20 rounded-full object-cover"
+                    className="h-14 w-14 rounded-full object-cover min-[376px]:h-16 min-[376px]:w-16 min-[441px]:h-20 min-[441px]:w-20"
                   />
                 ) : (
-                  <div className="h-20 w-20 rounded-full bg-accent/20" />
+                  <div className="h-14 w-14 rounded-full bg-accent/20 min-[376px]:h-16 min-[376px]:w-16 min-[441px]:h-20 min-[441px]:w-20" />
                 )}
                 {editing && (
                   <label className="absolute bottom-0 right-0 flex h-6 w-6 items-center justify-center rounded-full bg-primary">
@@ -248,10 +253,10 @@ export function MyPage() {
                     </span>
                   </div>
                 ) : (
-                  <p className="truncate text-base font-bold text-ink">{me.nickname}</p>
+                  <p className="truncate text-sm font-bold text-ink min-[376px]:text-base">{me.nickname}</p>
                 )}
-                <p className="mt-0.5 truncate text-sm text-ink-tertiary">{me.email}</p>
-                <p className="mt-1 text-xs text-ink-secondary">
+                <p className="mt-0.5 truncate text-xs text-ink-tertiary min-[376px]:text-sm">{me.email}</p>
+                <p className="mt-0.5 text-xs text-ink-secondary min-[376px]:mt-1">
                   {t('myPage.reviewedPlacesLabel', { count: me.reviewed_places_count })}
                 </p>
                 <p className="text-xs text-ink-secondary">
@@ -264,7 +269,7 @@ export function MyPage() {
                   type="button"
                   onClick={editing ? handleSaveProfile : startEditing}
                 disabled={editing && saving}
-                className="mt-2 rounded-full border border-primary bg-white px-4 py-1.5 text-xs font-medium text-primary disabled:opacity-40"
+                className="mt-1 rounded-full border border-primary bg-white px-4 py-1 text-xs font-medium text-primary disabled:opacity-40 min-[376px]:mt-2 min-[376px]:py-1.5"
               >
                 {editing ? t('myPage.profileSaveButton') : t('myPage.profileEditButton')}
               </button>
