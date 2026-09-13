@@ -1,4 +1,14 @@
 {
+  "share": {
+    "title": "Share",
+    "subtitle": "Share it with someone you'd love to go with",
+    "copyLink": "Copy link",
+    "copied": "Copied",
+    "kakao": "Share to KakaoTalk",
+    "x": "Share to X",
+    "line": "Share to LINE",
+    "whatsapp": "Share to WhatsApp"
+  },
   "bottomNav": {
     "home": "Home",
     "map": "Map",

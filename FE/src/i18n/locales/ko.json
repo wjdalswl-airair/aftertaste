@@ -1,4 +1,14 @@
 {
+  "share": {
+    "title": "공유하기",
+    "subtitle": "함께 가고 싶은 사람과 나눠보세요",
+    "copyLink": "링크 복사하기",
+    "copied": "복사되었습니다",
+    "kakao": "카카오톡 공유하기",
+    "x": "X 공유하기",
+    "line": "라인 공유하기",
+    "whatsapp": "왓츠앱 공유하기"
+  },
   "bottomNav": {
     "home": "홈",
     "map": "지도",

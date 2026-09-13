@@ -20,6 +20,7 @@ import { BottomNav } from '../components/BottomNav'
 import { PlaceholderImage } from '../components/PlaceholderImage'
 import { FavoriteButton } from '../components/FavoriteButton'
 import { RatingModal } from '../components/RatingModal'
+import { ShareSheet } from '../components/ShareSheet'
 import { Skeleton } from '../components/Skeleton'
 import { loadKakaoMaps, pinIconDataUrl } from '../lib/kakaoMap'
 import { useAuthStore } from '../store/useAuthStore'
@@ -37,6 +38,7 @@ export function SpotDetailPage() {
   // undefined: 로딩 중, null: 존재하지 않거나 실패
   const [place, setPlace] = useState<PlaceDetail | null | undefined>(undefined)
   const [showRatingModal, setShowRatingModal] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
   const [courseAiLoading, setCourseAiLoading] = useState(false)
   const [courseAiError, setCourseAiError] = useState<string | null>(null)
 
@@ -46,10 +48,6 @@ export function SpotDetailPage() {
       .then(setPlace)
       .catch(() => setPlace(null))
   }, [placeId])
-
-  function handleShare() {
-    navigator.clipboard.writeText(window.location.href).catch(() => {})
-  }
 
   function requireLogin() {
     if (!member) {
@@ -105,13 +103,13 @@ export function SpotDetailPage() {
   }
 
   return (
-    <main className="flex min-h-dvh flex-col gap-4 pb-24">
-      <header className="grid min-h-16 grid-cols-[24px_1fr_24px] items-center px-4 pt-4">
+    <main className="flex min-h-dvh flex-col gap-6 pb-24">
+      <header className="grid min-h-16 grid-cols-[24px_1fr_24px] items-center px-4 pt-2">
         <button type="button" onClick={() => navigate(-1)} aria-label="뒤로가기">
           <ArrowLeft size={24} className="text-ink" />
         </button>
         <div />
-        <button type="button" onClick={handleShare} aria-label="공유" className="justify-self-end">
+        <button type="button" onClick={() => setShareOpen(true)} aria-label="공유" className="justify-self-end">
           <Share2 size={22} className="text-ink" />
         </button>
       </header>
@@ -245,6 +243,17 @@ export function SpotDetailPage() {
             setShowRatingModal(false)
             navigate(`/spots/${placeId}/reviews/new`, { state: { rating } })
           }}
+        />
+      )}
+
+      {shareOpen && place && (
+        <ShareSheet
+          url={window.location.href}
+          title={place.name}
+          description={place.description || place.address}
+          imageUrl={place.photo_url || spotPlaceholder}
+          kakaoButtonLabel="촬영지 보러가기"
+          onClose={() => setShareOpen(false)}
         />
       )}
 

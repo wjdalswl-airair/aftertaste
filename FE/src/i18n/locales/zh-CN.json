@@ -1,4 +1,14 @@
 {
+  "share": {
+    "title": "分享",
+    "subtitle": "分享给想一起去的人吧",
+    "copyLink": "复制链接",
+    "copied": "已复制",
+    "kakao": "分享到KakaoTalk",
+    "x": "分享到X",
+    "line": "分享到LINE",
+    "whatsapp": "分享到WhatsApp"
+  },
   "bottomNav": {
     "home": "首页",
     "map": "地图",
