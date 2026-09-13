@@ -77,7 +77,7 @@ export function ReviewFeedPage() {
       <div className="px-4 pb-2">
         {workId ? (
           <div className="flex items-center gap-2 rounded-lg bg-accent/15 p-4">
-            <span className="flex-1 truncate text-sm font-bold text-ink">
+            <span className="flex-1 truncate text-sm text-ink">
               {t('reviewFeedPage.workFilterLabel', { title: workTitle })}
             </span>
             <button type="button" onClick={handleClearWorkFilter} aria-label={t('reviewFeedPage.workFilterClear')}>
