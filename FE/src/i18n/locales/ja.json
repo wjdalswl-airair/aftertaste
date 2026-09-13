@@ -20,7 +20,9 @@
     "loadMore": "もっと見る",
     "loadingMore": "読み込み中...",
     "empty": "まだレビューがありません",
-    "searchEmpty": "検索結果がありません"
+    "searchEmpty": "検索結果がありません",
+    "workFilterLabel": "#{{title}} のレビュー",
+    "workFilterClear": "すべてのレビューを見る"
   },
   "mainPage": {
     "greeting": {
@@ -124,6 +126,8 @@
     "workPlaceholder": "作品タイトルを検索してください",
     "photoLabel": "写真添付",
     "photoUploadError": "写真のアップロードに失敗しました。もう一度お試しください。",
+    "photoUnsupportedFormat": "この写真形式には対応していません。JPEGまたはPNGでお試しください。",
+    "photoTooLarge": "写真の容量が大きすぎます。別の写真を選んでください。",
     "contentLabel": "訪問レビュー",
     "contentPlaceholder": "ここでの体験を書いてください",
     "submitButton": "登録"

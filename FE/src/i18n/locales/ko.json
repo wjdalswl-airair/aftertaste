@@ -20,7 +20,9 @@
     "loadMore": "더보기",
     "loadingMore": "불러오는 중...",
     "empty": "아직 등록된 리뷰가 없어요",
-    "searchEmpty": "검색 결과가 없어요"
+    "searchEmpty": "검색 결과가 없어요",
+    "workFilterLabel": "#{{title}} 리뷰",
+    "workFilterClear": "전체 리뷰 보기"
   },
   "mainPage": {
     "greeting": {
@@ -124,6 +126,8 @@
     "workPlaceholder": "작품 제목을 검색해 보세요",
     "photoLabel": "사진 첨부",
     "photoUploadError": "사진 업로드에 실패했어요. 다시 시도해주세요.",
+    "photoUnsupportedFormat": "이 사진 형식은 지원하지 않아요. JPEG나 PNG로 다시 시도해주세요.",
+    "photoTooLarge": "사진 용량이 너무 커요. 다른 사진을 선택해주세요.",
     "contentLabel": "방문 후기",
     "contentPlaceholder": "이곳에서의 경험을 남겨주세요",
     "submitButton": "등록"

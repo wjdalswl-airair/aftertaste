@@ -20,7 +20,9 @@
     "loadMore": "Load more",
     "loadingMore": "Loading...",
     "empty": "No reviews yet",
-    "searchEmpty": "No search results"
+    "searchEmpty": "No search results",
+    "workFilterLabel": "#{{title}} reviews",
+    "workFilterClear": "View all reviews"
   },
   "mainPage": {
     "greeting": {
@@ -124,6 +126,8 @@
     "workPlaceholder": "Search for a work title",
     "photoLabel": "Photos",
     "photoUploadError": "Couldn't upload the photo. Please try again.",
+    "photoUnsupportedFormat": "This photo format isn't supported. Please try a JPEG or PNG instead.",
+    "photoTooLarge": "This photo is too large. Please choose a different one.",
     "contentLabel": "Your review",
     "contentPlaceholder": "Share your experience here",
     "submitButton": "Submit"
