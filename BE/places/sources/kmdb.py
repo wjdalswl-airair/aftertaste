@@ -22,6 +22,10 @@ _MAIN_CAST_MAX_ACTORS = 6
 _DIRECTOR_MAX_LENGTH = 100
 _MAIN_CAST_MAX_LENGTH = 300
 _POSTER_URL_MAX_LENGTH = 200
+_GENRE_MAX_LENGTH = 200
+
+# KMDB genre는 "SF,액션"처럼 콤마로, 간혹 "드라마/멜로"처럼 슬래시로 여러 개를 이어붙여 준다.
+_GENRE_SPLIT_RE = re.compile(r"[,/]")
 
 
 def _get_api_key():
@@ -46,6 +50,21 @@ def _first_poster_url(posters):
     if not posters:
         return ""
     return posters.split("|")[0].strip()
+
+
+def _parse_runtime(raw_runtime):
+    """KMDB의 runtime은 분 단위 숫자 문자열("120")이다. 비어있거나 숫자가 아니면 None."""
+    try:
+        return int(raw_runtime)
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_genre(raw_genre):
+    """KMDB의 genre는 "SF,액션"·"드라마/멜로"처럼 콤마·슬래시로 여러 개를 이어붙인 문자열이다.
+    ", "로 통일해서 다시 이어붙인다."""
+    parts = [part.strip() for part in _GENRE_SPLIT_RE.split(raw_genre or "") if part.strip()]
+    return ", ".join(parts)[:_GENRE_MAX_LENGTH]
 
 
 def search_movies(*, title=None, director=None, keyword=None):
@@ -84,6 +103,8 @@ def search_movies(*, title=None, director=None, keyword=None):
             "release_date": movie.get("repRlsDate") or "",
             "poster_url": _first_poster_url(movie.get("posters"))[:_POSTER_URL_MAX_LENGTH],
             "description": _korean_plot(movie.get("plots")),
+            "runtime": _parse_runtime(movie.get("runtime")),
+            "genre": _parse_genre(movie.get("genre")),
         }
         for movie in movies
     ]

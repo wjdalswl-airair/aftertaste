@@ -50,6 +50,8 @@ class Command(BaseCommand):
                     "release_date": release_date,
                     "poster_url": movie["poster_url"],
                     "description": movie["description"],
+                    "runtime": movie["runtime"],
+                    "genre": movie["genre"],
                 },
             )
             if created:

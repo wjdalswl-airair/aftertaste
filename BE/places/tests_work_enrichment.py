@@ -7,13 +7,14 @@
 """
 
 import datetime
+from decimal import Decimal
 from unittest.mock import patch
 
 from django.core.management import call_command
 from django.test import TestCase, override_settings
 
 from places.models import Work, WorkSource
-from places.sources.tmdb import _extract_director
+from places.sources.tmdb import _extract_cast, _extract_director, _extract_genre, _extract_runtime
 from places.work_enrichment import enrich_work, normalize_title_for_match, pick_tmdb_match
 
 
@@ -28,11 +29,26 @@ def _candidate(tmdb_id, title, *, original_title=None, lang="ko", year=2016, pop
     }
 
 
-def _detail(tmdb_id, *, overview="줄거리입니다", director="김감독", release_date="2016-12-02", poster_path="/abc.jpg"):
+def _detail(
+    tmdb_id,
+    *,
+    overview="줄거리입니다",
+    director="김감독",
+    cast="주연1, 주연2",
+    vote_average=8.49,
+    runtime=131,
+    genre="코미디, 드라마",
+    release_date="2016-12-02",
+    poster_path="/abc.jpg",
+):
     return {
         "tmdb_id": tmdb_id,
         "overview": overview,
         "director": director,
+        "cast": cast,
+        "vote_average": vote_average,
+        "runtime": runtime,
+        "genre": genre,
         "release_date": release_date,
         "poster_path": poster_path,
     }
@@ -117,10 +133,26 @@ class EnrichWorkTest(TestCase):
             status, filled = enrich_work(work)
 
         self.assertEqual(status, "matched")
-        self.assertEqual(set(filled), {"description", "director", "release_date", "poster_url"})
+        self.assertEqual(
+            set(filled),
+            {
+                "description",
+                "director",
+                "main_cast",
+                "rating",
+                "runtime",
+                "genre",
+                "release_date",
+                "poster_url",
+            },
+        )
         work.refresh_from_db()
         self.assertEqual(work.description, "줄거리입니다")
         self.assertEqual(work.director, "김감독")
+        self.assertEqual(work.main_cast, "주연1, 주연2")
+        self.assertEqual(work.rating, Decimal("8.5"))
+        self.assertEqual(work.runtime, 131)
+        self.assertEqual(work.genre, "코미디, 드라마")
         self.assertEqual(work.release_date, datetime.date(2016, 12, 2))
         self.assertEqual(work.poster_url, "https://image.tmdb.org/t/p/w500/abc.jpg")
 
@@ -136,7 +168,10 @@ class EnrichWorkTest(TestCase):
             status, filled = enrich_work(work)
 
         self.assertEqual(status, "matched")
-        self.assertEqual(set(filled), {"release_date", "poster_url"})
+        self.assertEqual(
+            set(filled),
+            {"main_cast", "rating", "runtime", "genre", "release_date", "poster_url"},
+        )
         work.refresh_from_db()
         self.assertEqual(work.description, "관리자가 쓴 감성 줄거리")
         self.assertEqual(work.director, "관리자입력 감독")
@@ -189,7 +224,17 @@ class EnrichWorkTest(TestCase):
 
     def test_matched_but_tmdb_values_empty_reports_no_change(self):
         work = Work.objects.create(title="도깨비", category=Work.Category.DRAMA)
-        detail = _detail(1, overview="", director="", release_date="", poster_path=None)
+        detail = _detail(
+            1,
+            overview="",
+            director="",
+            cast="",
+            vote_average=0.0,
+            runtime=None,
+            genre="",
+            release_date="",
+            poster_path=None,
+        )
         search, get_detail = self._mock([_candidate(1, "도깨비")], detail)
         with search, get_detail:
             status, filled = enrich_work(work)
@@ -270,6 +315,55 @@ class ExtractDirectorTest(TestCase):
     def test_movie_director_from_crew(self):
         data = {"credits": {"crew": [{"job": "Director", "name": "봉준호"}, {"job": "Writer", "name": "한진원"}]}}
         self.assertEqual(_extract_director(data, "movie"), "봉준호")
+
+
+class ExtractCastTest(TestCase):
+    """TMDB 상세에서 주연배우를 뽑을 때 비중 순서(order)로 정렬해 상위 6명만 담는다."""
+
+    def test_sorted_by_order_and_capped_at_six(self):
+        cast = [
+            {"name": f"배우{i}", "order": order}
+            for i, order in enumerate([3, 1, 0, 5, 2, 4, 6, 7], start=1)
+        ]
+        data = {"credits": {"cast": cast}}
+        self.assertEqual(_extract_cast(data), "배우3, 배우2, 배우5, 배우1, 배우6, 배우4")
+
+    def test_no_cast_returns_empty(self):
+        self.assertEqual(_extract_cast({"credits": {"cast": []}}), "")
+        self.assertEqual(_extract_cast({}), "")
+
+
+class ExtractRuntimeTest(TestCase):
+    """드라마는 episode_run_time이 최근 TMDB 데이터에서 자주 비어있어서
+    last_episode_to_air.runtime으로 대신 채운다 (2026-09 실제 API 확인, 오징어게임 사례)."""
+
+    def test_movie_uses_runtime_field(self):
+        self.assertEqual(_extract_runtime({"runtime": 131}, "movie"), 131)
+
+    def test_movie_without_runtime_returns_none(self):
+        self.assertIsNone(_extract_runtime({"runtime": 0}, "movie"))
+        self.assertIsNone(_extract_runtime({}, "movie"))
+
+    def test_tv_uses_episode_run_time_when_present(self):
+        data = {"episode_run_time": [58, 60]}
+        self.assertEqual(_extract_runtime(data, "tv"), 58)
+
+    def test_tv_falls_back_to_last_episode_to_air_when_episode_run_time_empty(self):
+        data = {"episode_run_time": [], "last_episode_to_air": {"runtime": 62}}
+        self.assertEqual(_extract_runtime(data, "tv"), 62)
+
+    def test_tv_without_any_runtime_info_returns_none(self):
+        self.assertIsNone(_extract_runtime({"episode_run_time": []}, "tv"))
+
+
+class ExtractGenreTest(TestCase):
+    def test_joins_genre_names(self):
+        data = {"genres": [{"id": 35, "name": "코미디"}, {"id": 18, "name": "드라마"}]}
+        self.assertEqual(_extract_genre(data), "코미디, 드라마")
+
+    def test_no_genres_returns_empty(self):
+        self.assertEqual(_extract_genre({"genres": []}), "")
+        self.assertEqual(_extract_genre({}), "")
 
 
 @override_settings(TMDB_API_KEY="test-token", TMDB_IMAGE_BASE_URL="https://image.tmdb.org/t/p", TMDB_POSTER_SIZE="w500")

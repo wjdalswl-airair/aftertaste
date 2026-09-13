@@ -88,6 +88,13 @@ class Work(models.Model):
     main_cast = models.CharField(max_length=300, blank=True)
     director = models.CharField(max_length=100, blank=True)
     poster_url = models.URLField(max_length=PHOTO_URL_MAX_LENGTH, blank=True)
+    # TMDB vote_average(0~10점)를 소수 1자리로 반올림해서 저장한다. KMDB/KOBIS는 평점이 아니라
+    # 관람등급(전체가/15세/청불 등)만 있어서 이 필드를 채우지 못한다.
+    rating = models.DecimalField(max_digits=3, decimal_places=1, null=True, blank=True)
+    # 상영시간(분). TMDB(영화 runtime, 드라마 episode_run_time)와 KMDB(영화 runtime)에서 채운다.
+    runtime = models.PositiveSmallIntegerField(null=True, blank=True)
+    # 장르. 여러 개면 ", "로 이어붙인 문자열로 저장한다 (main_cast/director와 같은 방식).
+    genre = models.CharField(max_length=200, blank=True)
 
     class Meta:
         constraints = [
