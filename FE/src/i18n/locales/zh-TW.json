@@ -8,7 +8,9 @@
   },
   "mapPage": {
     "title": "地圖",
-    "comingSoon": "敬請期待"
+    "unavailable": "暫時無法顯示地圖",
+    "workSearchPlaceholder": "搜尋作品",
+    "workEmpty": "這部作品尚無已登記的拍攝地"
   },
   "reviewFeedPage": {
     "title": "全部評價",

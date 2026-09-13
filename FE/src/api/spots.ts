@@ -97,3 +97,20 @@ export function getPlaceDetail(placeId: number): Promise<PlaceDetail> {
   const lang = useLocaleStore.getState().language
   return publicFetch<PlaceDetail>(`/api/places/${placeId}/?lang=${lang}`)
 }
+
+export type MapPlace = {
+  id: number
+  name: string
+  latitude: number
+  longitude: number
+}
+
+// 지도 탭에서 전체 명소를 마커로 뿌리기 위한 목록. BE에 아직 없는 엔드포인트
+// 스펙대로 만들어둔 함수다 (getWorkDetail과 같은 패턴, api/works.ts 참고) —
+// BE가 GET /api/places/map/을 구현하면 이 함수는 그대로 동작한다.
+// 좌표 필터·페이지네이션 없이 전체를 반환한다(명소 수가 몇 백 개 수준이라 감당 가능,
+// BE DETAIL_SPEC 5장 참고, 2026-09-13 사용자 확인).
+export function getMapPlaces(): Promise<MapPlace[]> {
+  const lang = useLocaleStore.getState().language
+  return publicFetch<{ places: MapPlace[] }>(`/api/places/map/?lang=${lang}`).then((res) => res.places)
+}

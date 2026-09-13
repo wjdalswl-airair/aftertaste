@@ -8,7 +8,9 @@
   },
   "mapPage": {
     "title": "지도",
-    "comingSoon": "아직 준비 중이에요"
+    "unavailable": "지도를 표시할 수 없어요",
+    "workSearchPlaceholder": "작품을 검색해 보세요",
+    "workEmpty": "이 작품은 등록된 촬영지가 없어요"
   },
   "reviewFeedPage": {
     "title": "모든 리뷰",

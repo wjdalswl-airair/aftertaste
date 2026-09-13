@@ -8,7 +8,9 @@
   },
   "mapPage": {
     "title": "地图",
-    "comingSoon": "敬请期待"
+    "unavailable": "暂时无法显示地图",
+    "workSearchPlaceholder": "搜索作品",
+    "workEmpty": "该作品暂无已登记的拍摄地"
   },
   "reviewFeedPage": {
     "title": "全部评价",

@@ -8,7 +8,9 @@
   },
   "mapPage": {
     "title": "地図",
-    "comingSoon": "近日公開予定です"
+    "unavailable": "地図を表示できません",
+    "workSearchPlaceholder": "作品を検索してください",
+    "workEmpty": "この作品の撮影地は登録されていません"
   },
   "reviewFeedPage": {
     "title": "すべてのレビュー",
