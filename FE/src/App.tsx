@@ -16,6 +16,8 @@ import { ReviewFormPage } from './pages/ReviewFormPage'
 import { ReviewListPage } from './pages/ReviewListPage'
 import { SearchPage } from './pages/SearchPage'
 import { SpotDetailPage } from './pages/SpotDetailPage'
+import { TermsDetailPage } from './pages/TermsDetailPage'
+import { TermsListPage } from './pages/TermsListPage'
 import { WorkDetailPage } from './pages/WorkDetailPage'
 
 function App() {
@@ -35,6 +37,8 @@ function App() {
         <Route path="/spots/:placeId/reviews/:reviewId" element={<ReviewDetailPage />} />
         <Route path="/works/:workId" element={<WorkDetailPage />} />
         <Route path="/courses/:courseId" element={<CourseDetailPage />} />
+        <Route path="/terms" element={<TermsListPage />} />
+        <Route path="/terms/:slug" element={<TermsDetailPage />} />
         <Route element={<RequireAuth />}>
           <Route path="/mypage" element={<MyPage />} />
           <Route path="/bookmarks" element={<BookmarksPage />} />
