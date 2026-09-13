@@ -23,7 +23,9 @@ def _get_firebase_app():
                 "Firebase 서비스 계정 키가 설정되지 않았습니다."
             )
         cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
-        _firebase_app = firebase_admin.initialize_app(cred)
+        _firebase_app = firebase_admin.initialize_app(
+            cred, options={"storageBucket": settings.FIREBASE_STORAGE_BUCKET}
+        )
     return _firebase_app
 
 

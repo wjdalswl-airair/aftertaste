@@ -264,6 +264,11 @@ COURSE_AI_MODEL = os.environ.get("COURSE_AI_MODEL", "claude-haiku-4-5")
 FIREBASE_CREDENTIALS_PATH = os.environ.get(
     "FIREBASE_CREDENTIALS_PATH", str(BASE_DIR / "firebase-service-account.json")
 )
+# 리뷰 사진이 올라가는 Storage 버킷 이름. 사진을 지울 때(issue #66) 어느 버킷에서
+# 지울지 알려주는 데 쓰인다.
+FIREBASE_STORAGE_BUCKET = os.environ.get(
+    "FIREBASE_STORAGE_BUCKET", "aftertaste-ae114.firebasestorage.app"
+)
 
 
 # Django REST Framework

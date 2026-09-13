@@ -20,6 +20,7 @@ from reviews.models import (
     REVIEW_REPORT_HIDE_THRESHOLD,
     Review,
     ReviewLike,
+    ReviewPhoto,
     ReviewReport,
 )
 
@@ -461,6 +462,79 @@ class ReviewEditDeleteTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(self.review.photos.count(), 1)
         self.assertEqual(self.review.photos.first().photo_url, url)
+
+    @patch("reviews.serializers.delete_photo_from_storage")
+    @patch("accounts.authentication.verify_id_token")
+    def test_editing_photos_deletes_only_removed_ones_from_storage(self, mock_verify, mock_delete_storage):
+        """issue #66: 새 목록에 없는 사진만(차집합) 지운다 — 안 바뀐 사진은 지우면 안 된다."""
+        mock_verify.return_value = make_decoded_token("owner-uid")
+        kept_url = firebase_photo_url("kept.jpg")
+        removed_url = firebase_photo_url("removed.jpg")
+        ReviewPhoto.objects.create(review=self.review, photo_url=kept_url)
+        ReviewPhoto.objects.create(review=self.review, photo_url=removed_url)
+        new_url = firebase_photo_url("new.jpg")
+
+        response = self.client.patch(
+            review_detail_url(self.review.id),
+            {"photo_urls": [kept_url, new_url]},
+            format="json",
+            HTTP_AUTHORIZATION="Bearer fake-token",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual({p.photo_url for p in self.review.photos.all()}, {kept_url, new_url})
+        mock_delete_storage.assert_called_once_with(removed_url)
+
+    @patch("reviews.serializers.delete_photo_from_storage")
+    @patch("accounts.authentication.verify_id_token")
+    def test_editing_content_only_does_not_touch_storage(self, mock_verify, mock_delete_storage):
+        """photo_urls 없이 content만 고치면 Storage는 전혀 건드리지 않는다."""
+        mock_verify.return_value = make_decoded_token("owner-uid")
+        ReviewPhoto.objects.create(review=self.review, photo_url=firebase_photo_url("kept.jpg"))
+
+        response = self.client.patch(
+            review_detail_url(self.review.id),
+            {"content": "사진은 그대로"},
+            format="json",
+            HTTP_AUTHORIZATION="Bearer fake-token",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        mock_delete_storage.assert_not_called()
+
+    @patch("reviews.views.delete_photo_from_storage")
+    @patch("accounts.authentication.verify_id_token")
+    def test_deleting_review_removes_its_photos_from_storage(self, mock_verify, mock_delete_storage):
+        """issue #66: 리뷰를 지우면 그 리뷰의 모든 사진도 Storage에서 지운다."""
+        mock_verify.return_value = make_decoded_token("owner-uid")
+        url1 = firebase_photo_url("one.jpg")
+        url2 = firebase_photo_url("two.jpg")
+        ReviewPhoto.objects.create(review=self.review, photo_url=url1)
+        ReviewPhoto.objects.create(review=self.review, photo_url=url2)
+
+        response = self.client.delete(
+            review_detail_url(self.review.id), HTTP_AUTHORIZATION="Bearer fake-token"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(mock_delete_storage.call_count, 2)
+        mock_delete_storage.assert_any_call(url1)
+        mock_delete_storage.assert_any_call(url2)
+
+    @patch("reviews.views.delete_photo_from_storage")
+    @patch("accounts.authentication.verify_id_token")
+    def test_storage_deletion_failure_does_not_block_review_delete(self, mock_verify, mock_delete_storage):
+        """issue #66: Storage 삭제가 실패해도 리뷰 삭제 자체는 막히면 안 된다."""
+        mock_verify.return_value = make_decoded_token("owner-uid")
+        mock_delete_storage.return_value = False
+        ReviewPhoto.objects.create(review=self.review, photo_url=firebase_photo_url())
+
+        response = self.client.delete(
+            review_detail_url(self.review.id), HTTP_AUTHORIZATION="Bearer fake-token"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Review.objects.filter(pk=self.review.id).exists())
 
 
 class ReviewLikeTests(TestCase):
