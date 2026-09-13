@@ -69,7 +69,7 @@ export function ReviewFeedPage() {
   )
 
   return (
-    <main className="flex min-h-dvh flex-col gap-4 pb-24">
+    <main className="flex min-h-dvh flex-col gap-6 pb-24">
       <header className="grid grid-cols-[1fr_auto_1fr] items-center px-4 pt-4">
         <Link to="/" className="font-brand text-2xl font-bold text-primary">여운</Link>
         <h1 className="text-lg font-bold text-ink">{t('reviewFeedPage.title')}</h1>
