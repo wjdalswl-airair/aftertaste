@@ -3199,3 +3199,86 @@ class ImportKmdbCommandTest(TestCase):
 
         with self.assertRaises(CommandError):
             call_command("import_kmdb")
+
+
+# ---------------------------------------------------------------------------
+# 지도 탭 전체 명소 목록 GET /api/places/map/ (issue #63).
+# ---------------------------------------------------------------------------
+
+MAP_URL = "/api/places/map/"
+
+
+class PlaceMapListViewTest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+
+    def test_login_not_required(self):
+        response = self.client.get(MAP_URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_invalid_token_still_returns_200_not_401(self, mock_verify):
+        mock_verify.side_effect = InvalidFirebaseToken("expired")
+
+        response = self.client.get(MAP_URL, HTTP_AUTHORIZATION="Bearer fake-token")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_returns_id_name_and_coordinates_only(self):
+        create_place_with_source(
+            "경복궁", "TEST_SOURCE", "MAP_1", address="서울시 종로구",
+            latitude=Decimal("37.579617"), longitude=Decimal("126.977041"),
+        )
+
+        response = self.client.get(MAP_URL)
+
+        place = response.data["places"][0]
+        self.assertEqual(set(place.keys()), {"id", "name", "latitude", "longitude"})
+        self.assertEqual(place["name"], "경복궁")
+        self.assertIsInstance(place["latitude"], float)
+        self.assertIsInstance(place["longitude"], float)
+        self.assertAlmostEqual(place["latitude"], 37.579617)
+
+    def test_place_without_coordinates_is_excluded(self):
+        create_place_with_source("좌표없음", "TEST_SOURCE", "MAP_NO_COORD")
+        create_place_with_source(
+            "좌표있음", "TEST_SOURCE", "MAP_HAS_COORD",
+            latitude=Decimal("37.0"), longitude=Decimal("127.0"),
+        )
+
+        response = self.client.get(MAP_URL)
+
+        names = {p["name"] for p in response.data["places"]}
+        self.assertEqual(names, {"좌표있음"})
+
+    def test_returns_all_places_without_pagination(self):
+        for i in range(15):
+            create_place_with_source(
+                f"명소{i}", "TEST_SOURCE", f"MAP_MANY_{i}",
+                latitude=Decimal("37.0"), longitude=Decimal("127.0"),
+            )
+
+        response = self.client.get(MAP_URL)
+
+        self.assertEqual(len(response.data["places"]), 15)
+        self.assertNotIn("next", response.data)
+
+    def test_shows_english_name_when_lang_and_approved(self):
+        place = create_place_with_source(
+            "경복궁", "TEST_SOURCE", "MAP_LANG", latitude=Decimal("37.0"), longitude=Decimal("127.0"),
+        )
+        PlaceTranslation.objects.create(place=place, language="en", name="Gyeongbokgung", is_approved=True)
+
+        response = self.client.get(MAP_URL, {"lang": "en"})
+
+        self.assertEqual(response.data["places"][0]["name"], "Gyeongbokgung")
+
+    def test_shows_korean_name_without_lang(self):
+        place = create_place_with_source(
+            "경복궁", "TEST_SOURCE", "MAP_NO_LANG", latitude=Decimal("37.0"), longitude=Decimal("127.0"),
+        )
+        PlaceTranslation.objects.create(place=place, language="en", name="Gyeongbokgung", is_approved=True)
+
+        response = self.client.get(MAP_URL)
+
+        self.assertEqual(response.data["places"][0]["name"], "경복궁")

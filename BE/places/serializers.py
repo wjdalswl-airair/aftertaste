@@ -75,6 +75,33 @@ class RecommendResponseSerializer(serializers.Serializer):
     places = PlaceSearchSerializer(many=True)
 
 
+class PlaceMapSerializer(serializers.ModelSerializer):
+    """지도 탭 마커용 최소 정보 (issue #63). 좌표 없는 명소는 뷰의 쿼리셋에서 이미 제외된다.
+
+    latitude/longitude를 명시적으로 FloatField로 선언한다 — 안 하면 모델의
+    DecimalField 기본 표현(문자열, 예: "37.579771")으로 나가는데, FE는 number 타입을
+    기대한다(src/api/spots.ts MapPlace).
+    """
+
+    name = serializers.SerializerMethodField()
+    latitude = serializers.FloatField()
+    longitude = serializers.FloatField()
+
+    class Meta:
+        model = Place
+        fields = ["id", "name", "latitude", "longitude"]
+        read_only_fields = fields
+
+    def get_name(self, obj):
+        return pick_translated_text(obj, "name", self.context.get("language"))
+
+
+class PlaceMapResponseSerializer(serializers.Serializer):
+    """GET /api/places/map/ 응답 형태."""
+
+    places = PlaceMapSerializer(many=True)
+
+
 class WorkDetailSerializer(serializers.ModelSerializer):
     """명소 상세에 보여줄 작품 정보 (PRD F-05: 제목, 방영 시기, 주연배우, 감독).
 
