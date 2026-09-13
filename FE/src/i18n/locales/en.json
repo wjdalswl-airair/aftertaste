@@ -8,7 +8,9 @@
   },
   "mapPage": {
     "title": "Map",
-    "comingSoon": "Coming soon"
+    "unavailable": "The map isn't available right now",
+    "workSearchPlaceholder": "Search for a work",
+    "workEmpty": "No filming spots registered for this work"
   },
   "reviewFeedPage": {
     "title": "All Reviews",

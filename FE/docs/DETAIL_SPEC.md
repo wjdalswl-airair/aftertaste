@@ -301,6 +301,16 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
   3. BottomNav 탭 이동 — `BottomNav`에 `guardNavigation?: (to: string) => boolean` prop을 추가했다(다른 화면은 안 넘기면 기존과 동일하게 동작). `false`를 반환하면 `Link`의 기본 이동을 막고 호출한 쪽이 직접 처리한다.
   - 탭 닫기·새로고침은 브라우저가 자체 경고창만 띄울 수 있어(보안 정책상 커스텀 불가) 이번 범위에서 뺐다.
 
+**지도 탭 — 전체 명소 지도 (2026-09-13 구현, `pages/MapPage.tsx`)**:
+- "아직 준비 중이에요" 자리 표시 화면이었던 것을 실제로 구현했다. 현재 위치를 중심으로 지도가 뜨고, 등록된 모든 명소가 마커로 표시된다. 축소하면 개수 뱃지로 뭉치고(클러스터) 확대하면 개별 마커로 흩어진다.
+- **BE에 아직 없는 API에 기대고 있다**: `GET /api/places/map/` → `{ places: [{ id, name, latitude, longitude }, ...] }`. 로그인 불필요, 승인된 명소만, **좌표 필터·페이지네이션 없이 전체 반환**(명소 수가 몇 백 개 수준이라 감당 가능, BE DETAIL_SPEC 5장 참고, 2026-09-13 사용자 확인). `api/spots.ts`의 `getMapPlaces`는 `getWorkDetail`(`api/works.ts`)과 같은 패턴 — BE 미구현 엔드포인트 스펙대로 먼저 만들어뒀다. BE 구현 전까진 호출이 실패해서 지도에 마커가 안 뜬다(빈 배열로 처리, 화면은 안 깨짐).
+- **API 호출은 화면 진입(마운트)마다 딱 1번**이다. 반경/바운딩박스로 나눠 받는 방식(지도를 움직일 때마다 재호출) 대신 전체를 한 번에 받아서, 클러스터링·확대/축소·마커 클릭을 전부 클라이언트에서만 처리하고 추가 네트워크 요청이 없다(2026-09-13 사용자 결정).
+- 위치 권한이 없거나 거부됐을 때 지도 기본 중심은 **서울시청**(37.5665, 126.978, `DEFAULT_CENTER`)이다. 권한이 허용되는 순간에만 **한 번** 사용자 위치로 재중심하고(`recenteredRef`), 그 뒤로는 GPS 좌표가 미세하게 갱신되거나 사용자가 지도를 직접 움직여도 다시 안 튄다. 위치 권한 흐름은 `useGeolocation`·`LocationPermissionModal`(메인 화면 "내 주변 명소"와 동일 컴포넌트, `RecommendedSpots.tsx` 참고)을 그대로 재사용했다.
+- 클러스터링은 카카오맵 SDK의 `MarkerClusterer`를 그대로 쓴다(커스텀 로직 없음) — `index.html`의 SDK 스크립트에 `libraries=services,clusterer`를 추가해야 쓸 수 있다. 타입 선언은 `src/types/kakao.d.ts`에 실제로 쓰는 옵션(`gridSize`/`averageCenter`/`minLevel`)·메서드(`addMarkers`/`clear`)만 최소로 추가했다.
+- 개별 마커(클러스터에 안 묶인 것) 클릭 시 `InfoWindow`로 명소 이름만 보여주고, 그 텍스트가 `/spots/{id}`로 가는 링크다(2026-09-13 사용자 결정 — 처음엔 이름+사진이었다가 이름만으로 단순화).
+- **지도 컨테이너는 `flex-1`/`h-full`이 아니라 고정 높이(`h-[80dvh]`)를 쓴다.** `flex-1`로 만들었다가 조상(`<main>`)이 `min-h-dvh`(확정 높이 아님)만 갖고 있어서 지도 영역 높이가 0이 되어 화면에 배경색만 보이는 버그를 겪었다 — 자세한 증상·원인은 `docs/troubleshooting.md` "지도 탭에서 지도가 아예 안 뜨고 회색 박스만 보임" 참고.
+- **작품 검색 필터 (2026-09-13 추가)**: 지도 위에 떠 있는 검색창(작품 제목 자동완성, `searchPlaces(keyword, 'WORK')` 재사용 — `SearchPage.tsx`와 동일한 통합검색 API)에서 작품을 고르면, 그 작품이 촬영된 명소만 지도에 남기고 나머지는 숨긴다. `getWorkDetail(work.id)`(`api/works.ts`, `GET /api/works/{id}/` — BE에 이미 구현돼 있음)로 그 작품의 명소 id 목록만 받아서, 이미 전체 로드해둔 `MapPlace[]`(좌표 포함)와 id로 대조해 클라이언트에서 걸러낸다 — `WorkPlace`엔 좌표가 없어서 이 방식이 아니면 별도 API가 더 필요했을 것. 그래서 이 기능은 **BE 추가 작업 없이** 지금 있는 API만으로 완결된다(전체 명소 목록을 내려주는 `/api/places/map/`만 제외하면). 선택 시 `map.setBounds`로 그 명소들이 다 보이게 지도를 재조정하고(`kakao.maps.LatLngBounds`, `kakao.d.ts`에 타입 추가), 검색창을 지우면 필터 없이 전체로 돌아간다(지도 위치는 안 건드림). 매칭되는 명소가 0개면 "이 작품은 등록된 촬영지가 없어요" 안내를 보여준다.
+
 ### S-08. 코스 — `pages/CourseDetailPage.tsx`, `CourseCreatePage.tsx`, `MyCourseListPage.tsx` (Phase 8, 구현 완료 — 2026-08-31)
 - (2026-08-31 변경) 원래 "코스 생성 UI는 안 만든다"(PRD 5장)였으나, 사용자가 이번 Phase에서 생성 화면까지 포함하기로 결정했다. `docs/PRD.md` 5장에 이 결정 기록해둠.
 - API (전부 확정, 실제 BE 코드로 확인함 — `courses/views.py`, `favorites/views.py`):
