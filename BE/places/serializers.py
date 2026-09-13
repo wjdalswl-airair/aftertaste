@@ -96,6 +96,7 @@ class WorkDetailSerializer(serializers.ModelSerializer):
             "director",
             "poster_url",
             "rating",
+            "runtime",
         ]
         read_only_fields = fields
 
@@ -154,6 +155,7 @@ class WorkPageSerializer(serializers.ModelSerializer):
             "director",
             "poster_url",
             "rating",
+            "runtime",
             "places",
         ]
         read_only_fields = fields

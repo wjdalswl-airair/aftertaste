@@ -31,7 +31,15 @@ logger = logging.getLogger(__name__)
 # (커맨드의 --only-missing 필터는 description/director/release_date/poster_url 4개
 # 기준 그대로 둔다 — main_cast는 KMDB로 이미 채워진 영화가 많아서 "없어서 다시 도는 대상"을
 # 넓히면 --only-missing의 의미가 흐려진다.)
-FILLABLE_FIELDS = ("description", "director", "main_cast", "rating", "release_date", "poster_url")
+FILLABLE_FIELDS = (
+    "description",
+    "director",
+    "main_cast",
+    "rating",
+    "runtime",
+    "release_date",
+    "poster_url",
+)
 
 # Work.director는 CharField(max_length=100). 넘치면 저장이 실패하므로 잘라 넣는다
 # (translation.py의 제목 자르기, services.py의 _WORK_TITLE_MAX_LENGTH 처리와 같은 방식).
@@ -113,6 +121,9 @@ def _values_from_detail(detail):
 
     if detail.get("vote_average"):
         values["rating"] = round(detail["vote_average"], 1)
+
+    if detail.get("runtime"):
+        values["runtime"] = detail["runtime"]
 
     release_date = _parse_release_date(detail.get("release_date"))
     if release_date is not None:

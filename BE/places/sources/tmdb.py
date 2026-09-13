@@ -82,6 +82,7 @@ def get_detail(tmdb_id, category):
       - director: 감독/연출 이름. 여러 명이면 ", "로 이어 붙인다. 없으면 빈 문자열
       - cast: 주연배우 이름. 비중 순서(order)가 앞선 사람부터 ", "로 이어 붙인다. 없으면 빈 문자열
       - vote_average: TMDB 평점(0~10점, float). 투표가 없으면 0.0
+      - runtime: 상영시간(분, int) 또는 None
       - release_date: "YYYY-MM-DD" 문자열 또는 빈 문자열
       - poster_path: "/xxxx.jpg" 또는 None (CDN 주소 앞부분은 붙어 있지 않다)
     """
@@ -102,6 +103,7 @@ def get_detail(tmdb_id, category):
         "director": _extract_director(data, media_type),
         "cast": _extract_cast(data),
         "vote_average": data.get("vote_average") or 0.0,
+        "runtime": _extract_runtime(data, media_type),
         "release_date": (data.get("first_air_date") if media_type == "tv" else data.get("release_date")) or "",
         "poster_path": data.get("poster_path"),
     }
@@ -154,6 +156,21 @@ def _extract_cast(data):
     ordered = sorted(cast, key=lambda person: person.get("order") if person.get("order") is not None else 999)
     names = [person.get("name") for person in ordered[:_MAIN_CAST_MAX_ACTORS] if person.get("name")]
     return ", ".join(names)[:_MAIN_CAST_MAX_LENGTH]
+
+
+def _extract_runtime(data, media_type):
+    """상영시간(분)을 뽑는다. 영화는 runtime을 그대로 쓴다. 드라마는 episode_run_time이
+    최근 TMDB 데이터에서 빈 배열로 오는 경우가 많아서, 없으면 last_episode_to_air.runtime으로
+    대신한다. 둘 다 없으면 None."""
+    if media_type != "tv":
+        return data.get("runtime") or None
+
+    episode_run_time = data.get("episode_run_time") or []
+    if episode_run_time:
+        return episode_run_time[0]
+
+    last_episode = data.get("last_episode_to_air") or {}
+    return last_episode.get("runtime") or None
 
 
 def _year_from_date(date_str):

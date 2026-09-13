@@ -3014,6 +3014,7 @@ def _fake_kmdb_raw_movie(**overrides):
         },
         "repRlsDate": "20190530",
         "posters": "http://file.koreafilm.or.kr/a.jpg|http://file.koreafilm.or.kr/b.jpg",
+        "runtime": "132",
     }
     movie.update(overrides)
     return movie
@@ -3044,6 +3045,19 @@ class KmdbModuleTest(TestCase):
         self.assertEqual(movie["release_date"], "20190530")
         self.assertEqual(movie["poster_url"], "http://file.koreafilm.or.kr/a.jpg")  # 첫 번째 포스터만
         self.assertEqual(movie["description"], "전원백수인 기택 가족 이야기")  # 한국어 줄거리만
+        self.assertEqual(movie["runtime"], 132)
+
+    @patch("places.sources.kmdb.requests.get")
+    def test_search_movies_parses_missing_or_bad_runtime_as_none(self, mock_get):
+        mock_get.return_value.json.return_value = _fake_kmdb_search_response(
+            _fake_kmdb_raw_movie(runtime="")
+        )
+        mock_get.return_value.raise_for_status.return_value = None
+
+        with override_settings(KMDB_API_KEY="fake-key"):
+            results = kmdb.search_movies(title="기생충")
+
+        self.assertIsNone(results[0]["runtime"])
 
     def test_search_movies_without_api_key_raises(self):
         with override_settings(KMDB_API_KEY=""):
@@ -3074,6 +3088,7 @@ def _fake_kmdb_parsed_movie(**overrides):
         "release_date": "20190530",
         "poster_url": "http://file.koreafilm.or.kr/a.jpg",
         "description": "전원백수인 기택 가족 이야기",
+        "runtime": 132,
     }
     movie.update(overrides)
     return movie
@@ -3102,6 +3117,7 @@ class ImportKmdbCommandTest(TestCase):
         self.assertEqual(work.release_date.isoformat(), "2019-05-30")
         self.assertEqual(work.poster_url, "http://file.koreafilm.or.kr/a.jpg")
         self.assertEqual(work.description, "전원백수인 기택 가족 이야기")
+        self.assertEqual(work.runtime, 132)
 
     @patch("places.management.commands.import_kmdb.kmdb.search_movies")
     def test_reimport_does_not_overwrite_existing_work(self, mock_search):

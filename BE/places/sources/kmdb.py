@@ -48,6 +48,14 @@ def _first_poster_url(posters):
     return posters.split("|")[0].strip()
 
 
+def _parse_runtime(raw_runtime):
+    """KMDB의 runtime은 분 단위 숫자 문자열("120")이다. 비어있거나 숫자가 아니면 None."""
+    try:
+        return int(raw_runtime)
+    except (TypeError, ValueError):
+        return None
+
+
 def search_movies(*, title=None, director=None, keyword=None):
     """title/director/keyword 중 하나 이상으로 영화를 검색한다. 상세정보(줄거리·배우 등)까지 받아온다."""
     if not (title or director or keyword):
@@ -84,6 +92,7 @@ def search_movies(*, title=None, director=None, keyword=None):
             "release_date": movie.get("repRlsDate") or "",
             "poster_url": _first_poster_url(movie.get("posters"))[:_POSTER_URL_MAX_LENGTH],
             "description": _korean_plot(movie.get("plots")),
+            "runtime": _parse_runtime(movie.get("runtime")),
         }
         for movie in movies
     ]
