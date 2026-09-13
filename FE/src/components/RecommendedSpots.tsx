@@ -50,7 +50,7 @@ export function RecommendedSpots() {
             <div className="flex gap-3 px-4">
               {[0, 1, 2].map((i) => (
                 <div key={i} className="w-[110px] flex-shrink-0">
-                  <Skeleton className="aspect-square w-full rounded-md" />
+                  <Skeleton className="aspect-square w-full rounded-lg" />
                   <Skeleton className="mt-1 h-3 w-full rounded-sm" />
                   <Skeleton className="mt-1 h-3 w-2/3 rounded-sm" />
                 </div>
@@ -71,7 +71,7 @@ export function RecommendedSpots() {
                       src={spot.photo_url}
                       placeholder={spotPlaceholder}
                       alt=""
-                      className="aspect-square w-full rounded-md"
+                      className="aspect-square w-full rounded-lg"
                     />
                     <FavoriteButton placeId={spot.id} initialFavorited={spot.is_favorited} />
                   </div>
