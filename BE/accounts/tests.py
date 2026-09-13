@@ -339,6 +339,68 @@ class DeleteFirebaseUserTests(TestCase):
         self.assertFalse(delete_firebase_user("uid-3"))
 
 
+class DeletePhotoFromStorageTests(TestCase):
+    """accounts.storage.delete_photo_from_storage — 실패해도 예외를 안 올린다 (issue #66)."""
+
+    DOWNLOAD_URL = (
+        "https://firebasestorage.googleapis.com/v0/b/aftertaste-ae114.firebasestorage.app/"
+        "o/reviews%2Fkakao%3A5075673135%2F1788955795543-photo.jpg?alt=media&token=abc-123"
+    )
+
+    def test_object_path_is_extracted_and_decoded_from_download_url(self):
+        from accounts.storage import _object_path_from_url
+
+        self.assertEqual(
+            _object_path_from_url(self.DOWNLOAD_URL),
+            "reviews/kakao:5075673135/1788955795543-photo.jpg",
+        )
+
+    def test_object_path_is_none_for_url_without_o_marker(self):
+        from accounts.storage import _object_path_from_url
+
+        self.assertIsNone(_object_path_from_url("https://example.com/no-o-marker.jpg"))
+
+    @patch("accounts.storage._get_firebase_app")
+    @patch("accounts.storage.firebase_storage.bucket")
+    def test_returns_true_on_success(self, mock_bucket, mock_app):
+        from accounts.storage import delete_photo_from_storage
+
+        self.assertTrue(delete_photo_from_storage(self.DOWNLOAD_URL))
+        mock_bucket.return_value.blob.assert_called_once_with(
+            "reviews/kakao:5075673135/1788955795543-photo.jpg"
+        )
+        mock_bucket.return_value.blob.return_value.delete.assert_called_once()
+
+    @patch("accounts.storage._get_firebase_app")
+    @patch("accounts.storage.firebase_storage.bucket")
+    def test_already_deleted_is_treated_as_success(self, mock_bucket, mock_app):
+        from google.cloud.exceptions import NotFound
+
+        from accounts.storage import delete_photo_from_storage
+
+        mock_bucket.return_value.blob.return_value.delete.side_effect = NotFound("gone")
+        self.assertTrue(delete_photo_from_storage(self.DOWNLOAD_URL))
+
+    @patch("accounts.storage._get_firebase_app")
+    @patch("accounts.storage.firebase_storage.bucket")
+    def test_other_error_returns_false_without_raising(self, mock_bucket, mock_app):
+        from accounts.storage import delete_photo_from_storage
+
+        mock_bucket.return_value.blob.return_value.delete.side_effect = RuntimeError("storage down")
+        self.assertFalse(delete_photo_from_storage(self.DOWNLOAD_URL))
+
+    def test_url_with_unrecognized_shape_returns_false_without_raising(self):
+        from accounts.storage import delete_photo_from_storage
+
+        self.assertFalse(delete_photo_from_storage("https://example.com/not-a-firebase-url.jpg"))
+
+    @patch("accounts.storage._get_firebase_app", side_effect=Exception("no credentials"))
+    def test_missing_credentials_returns_false_without_raising(self, mock_app):
+        from accounts.storage import delete_photo_from_storage
+
+        self.assertFalse(delete_photo_from_storage(self.DOWNLOAD_URL))
+
+
 class MeViewTests(TestCase):
     """GET /api/account/"""
 

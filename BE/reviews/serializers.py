@@ -1,6 +1,7 @@
 from django.db import transaction
 from rest_framework import serializers
 
+from accounts.storage import delete_photo_from_storage
 from config.constants import PHOTO_URL_MAX_LENGTH
 from places.models import Work
 from reviews.models import REVIEW_MAX_PHOTOS, Review, ReviewPhoto
@@ -161,10 +162,18 @@ class ReviewWriteSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
         instance.save()
         if photo_urls is not None:
-            instance.photos.all().delete()
-            ReviewPhoto.objects.bulk_create(
-                [ReviewPhoto(review=instance, photo_url=url) for url in photo_urls]
-            )
+            # 안 바뀐 사진까지 실수로 Storage에서 지우면 안 되므로, 새 목록에 없는
+            # 것만(차집합) 골라둔다 (issue #66). DB 반영이 끝난 뒤에만 지운다 —
+            # 도중에 실패해서 롤백되면 아직 DB가 참조 중인 파일을 지우게 된다.
+            old_urls = set(instance.photos.values_list("photo_url", flat=True))
+            removed_urls = old_urls - set(photo_urls)
+            with transaction.atomic():
+                instance.photos.all().delete()
+                ReviewPhoto.objects.bulk_create(
+                    [ReviewPhoto(review=instance, photo_url=url) for url in photo_urls]
+                )
+            for url in removed_urls:
+                delete_photo_from_storage(url)
         if work_ids is not None:
             instance.works.set(work_ids)
         return instance

@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from accounts.storage import delete_photo_from_storage
 from config.api_messages import NOT_FOUND_MESSAGE
 from places.models import Place
 from reviews.models import REVIEW_REPORT_HIDE_THRESHOLD, Review, ReviewLike, ReviewReport
@@ -164,7 +165,12 @@ class ReviewDetailView(APIView):
             return Response(status=204)
         if review.member_id != request.user.id:
             raise PermissionDenied()
+        # Storage 삭제는 DB 삭제가 끝난 뒤에 한다 — DB 삭제 도중 실패해서 리뷰가
+        # 그대로 남으면, 아직 DB가 참조 중인 파일을 지워버리게 된다 (issue #66).
+        photo_urls = list(review.photos.values_list("photo_url", flat=True))
         review.delete()
+        for url in photo_urls:
+            delete_photo_from_storage(url)
         return Response(status=204)
 
 
