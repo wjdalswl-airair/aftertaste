@@ -140,7 +140,7 @@ function ReviewFeedCard({ review }: { review: ReviewItem }) {
         alt=""
         className="block h-auto w-full object-cover"
       />
-      <div className="absolute bottom-2 right-2 flex items-center gap-0.5 rounded-full bg-accent px-1.5 py-0.5">
+      <div className="absolute bottom-2 right-2 flex items-center gap-1 rounded-full bg-black/40 px-1.5 py-0.5">
         <Heart size={12} className={`text-white ${review.is_liked_by_me ? 'fill-white' : ''}`} />
         <span className="text-[10px] font-medium text-white">{review.like_count}</span>
       </div>
