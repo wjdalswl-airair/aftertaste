@@ -28,5 +28,10 @@ export async function publicFetch<T>(path: string, options: RequestInit = {}): P
     return undefined as T
   }
 
-  return response.json() as Promise<T>
+  try {
+    return (await response.json()) as T
+  } catch {
+    // authorizedFetch와 같은 이유 — 200/201인데 본문이 빈 응답을 실패로 오인하지 않는다.
+    return undefined as T
+  }
 }

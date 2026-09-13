@@ -269,6 +269,20 @@ describe('src/api/reviews.ts', () => {
 
       await expect(likeReview(1)).rejects.toThrow('서버 오류')
     })
+
+    it('본문 없는 200/201 응답도 성공으로 처리한다 (BE ReviewLikeView가 본문 없이 200/201만 주는 경우, fix/fe/review-favorite)', async () => {
+      const { likeReview } = await import('./reviews')
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          status: 201,
+          json: () => Promise.reject(new SyntaxError('Unexpected end of JSON input')),
+        }),
+      )
+
+      await expect(likeReview(1)).resolves.toBeUndefined()
+    })
   })
 
   describe('reportReview', () => {
