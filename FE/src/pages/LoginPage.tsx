@@ -6,7 +6,6 @@ import googleIcon from '../assets/icons/google.svg'
 import kakaoIcon from '../assets/icons/kakao.svg'
 import yeounCharacter from '../assets/characters/yeoun.png'
 import { BottomNav } from '../components/BottomNav'
-import { Modal } from '../components/Modal'
 import { auth, googleProvider } from '../lib/firebase'
 import { loadKakaoAuth } from '../lib/kakaoAuth'
 import { getLastLoginProvider, saveLastLoginProvider } from '../lib/lastLoginProvider'
@@ -23,7 +22,6 @@ export function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const [error, setError] = useState<string | null>(null)
-  const [openModal, setOpenModal] = useState<'terms' | 'privacy' | null>(null)
   // 한 번만 읽으면 되는 값이라(로그인 성공하면 바로 화면을 떠남) state로 관리 안 하고 그냥 상수로 둔다.
   const lastProvider = getLastLoginProvider()
 
@@ -118,27 +116,16 @@ export function LoginPage() {
         <p className="text-sm text-ink-tertiary">
           로그인 시
           <br />
-          <button type="button" onClick={() => setOpenModal('terms')} className="underline">
+          <Link to="/terms/service" className="underline">
             이용약관
-          </button>{' '}
+          </Link>{' '}
           및{' '}
-          <button type="button" onClick={() => setOpenModal('privacy')} className="underline">
+          <Link to="/terms/privacy" className="underline">
             개인정보처리방침
-          </button>
+          </Link>
           에 동의합니다.
         </p>
       </div>
-
-      {openModal === 'terms' && (
-        <Modal title="이용약관" onClose={() => setOpenModal(null)}>
-          이용약관 내용은 추후 확정 예정입니다.
-        </Modal>
-      )}
-      {openModal === 'privacy' && (
-        <Modal title="개인정보처리방침" onClose={() => setOpenModal(null)}>
-          개인정보처리방침 내용은 추후 확정 예정입니다.
-        </Modal>
-      )}
 
       <BottomNav />
     </main>

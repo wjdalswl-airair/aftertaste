@@ -37,10 +37,10 @@ function App() {
         <Route path="/spots/:placeId/reviews/:reviewId" element={<ReviewDetailPage />} />
         <Route path="/works/:workId" element={<WorkDetailPage />} />
         <Route path="/courses/:courseId" element={<CourseDetailPage />} />
+        <Route path="/terms" element={<TermsListPage />} />
+        <Route path="/terms/:slug" element={<TermsDetailPage />} />
         <Route element={<RequireAuth />}>
           <Route path="/mypage" element={<MyPage />} />
-          <Route path="/terms" element={<TermsListPage />} />
-          <Route path="/terms/:slug" element={<TermsDetailPage />} />
           <Route path="/bookmarks" element={<BookmarksPage />} />
           <Route path="/mycourses" element={<MyCourseListPage />} />
           <Route path="/spots/:placeId/reviews/new" element={<ReviewFormPage />} />
