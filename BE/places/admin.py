@@ -7,6 +7,7 @@ from places.models import (
     PlaceWork,
     SearchHistory,
     Work,
+    WorkSource,
     WorkTranslation,
 )
 from places.translation import translate_place, translate_work
@@ -26,6 +27,13 @@ class PlaceSourceInline(admin.TabularInline):
     extra = 1
 
 
+class WorkSourceInline(admin.TabularInline):
+    """작품 관리 화면에서 이 작품이 어느 출처들에서 왔는지 바로 확인할 수 있게 한다."""
+
+    model = WorkSource
+    extra = 1
+
+
 @admin.register(Place)
 class PlaceAdmin(admin.ModelAdmin):
     list_display = ("name", "address", "created_at")
@@ -33,17 +41,11 @@ class PlaceAdmin(admin.ModelAdmin):
     inlines = [PlaceSourceInline, PlaceWorkInline]
 
 
-@admin.register(PlaceSource)
-class PlaceSourceAdmin(admin.ModelAdmin):
-    list_display = ("place", "source", "source_id")
-    search_fields = ("source", "source_id", "place__name")
-
-
 @admin.register(Work)
 class WorkAdmin(admin.ModelAdmin):
     list_display = ("title", "category", "release_date", "director")
     search_fields = ("title", "director", "main_cast")
-    inlines = [PlaceWorkInline]
+    inlines = [WorkSourceInline, PlaceWorkInline]
 
 
 @admin.action(description="선택한 번역 다시 번역하기")
