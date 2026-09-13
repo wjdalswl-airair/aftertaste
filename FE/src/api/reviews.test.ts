@@ -73,6 +73,60 @@ describe('src/api/reviews.ts', () => {
     })
   })
 
+  describe('getReviewFeed', () => {
+    const feedItem = { ...review, place_name: '경복궁', place_photo_url: 'https://a.com/place.png' }
+
+    it('성공하면 페이지네이션 정보와 함께 리뷰 목록을 반환한다', async () => {
+      const { getReviewFeed } = await import('./reviews')
+      const page = { count: 1, next: null, previous: null, reviews: [feedItem] }
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => page }))
+
+      const result = await getReviewFeed()
+
+      expect(result).toEqual(page)
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/api/reviews/'), expect.anything())
+    })
+
+    it('ordering·page를 쿼리파라미터로 붙인다', async () => {
+      const { getReviewFeed } = await import('./reviews')
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          status: 200,
+          json: async () => ({ count: 0, next: null, previous: null, reviews: [] }),
+        }),
+      )
+
+      await getReviewFeed({ ordering: 'popular', page: 2 })
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/reviews/?ordering=popular&page=2'),
+        expect.anything(),
+      )
+    })
+
+    it('리뷰가 없으면 빈 배열을 반환한다 (에러 아님)', async () => {
+      const { getReviewFeed } = await import('./reviews')
+      const page = { count: 0, next: null, previous: null, reviews: [] }
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => page }))
+
+      const result = await getReviewFeed()
+
+      expect(result.reviews).toEqual([])
+    })
+
+    it('실패하면 에러를 던진다', async () => {
+      const { getReviewFeed } = await import('./reviews')
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({ detail: '서버 오류' }) }),
+      )
+
+      await expect(getReviewFeed()).rejects.toThrow('서버 오류')
+    })
+  })
+
   describe('getMyReviews', () => {
     it('성공하면 내가 쓴 리뷰 목록을 반환한다', async () => {
       const { getMyReviews } = await import('./reviews')

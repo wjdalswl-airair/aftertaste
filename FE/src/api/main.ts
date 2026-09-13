@@ -1,3 +1,4 @@
+import { useLocaleStore } from '../store/useLocaleStore'
 import { publicFetch } from './client'
 
 export type Banner = {
@@ -21,6 +22,20 @@ export type HallOfFameReview = {
   updated_at: string
 }
 
+export type HallOfFameWork = {
+  title: string
+  category: 'DRAMA' | 'MOVIE'
+}
+
+// 명예의전당 카드 캡션에 필요한 최소 명소 정보. 상세 API(PlaceDetail)와 달리 이름 +
+// 대표 작품 하나만 있다 — 히어로 캡션 한 줄 때문에 무거운 명소 상세 API를 또 부르지
+// 않으려고 BE가 hall-of-fame 응답에 바로 얹어준다.
+export type HallOfFamePlace = {
+  id: number
+  name: string
+  work: HallOfFameWork | null
+}
+
 export type TopPlace = {
   id: number
   name: string
@@ -36,10 +51,13 @@ export function getBanners(): Promise<Banner[]> {
   return publicFetch<{ banners: Banner[] }>('/api/banners/').then((res) => res.banners)
 }
 
-export function getHallOfFame(): Promise<HallOfFameReview | null> {
-  return publicFetch<{ review: HallOfFameReview | null }>('/api/main/hall-of-fame/').then(
-    (res) => res.review,
-  )
+// lang은 항상 붙인다 — 안 보내면 비로그인 사용자는 언어를 바꿔도 place 캡션이 계속 한국어로 온다
+// (getRecommendedSpots·getPlaceDetail과 같은 이유, DETAIL_SPEC 7장).
+export function getHallOfFame(): Promise<{ review: HallOfFameReview; place: HallOfFamePlace | null } | null> {
+  const lang = useLocaleStore.getState().language
+  return publicFetch<{ review: HallOfFameReview | null; place: HallOfFamePlace | null }>(
+    `/api/main/hall-of-fame/?lang=${lang}`,
+  ).then((res) => (res.review ? { review: res.review, place: res.place } : null))
 }
 
 export function getTopPlaces(): Promise<TopPlace[]> {

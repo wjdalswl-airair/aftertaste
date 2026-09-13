@@ -1,8 +1,22 @@
 {
   "bottomNav": {
     "home": "ホーム",
+    "map": "地図",
     "search": "検索",
+    "review": "レビュー",
     "profile": "プロフィール"
+  },
+  "mapPage": {
+    "title": "地図",
+    "comingSoon": "近日公開予定です"
+  },
+  "reviewFeedPage": {
+    "title": "すべてのレビュー",
+    "sortLatest": "最新順",
+    "sortPopular": "人気順",
+    "loadMore": "もっと見る",
+    "loadingMore": "読み込み中...",
+    "empty": "まだレビューがありません"
   },
   "mainPage": {
     "greeting": {

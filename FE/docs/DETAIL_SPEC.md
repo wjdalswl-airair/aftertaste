@@ -63,7 +63,9 @@ React Router로 화면 단위 페이지를 분리한다 (PRD 6장 결정).
 |---|---|---|
 | `/login` | S-01 온보딩/로그인 | — |
 | `/` | S-02 메인 | ❌ |
+| `/map` | (PRD/Phase에 없음) 지도 — 임시 빈 화면 | ❌ |
 | `/search` | S-03 검색 결과 | ❌ |
+| `/reviews` | (PRD/Phase에 없음) 전체 리뷰 피드 | ❌ |
 | `/spots/:spotId` | S-05 명소 상세 | ❌ |
 | `/works/:workId` | (PRD/Phase에 없음, 별도 정리 필요) 작품 상세 | ❌ |
 | `/bookmarks` | S-06 즐겨찾기 목록 | ✅ |
@@ -77,6 +79,17 @@ React Router로 화면 단위 페이지를 분리한다 (PRD 6장 결정).
 **로그인 성공 후엔 원래 가려던 화면이 아니라 항상 메인(`/`)으로 이동한다 (2026-09-06 변경).** 원래는 `RequireAuth`가 넘긴 `from` 경로로 돌아갔었는데, 사용자 결정으로 단순화했다 — `LoginPage.tsx`는 더 이상 `location.state.from`을 안 보고, `RequireAuth.tsx`도 `state`에 `from`을 안 담는다(`message`만 남음).
 
 추천(S-04)과 공유(S-09)는 별도 화면이 아니라 메인/명소 상세 화면 안의 기능이므로 자체 경로가 없다.
+
+**하단 탭 5개로 확장 (2026-09-12)**: 기존 홈/검색/프로필 3탭에 지도·리뷰를 추가했다. 순서는 홈(큐레이션 진입점) → 지도·검색(명소 찾기 두 가지 방법) → 리뷰(다녀온 뒤 보는 콘텐츠) → 프로필(계정, 다른 앱들 관례상 맨 끝). 지도는 다른 브랜치에서 별도로 작업 예정이라 `MapPage.tsx`는 "아직 준비 중이에요" 문구만 있는 자리만 잡은 화면이다. 리뷰 피드는 이번에 실제로 구현했다(아래).
+- 모든 하단 탭 화면(`MapPage`·`SearchPage`·`ReviewFeedPage`·`MyPage`)은 홈과 같은 기본 헤더(`여운` 로고 + `LanguageSheet`)를 공통으로 쓴다 — 서브 화면(뒤로가기 화살표 헤더)과는 다른 패턴이다.
+
+**리뷰 탭 — 전체 리뷰 피드 (2026-09-12 구현, `pages/ReviewFeedPage.tsx`)**:
+- **BE에 이미 완성돼 있던 `feature/be/review-community` 브랜치 구현(BE DETAIL_SPEC 6-1 #32)을 기준으로 맞췄다.** 처음엔 이 브랜치를 확인 안 하고 별도로 만들었다가, 이미 완성된 설계(페이지네이션·정렬 옵션 포함)가 있다는 걸 뒤늦게 알고 그쪽 API 계약에 맞게 FE를 다시 맞췄다 — 같은 기능을 두 번 만들지 않도록, 새 API를 붙이기 전엔 관련 기능이 다른 브랜치에 이미 있는지 먼저 확인한다.
+- API: `GET /api/reviews/?ordering=latest|popular&page=N` → `{ count, next, previous, reviews: [...] }` (`src/api/reviews.ts`의 `getReviewFeed`). `ReviewSerializer`(명소별 리뷰·내 리뷰와 공용) 자체에 `place_name`·`place_photo_url`·`author_profile_image_url`이 추가돼 있어서, 이 세 필드는 이제 다른 리뷰 목록 API 응답에도 함께 온다.
+- 로그인 여부와 상관없이 조회 가능, 관리자가 숨긴(is_hidden) 리뷰는 제외.
+- 정렬 탭(최신순/인기순)을 바꾸면 첫 페이지부터 다시 불러온다. "더보기" 버튼을 누르면 다음 페이지를 이어붙인다 — `next`가 절대 URL로 오지만 그대로 안 쓰고 FE가 `page` 번호를 직접 증가시켜 요청한다(`publicFetch`가 항상 `VITE_API_BASE_URL`을 앞에 붙이는 구조라 서버가 준 절대 URL을 그대로 넘기면 안 맞음).
+- 카드 클릭 시 `/spots/{review.place}/reviews/{review.id}`(기존 리뷰 상세 라우트)로 이동한다.
+- 사진은 리뷰 자체 대표 사진(`photos[0]`)이 있으면 그걸, 없으면 명소 사진(`place_photo_url`)으로 대체한다.
 
 ---
 
@@ -170,7 +183,7 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 - Apple 버튼은 Phase 11(2026-09-04)에서 제거, Kakao 버튼으로 교체했다 (5장 참고).
 
 ### S-02. 메인 — `pages/MainPage.tsx` (Phase 2, 구현 완료 — 2026-08-30 Figma 실제 목업에 맞춰 리디자인)
-- 컴포넌트: `Hero`(배너+명예의전당 병합), `LanguageSheet`(언어 선택 바텀시트), `BottomNav`(홈/검색/프로필), `TopPlacesCarousel`, `RecommendedSpots`
+- 컴포넌트: `Hero`(배너+명예의전당 병합), `LanguageSheet`(언어 선택 바텀시트), `BottomNav`(홈/지도/검색/리뷰/프로필, 2026-09-12부터 5탭), `TopPlacesCarousel`, `RecommendedSpots`
 - API (전부 확정, 실제 BE 코드로 확인함 — 2026-08-29):
   - `GET /api/banners/` → `{ banners: [{ id, image_url, link_url, order }] }`
   - `GET /api/main/hall-of-fame/` → `{ review: {...} | null }` (없으면 `null`, 200 정상 응답)
@@ -190,8 +203,11 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 - **BE 데이터가 없어서 생긴 제약 — BE 확인 필요 (2026-08-30)**:
   1. Top10/추천 카드의 부제(작품명)를 Figma는 보여주지만, 두 API 응답에 작품명이 없어 **`address`로 대신 표시** 중이다.
   2. 추천 카드의 거리 뱃지(예: "거리 1.2km")도 Figma엔 있지만, API 응답에 좌표가 없어 만들지 못했다.
-  3. Hero 캡션의 명소/작품명은 `review.place`(id)로 `GET /api/places/{id}/`를 한 번 더 호출해서 채운다. 이 상세 응답의 `works` 필드 정확한 구조를 아직 검증 못 해서(`src/api/spots.ts`의 `PlaceDetail` 타입이 추정치), 실제로 작품명이 안 나올 수 있다 — 필드가 없으면 명소 이름만 보인다.
-     - **성능 주의 (2026-09-08 측정)**: 이 API는 BE가 주변 상권을 카카오에 실시간으로 물어봐서(`_fetch_nearby_places`) 단독으로도 약 1.3초 걸리는 무거운 API다 — 배너·추천 API(각 ~0.4초)의 3배 수준. 명소 이름 한 줄 때문에 히어로 슬라이드 전체를 기다리게 하지 않도록, `Hero.tsx`는 이 호출을 기다리지 않고 먼저 `place: null`로 슬라이드를 보여준 뒤 응답이 오면 그때 이름을 채워 넣는다(체감 속도 개선, 실제 요청 시간 자체는 그대로).
+  3. ~~Hero 캡션의 명소/작품명은 `review.place`(id)로 `GET /api/places/{id}/`를 한 번 더 호출해서 채운다.~~ **(2026-09-12 제거, issue #44)** 이 API가 주변 상권을 카카오에 실시간으로 물어봐서(`_fetch_nearby_places`) 단독으로 약 1.3초 걸리는 무거운 API라(배너·추천 API의 3배 수준), 캡션 한 줄 때문에 히어로 전체가 늦게 뜨는 문제가 있었다. `GET /api/main/hall-of-fame/`(`refactor/be/response-speed-up`) 응답에 캡션용 최소 명소 정보를 바로 담도록 BE를 바꿔서, FE는 이제 두 번째 호출 없이 한 번에 받는다.
+     - 응답 형태: `{ review: {...} | null, place: { id, name, work: { title, category } | null } | null }` — `review`가 null이면 `place`도 null.
+     - `getHallOfFame()`이 `lang` 쿼리파라미터를 붙여 캡션 번역을 요청한다(다른 명소 API와 동일 패턴). BE가 요청 언어에 맞는 번역이 있으면 그 값을, 없으면 한국어 원문을 돌려준다.
+     - `Hero.tsx`는 더 이상 `getPlaceDetail`을 호출하지 않는다 — `place`는 처음부터 최종 값으로 온다(중간에 null→값으로 채워지는 단계 없음).
+     - **배포 순서 주의**: BE 응답은 하위호환(기존 `review` 필드는 그대로, `place`만 추가)이라 BE를 먼저 배포해도 구버전 FE는 안 깨진다. 하지만 반대로 새 FE를 BE보다 먼저 배포하면 `place`가 없어 캡션의 명소 이름이 안 보이는 리그레션이 생기므로, 반드시 BE 배포 확인 후 FE를 배포한다.
 
 ### S-03. 검색 결과 — `pages/SearchPage.tsx` (Phase 3, 구현 완료 — 2026-08-30)
 - 컴포넌트: 검색창(자동완성), 전체/드라마/영화 필터 칩, 작품/명소 섹션, 추천 검색어, 최근 검색어
@@ -269,6 +285,11 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 - 리뷰 더보기의 "최신순/인기순"은 서버를 다시 안 부르고 이미 받아온 목록을 클라이언트에서 `created_at`/`like_count` 기준으로 정렬한다.
 - 사진은 Firebase Storage에 먼저 업로드(`src/lib/reviewPhotoUpload.ts`, `reviews/{uid}/{timestamp}-{filename}` 경로)한 뒤 URL을 `photo_urls`로 보낸다. `src/lib/firebase.ts`에 `storage` export를 새로 추가했다.
 - 명소 상세의 "방문자 리뷰" 섹션에 "더보기" 링크와 카드별 상세 링크를 추가했다(목업엔 명시된 진입 동선이 없어서 직접 추가).
+- **리뷰 상세 사진 슬라이드 (2026-09-12 추가)**: `ReviewDetailPage`가 예전엔 `review.photos[0]`(대표 이미지)만 보여줬는데, 여러 장이면 Hero.tsx와 같은 방식(scroll-snap + 스크롤 멈춘 뒤 인덱스 확정)으로 스와이프해서 넘겨볼 수 있게 바꿨다. 사진이 2장 이상일 때만 상단 중앙에 점 인디케이터가 뜬다. 이미지 박스 높이는 280px→360px로 늘려 세로 사진의 잘림을 줄였다(가로로 긴 사진은 여전히 일부 잘림, `object-cover` 유지).
+- **작성자 프로필 사진 (2026-09-12 추가)**: `ReviewSerializer`에 `author_profile_image_url`이 추가돼서(BE `reviews/serializers.py`), 리뷰 상세 상단 아바타가 색만 있는 원(`bg-divider`) 대신 실제 프로필 사진을 보여준다. 값이 없거나(미설정) 탈퇴한 작성자면 기존처럼 색 원으로 대체.
+- **리뷰 사진 등록 UI 순서 (2026-09-12)**: `ReviewFormPage`의 사진 첨부 줄에서 `+` 추가 버튼을 맨 앞에 고정하고, 새로 추가한 사진은 그 뒤에 순서대로 쌓이게 바꿨다(기존엔 추가된 사진 뒤에 버튼이 있었음).
+- **사진 압축 후 업로드 (2026-09-12 추가)**: 휴대폰 사진(보통 3~8MB) 업로드가 느리다는 피드백으로, `src/lib/compressImage.ts`를 만들어 `reviewPhotoUpload.ts`·`profilePhotoUpload.ts` 둘 다 `uploadBytes` 전에 캔버스로 긴 변 1600px 이하로 줄이고 JPEG 품질 0.8로 재인코딩한다. 압축 실패 시 원본을 그대로 올린다.
+- **Firebase Storage 규칙 (2026-09-12)**: 리뷰 사진 업로드가 `storage/unauthorized`(403)로 실패하는 문제가 있었다 — 콘솔의 Storage 규칙이 모든 경로를 `allow read, write: if false`로 막고 있었다. `profile/{uid}/**`·`reviews/{uid}/**` 두 경로만 "쓰기는 본인 uid, 읽기는 전체 공개"로 열어주는 규칙으로 교체해서 해결했다(코드 변경 아님, Firebase 콘솔에서 직접 수정).
 
 ### S-08. 코스 — `pages/CourseDetailPage.tsx`, `CourseCreatePage.tsx`, `MyCourseListPage.tsx` (Phase 8, 구현 완료 — 2026-08-31)
 - (2026-08-31 변경) 원래 "코스 생성 UI는 안 만든다"(PRD 5장)였으나, 사용자가 이번 Phase에서 생성 화면까지 포함하기로 결정했다. `docs/PRD.md` 5장에 이 결정 기록해둠.

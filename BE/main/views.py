@@ -2,7 +2,7 @@ from datetime import timedelta
 
 from django.db.models import Count
 from django.utils import timezone
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
@@ -12,11 +12,13 @@ from main.models import Banner
 from main.serializers import (
     BannerListResponseSerializer,
     BannerSerializer,
+    HallOfFamePlaceSerializer,
     HallOfFameResponseSerializer,
     TopPlaceListResponseSerializer,
     TopPlaceSerializer,
 )
 from places.models import Place
+from places.translation import resolve_language
 from places.views import favorited_place_ids_for
 from reviews.models import Review
 from reviews.serializers import ReviewSerializer
@@ -52,9 +54,11 @@ class HallOfFameView(APIView):
     (오류로 처리하지 않음). 화면에 나가는 대표 이미지는 리뷰 사진 중 첫 번째 장이다
     (ReviewSerializer의 photos 배열 순서가 곧 제출 순서, DETAIL_SPEC 2-3).
 
-    응답에는 리뷰 객체만 담는다(place는 id만). 목업 카드에 필요한 명소 이름·작품 제목은
-    프론트엔드가 review.place id로 GET /api/places/<id>/를 한 번 더 불러서 채운다
-    (DETAIL_SPEC 6-1 #20-1, 2026-08-28).
+    응답에는 리뷰 객체(review)와, 그 리뷰가 달린 명소의 캡션용 최소 정보(place: 이름 +
+    대표 작품 하나)를 함께 담는다. 예전엔 place를 id만 주고 프론트가 GET /api/places/<id>/를
+    한 번 더 불러 채웠는데, 그 API가 주변 상권을 카카오에 실시간으로 물어봐서 느려
+    메인 화면 히어로가 그만큼 늦어졌다. 그래서 캡션에 필요한 값만 여기서 바로 준다
+    (DETAIL_SPEC 6-1 #20-1, 2026-09-09에 2026-08-28 결정을 뒤집음).
 
     배너·추천처럼 메인 화면 구성요소는 지금까지 전부 로그인이 필요 없었던 패턴을 따라
     로그인 여부와 상관없이 호출할 수 있게 만들었다. SearchView와 같은 이유로
@@ -71,8 +75,16 @@ class HallOfFameView(APIView):
         summary="명예의 전당 조회",
         description=(
             "이번 주(월요일부터)에 좋아요가 가장 많은, 사진이 있는 리뷰 하나를 반환한다.\n\n"
-            "이번 주 좋아요 데이터가 하나도 없으면 review가 null로 온다."
+            "리뷰가 달린 명소의 캡션용 정보(place: 이름 + 대표 작품 하나)도 함께 준다.\n\n"
+            "이번 주 좋아요 데이터가 하나도 없으면 review와 place가 둘 다 null로 온다."
         ),
+        parameters=[
+            OpenApiParameter(
+                "lang",
+                str,
+                description="place 캡션 언어 (예: en). 안 주면 로그인 회원의 언어 → 한국어 순",
+            ),
+        ],
         responses={200: HallOfFameResponseSerializer},
     )
     def get(self, request):
@@ -84,14 +96,34 @@ class HallOfFameView(APIView):
                 created_at__date__gte=week_start,
                 photos__isnull=False,
             )
+            .select_related("member")
+            .prefetch_related("photos")
             .annotate(like_count=Count("likes", distinct=True))
             .order_by("-like_count", "-created_at", "-id")
             .distinct()
             .first()
         )
         if review is None:
-            return Response({"review": None})
-        return Response({"review": ReviewSerializer(review, context={"request": request}).data})
+            return Response({"review": None, "place": None})
+
+        # 캡션에 쓸 명소 이름·작품 제목을 번역까지 골라야 해서 translations를 함께 prefetch한다.
+        # review.place는 필수 연결이라 항상 존재하지만, 방어적으로 first()로 받는다.
+        place = (
+            Place.objects.prefetch_related("translations", "place_works__work__translations")
+            .filter(pk=review.place_id)
+            .first()
+        )
+        language = resolve_language(request)
+        return Response(
+            {
+                "review": ReviewSerializer(review, context={"request": request}).data,
+                "place": (
+                    HallOfFamePlaceSerializer(place, context={"language": language}).data
+                    if place is not None
+                    else None
+                ),
+            }
+        )
 
 
 class TopPlacesView(APIView):

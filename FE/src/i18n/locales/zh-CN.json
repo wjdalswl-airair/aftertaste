@@ -1,8 +1,22 @@
 {
   "bottomNav": {
     "home": "首页",
+    "map": "地图",
     "search": "搜索",
+    "review": "评价",
     "profile": "我的"
+  },
+  "mapPage": {
+    "title": "地图",
+    "comingSoon": "敬请期待"
+  },
+  "reviewFeedPage": {
+    "title": "全部评价",
+    "sortLatest": "最新",
+    "sortPopular": "最热",
+    "loadMore": "查看更多",
+    "loadingMore": "加载中...",
+    "empty": "暂无评价"
   },
   "mainPage": {
     "greeting": {
