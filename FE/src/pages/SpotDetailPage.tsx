@@ -15,7 +15,9 @@ import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { aiRecommendCourse, getPlaceCourses } from '../api/courses'
 import { getPlaceDetail, type PlaceDetail, type PlaceWork } from '../api/spots'
+import spotPlaceholder from '../assets/placeholder/spot.png'
 import { BottomNav } from '../components/BottomNav'
+import { PlaceholderImage } from '../components/PlaceholderImage'
 import { FavoriteButton } from '../components/FavoriteButton'
 import { RatingModal } from '../components/RatingModal'
 import { Skeleton } from '../components/Skeleton'
@@ -123,10 +125,11 @@ export function SpotDetailPage() {
       {place && (
         <>
           <div className="relative px-4">
-            <img
+            <PlaceholderImage
               src={place.photo_url}
+              placeholder={spotPlaceholder}
               alt=""
-              className="h-[230px] w-full rounded-2xl object-cover"
+              className="h-[230px] w-full rounded-2xl"
             />
             <FavoriteButton
               placeId={place.id}
@@ -152,7 +155,7 @@ export function SpotDetailPage() {
               )}
             </div>
 
-            <div className="flex flex-col gap-4 rounded-2xl bg-accent/15 p-5">
+            <div className="flex flex-col gap-4 rounded-xl bg-accent/15 p-5">
               <InfoRow icon={<MapPin size={14} />} label={t('spotDetail.location')} value={place.address} />
               <MainWorksRow works={place.works} />
               <InfoRow icon={<Camera size={14} />} label={t('spotDetail.photoTips')} value={place.photo_tips} />
@@ -286,7 +289,7 @@ function MainWorksRow({ works }: { works: PlaceWork[] }) {
       <span className="flex-1 text-ink-secondary">
         {visibleWorks.map((placeWork, index) => (
           <span key={placeWork.work.id}>
-            <Link to={`/works/${placeWork.work.id}`} className="text-ink-secondary no-underline">
+            <Link to={`/works/${placeWork.work.id}`} className="text-ink-secondary underline">
               {placeWork.work.title}
             </Link>
             {index < visibleWorks.length - 1 && ', '}
@@ -429,7 +432,7 @@ function SpotDetailSkeleton() {
           <Skeleton className="h-6 w-2/3 rounded-sm" />
         </div>
 
-        <div className="flex flex-col gap-4 rounded-2xl bg-accent/15 p-5">
+        <div className="flex flex-col gap-4 rounded-xl bg-accent/15 p-5">
           {[0, 1, 2, 3, 4, 5].map((i) => (
             <Skeleton key={i} className="h-3.5 w-full rounded-sm" />
           ))}

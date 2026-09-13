@@ -3,7 +3,10 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { getAutocomplete, getPopularKeywords, searchPlaces, type SearchResult, type SearchType } from '../api/search'
+import spotPlaceholder from '../assets/placeholder/spot.png'
+import workPlaceholder from '../assets/placeholder/work.png'
 import { BottomNav } from '../components/BottomNav'
+import { PlaceholderImage } from '../components/PlaceholderImage'
 import { Skeleton } from '../components/Skeleton'
 import { useRecentSearches } from '../hooks/useRecentSearches'
 import { useAuthStore } from '../store/useAuthStore'
@@ -171,6 +174,7 @@ export function SearchPage() {
                     key={work.id}
                     to={`/works/${work.id}`}
                     thumbnail={work.poster_url}
+                    thumbnailPlaceholder={workPlaceholder}
                     title={work.title}
                     subtitle={work.category === 'DRAMA' ? t('searchPage.filters.drama') : t('searchPage.filters.movie')}
                   />
@@ -192,6 +196,7 @@ export function SearchPage() {
                     key={place.id}
                     to={`/spots/${place.id}`}
                     thumbnail={place.photo_url}
+                    thumbnailPlaceholder={spotPlaceholder}
                     title={place.name}
                     subtitle={place.address}
                   />
@@ -252,15 +257,21 @@ export function SearchPage() {
 
 type ResultRowProps = {
   thumbnail: string
+  thumbnailPlaceholder: string
   title: string
   subtitle: string
   to?: string
 }
 
-function ResultRow({ thumbnail, title, subtitle, to }: ResultRowProps) {
+function ResultRow({ thumbnail, thumbnailPlaceholder, title, subtitle, to }: ResultRowProps) {
   const content = (
     <>
-      <img src={thumbnail} alt="" className="h-[74px] w-[75px] rounded-2xl object-cover" />
+      <PlaceholderImage
+        src={thumbnail}
+        placeholder={thumbnailPlaceholder}
+        alt=""
+        className="h-[74px] w-[75px] rounded-2xl"
+      />
       <div className="flex-1">
         <p className="text-xs text-ink">{title}</p>
         <p className="text-[11px] text-ink-secondary">{subtitle}</p>

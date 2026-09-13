@@ -3,8 +3,10 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from 'react-router-dom'
 import { getMyFavorites, type Favorite } from '../api/bookmarks'
+import spotPlaceholder from '../assets/placeholder/spot.png'
 import { BottomNav } from '../components/BottomNav'
 import { FavoriteButton } from '../components/FavoriteButton'
+import { PlaceholderImage } from '../components/PlaceholderImage'
 import { Skeleton } from '../components/Skeleton'
 
 export function BookmarksPage() {
@@ -36,10 +38,11 @@ export function BookmarksPage() {
             {favorites.map((favorite) =>
               favorite.type === 'PLACE' && favorite.place ? (
                 <Link key={favorite.id} to={`/spots/${favorite.place.id}`} className="flex items-center gap-3">
-                  <img
+                  <PlaceholderImage
                     src={favorite.place.photo_url}
+                    placeholder={spotPlaceholder}
                     alt=""
-                    className="h-[74px] w-[75px] rounded-xl object-cover"
+                    className="h-[74px] w-[75px] rounded-xl"
                   />
                   <div className="flex-1">
                     <p className="text-sm text-ink">{favorite.place.name}</p>

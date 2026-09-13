@@ -3,7 +3,9 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useSearchParams } from 'react-router-dom'
 import { getReviewFeed, type ReviewFeedOrdering, type ReviewItem } from '../api/reviews'
+import spotPlaceholder from '../assets/placeholder/spot.png'
 import { BottomNav } from '../components/BottomNav'
+import { PlaceholderImage } from '../components/PlaceholderImage'
 import { Skeleton } from '../components/Skeleton'
 
 export function ReviewFeedPage() {
@@ -162,11 +164,12 @@ function ReviewFeedCard({ review }: { review: ReviewItem }) {
       to={`/spots/${review.place}/reviews/${review.id}`}
       className="relative block overflow-hidden rounded-md bg-divider"
     >
-      <img
-        src={review.photos[0]?.photo_url ?? review.place_photo_url}
+      <PlaceholderImage
+        src={review.photos[0]?.photo_url || review.place_photo_url}
+        placeholder={spotPlaceholder}
         alt=""
         loading="lazy"
-        className="block h-auto w-full object-cover"
+        className="block h-auto w-full"
       />
       <div className="absolute bottom-2 right-2 flex items-center gap-1 rounded-full bg-black/40 px-1.5 py-0.5">
         <Heart size={12} className={`text-white ${review.is_liked_by_me ? 'fill-white' : ''}`} />

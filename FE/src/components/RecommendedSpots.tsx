@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { getRecommendedSpots, type RecommendedSpot } from '../api/spots'
+import spotPlaceholder from '../assets/placeholder/spot.png'
 import { useGeolocation } from '../hooks/useGeolocation'
 import { FavoriteButton } from './FavoriteButton'
 import { LocationPermissionModal } from './LocationPermissionModal'
+import { PlaceholderImage } from './PlaceholderImage'
 import { Skeleton } from './Skeleton'
 import { getDongName } from '../lib/kakaoMap'
 
@@ -65,7 +67,12 @@ export function RecommendedSpots() {
               {spots.map((spot) => (
                 <Link key={spot.id} to={`/spots/${spot.id}`} className="w-[110px] flex-shrink-0 snap-center">
                   <div className="relative">
-                    <img src={spot.photo_url} alt="" className="aspect-square w-full rounded-md object-cover" />
+                    <PlaceholderImage
+                      src={spot.photo_url}
+                      placeholder={spotPlaceholder}
+                      alt=""
+                      className="aspect-square w-full rounded-md"
+                    />
                     <FavoriteButton placeId={spot.id} initialFavorited={spot.is_favorited} />
                   </div>
                   <p className="mt-1 truncate text-xs text-ink">{spot.name}</p>
