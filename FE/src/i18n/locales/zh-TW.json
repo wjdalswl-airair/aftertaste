@@ -12,11 +12,13 @@
   },
   "reviewFeedPage": {
     "title": "全部評價",
+    "searchPlaceholder": "搜尋拍攝地或作品",
     "sortLatest": "最新",
     "sortPopular": "最熱門",
     "loadMore": "查看更多",
     "loadingMore": "載入中...",
-    "empty": "尚無評價"
+    "empty": "尚無評價",
+    "searchEmpty": "沒有搜尋結果"
   },
   "mainPage": {
     "greeting": {
@@ -112,7 +114,12 @@
   "reviewForm": {
     "title": "撰寫評論",
     "editTitle": "編輯評論",
+    "leaveConfirm": "已填寫的內容將遺失，確定要離開嗎？",
+    "leaveConfirmStay": "繼續編輯",
+    "leaveConfirmLeave": "離開",
     "ratingLabel": "評分",
+    "workLabel": "作品",
+    "workPlaceholder": "搜尋作品標題",
     "photoLabel": "新增照片",
     "photoUploadError": "照片上傳失敗，請再試一次。",
     "contentLabel": "造訪心得",
