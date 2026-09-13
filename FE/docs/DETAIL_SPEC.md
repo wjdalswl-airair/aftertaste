@@ -257,15 +257,33 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 
 ### 작품 상세 — `pages/WorkDetailPage.tsx` (`/works/:workId`, 2026-08-30 구현)
 **PRD/Phase 문서에 없는 화면이다.** Figma엔 "작품 상세"(node-id `102:1174`, 작품 정보 + 그 작품의 촬영지 목록) 목업이 있는데, 사용자가 "라우트는 FE에서 정하면 되니까 먼저 만들고 API는 나중에 BE와 상의하겠다"고 해서 FE(라우트+화면+API 함수)만 먼저 만들었다. 나중에 어느 Phase에 넣을지는 별도로 정리해야 한다.
-- API: `GET /api/works/{work_id}/` — **BE에 아직 없다.** `src/api/works.ts`의 `getWorkDetail()`이 이 경로로 스펙대로 호출하도록만 만들어뒀고, BE가 구현하면 FE 수정 없이 바로 동작한다. 그 전까지는 항상 실패 → "존재하지 않습니다"로 보인다(정상).
-- 응답 스펙(안): `{ id, title, description, category, release_date, main_cast, director, poster_url, places: [{id,name,address,photo_url}] }`
+- API: `GET /api/works/{work_id}/` — BE 구현 완료(`places/views.py` `WorkDetailView`).
+- 응답 스펙: `{ id, title, description, category, release_date, main_cast, director, poster_url, rating, runtime, genre, places: [{id,name,address,photo_url}] }`
 - Figma 목업과 실제 `Work` 모델이 안 맞는 부분:
   1. 목업의 "극본" 행 — `Work` 모델에 해당 필드가 없어서 **뺐다**.
   2. 목업의 "방영날짜"는 시작~종료 범위지만, `Work.release_date`는 날짜 하나뿐이라 **시작일만** 보여준다.
   3. 목업엔 히어로 이미지에 북마크(즐겨찾기) 아이콘이 있지만, PRD상 즐겨찾기는 명소/코스에만 있는 기능이라(작품 즐겨찾기 자체가 없음) **넣지 않았다**.
+- **레이아웃 변경 + 필드 4개 추가 (2026-09-13, issue #59 `작품 상세정보 4개 필드 추가`)**: 원래는 포스터를 화면 너비 그대로 위에 크게 보여주고 그 아래 정보 카드가 있었는데, 왼쪽 42% 썸네일 + 오른쪽 정보 카드를 가로로 배치하는 구조로 바꿨다(사용자가 준 스크린샷 참고). 정보 카드엔 기존 주연·연출·방영날짜에 더해 `genre`·`rating`·`runtime`을 추가했다 — `rating`은 DRF `DecimalField` 기본 동작대로 문자열로 오므로(예: `"8.5"`) 소수점 표현을 그대로 쓰기 위해 숫자로 변환하지 않는다. 카테고리+제목 블록은 이 가로 배치 위, 헤더 바로 아래 그대로 뒀다(한 차례 "이야기" 섹션 바로 위로 옮겼다가 사용자 요청으로 원복).
+  - **작품 설명이 비었을 때 (2026-09-13)**: `description`이 빈 값이면 "정보를 준비중입니다"(`workDetail.storyEmpty`) 문구로 대신 보여준다 — 실제 데이터가 채워지면 자연히 안 뜬다.
+  - 배포 DB엔 아직 `rating`/`runtime`/`genre`/`main_cast`/`director`가 대부분 비어있다(TMDB enrich 커맨드 미실행으로 추정) — 값이 없는 항목은 `InfoRow`가 자동으로 숨긴다.
 - "자세히 보러가기" 버튼은 목적지가 따로 없어서, 작품 제목으로 구글 검색하는 링크(`https://www.google.com/search?q={제목}`)로 연결한다(2026-08-30, 사용자 확인).
 - 진입점: 검색 결과의 작품 카드(`SearchPage.tsx`), 명소 상세의 작품 태그(`SpotDetailPage.tsx`)를 `/works/{id}`로 연결했다.
 - 예외: 없는 작품 → "존재하지 않습니다"
+
+### 소셜 공유 — `components/ShareSheet.tsx`, `lib/share.ts` (2026-09-13 추가, feature/fe/detail-socialshare)
+명소·작품·코스 상세 화면의 공유 아이콘이 예전엔 그냥 `navigator.clipboard.writeText(location.href)`로 링크만 조용히 복사했는데, 바텀시트로 채널을 고를 수 있게 바꿨다.
+- **지원 채널: 카카오톡, X(트위터), LINE, WhatsApp, 링크 복사.** 인스타그램·위챗은 외부 웹사이트가 쓸 수 있는 공식 공유 방법이 없어서 뺐다(2026-09-13 확인) — 인스타는 피드/스토리 공유가 네이티브 앱 전용 딥링크라 일반 브라우저에서 못 쓰고, 위챗은 자체 JS-SDK가 위챗 앱 내장 브라우저에서 연 페이지에서만 동작해서 외부 브라우저에선 아무 효과가 없다.
+- **채널 선택 근거**: LINE은 이 서비스가 지원하는 5개 언어(ko/en/ja/zh-CN/zh-TW) 중 일본어·중국어 번체 사용자권에서 카카오톡급으로 지배적인 메신저라 넣었고, WhatsApp은 그 외 해외권 범용 메신저로 추가했다. X·LINE·WhatsApp은 전부 SDK 없이 웹 인텐트 URL(`window.open`)만으로 동작한다.
+- **카카오톡 공유**: `src/lib/kakaoAuth.ts`의 `loadKakaoAuth()`(로그인용으로 이미 있던 카카오 JS SDK 로더, 이름은 "Auth"지만 SDK 자체를 한 번만 초기화하는 공용 로더라 그대로 재사용)로 SDK 준비를 기다린 뒤 `Kakao.Share.sendDefault()`로 제목·설명·이미지가 있는 카드를 보낸다. **카카오 개발자 콘솔에서 "카카오톡 공유" 기능이 별도로 켜져 있어야 실제로 전송된다** — 로그인용 JS 키와 앱은 같지만 활성화는 따로 해야 하는 기능이라 배포 전 콘솔에서 확인 필요.
+- **디자인**: 사용자가 준 스크린샷 기준으로 만들었다. 제목("공유하기")+부제 아래 구분선, 그 아래 5개 채널을 각각 아이콘+텍스트 행으로 나열한다 — 링크 복사는 회색 아이콘(`Link2`), 카카오톡·X·LINE·WhatsApp은 사용자가 준 실제 브랜드 로고(`src/assets/icons/{kakao,x,line,whatsapp}.svg`)를 40×40으로 보여준다. 별도 취소 버튼은 없고 `BottomSheet`의 배경(딤) 탭으로 닫는다.
+- **부제 문구 (2026-09-13 사용자 결정, 두 차례 수정)**: 처음엔 "해당 내용을 소셜미디어에 공유하세요!" → 브랜드명 "여운"을 살린 "이 장면의 여운, 함께 나눠보세요"로 바꿨다가, "이 장소를 같이 가고 싶은 사람에게 공유한다"는 느낌으로 다시 바꿨다(최종: "함께 가고 싶은 사람과 나눠보세요"). 5개 언어 다 같은 뜻으로 옮겼다(예: en "Share it with someone you'd love to go with").
+- 진입점: `WorkDetailPage.tsx`, `SpotDetailPage.tsx`, `CourseDetailPage.tsx`의 헤더 공유 아이콘 — 각 화면이 제목/설명/이미지를 `ShareSheet`에 넘긴다(코스는 연결된 명소의 `photo_url`을 이미지로 씀, 없으면 명소 플레이스홀더).
+  - **설명 없을 때 카카오톡 카드가 허전해 보이는 문제 (2026-09-13 발견)**: `description`이 빈 값인 명소가 실제로 있다(예: 경복궁, `Place.description = ""`, 시드 데이터 확인함) — 이 경우 카카오톡 카드에 제목만 뜨고 설명 줄 자체가 없어서 허전해 보였다. `description`이 비었을 때 명소는 `place.address`, 작품은 "카테고리 · 장르"(`work.category`+`work.genre`), 코스는 연결된 명소의 `address`로 대체하도록 각 페이지의 `ShareSheet` 호출부에 fallback을 추가했다.
+  - **더 채울 수 있는 것(참고, 미적용)**: 카카오 피드 템플릿은 버튼 최대 2개, 좋아요/댓글/공유/조회/구독 아이콘의 숫자 줄(`social`)도 지원한다. 이미지는 1장만 가능 — 코스처럼 여러 사진을 보여주려면 "리스트형" 템플릿으로 바꿔야 한다.
+  - **X·WhatsApp 텍스트에 설명도 포함 (2026-09-13 추가)**: 둘 다 제목만 넣었었는데, `shareToX`/`shareToWhatsApp`에 `description`을 받아 제목과 줄바꿈으로 이어붙이게 고쳤다. WhatsApp은 `text` 파라미터 하나가 메시지 전체라 이미지·카드 없이 순수 텍스트로만 채워지고, X는 트위터 자체 글자수 제한(280자)에 걸리면 자동으로 잘린다. **LINE은 안 됨** — `lineit/share`가 공식적으로 `url`만 받고 텍스트 삽입 자체를 지원하지 않아서, 미리보기는 전적으로 그 URL의 OG 태그(이 앱엔 없음)에 달려있다.
+  - **카카오톡 카드 버튼 문구를 공유 대상별로 분리 (2026-09-13)**: 원래 "자세히 보기"/"촬영지 보러가기"로 한 문구를 공용으로 썼는데, `ShareContent`/`ShareSheet`에 `buttonLabel`/`kakaoButtonLabel`을 추가해 화면마다 다르게 넘기게 했다 — 명소 상세는 "촬영지 보러가기", 코스 상세는 "나만의 코스 보러가기", 작품 상세는 "작품 보러가기".
+- **명소·작품 상세 이미지 위 즐겨찾기 버튼 디자인 (2026-09-13, 시도 후 원복)**: 반투명 흰 원(`bg-white/85`) + 별 아이콘을 "원 배경 없이 별 아이콘만 + 그림자"(`drop-shadow`)로 한 차례 바꿨다가, 사용자 요청으로 원래 흰 원 디자인으로 되돌렸다.
+- **미리보기(OG 태그) 관련 한계**: 이 앱은 CSR SPA라 카카오톡/X 등에 링크를 붙여넣었을 때 뜨는 미리보기 카드는 `index.html`의 고정된 `<meta>` 태그를 쓴다 — 어떤 명소/작품/코스를 공유하든 항상 같은 기본 미리보기만 뜬다(카카오톡 자체 공유 카드는 예외 — `Kakao.Share.sendDefault()`가 직접 카드 내용을 지정해서 보내므로 정상적으로 그 작품/명소의 제목·이미지가 뜬다). X/LINE/WhatsApp처럼 그냥 링크만 전달하는 채널은 페이지별 미리보기를 다르게 하려면 SSR이나 서버리스/엣지 함수로 페이지마다 다른 OG 태그를 심어야 하는데, 이번 범위에는 포함하지 않았다.
 
 ### S-06. 즐겨찾기 목록 — `pages/BookmarksPage.tsx` (Phase 5, 구현 완료 — 2026-08-30)
 - 저장/취소는 Phase2에서 이미 구현됨(`FavoriteButton`, `POST/DELETE /api/places/{id}/favorite/`) — 이번 Phase에서 새로 만든 건 목록 화면뿐.
@@ -311,6 +329,11 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
     - **BE 이슈로 남긴 것(FE만으론 불가)**: 리뷰 수정 시 `ReviewWriteSerializer.update()`가 `instance.photos.all().delete()`로 DB 행만 지우고, 리뷰 삭제 시 `review.delete()`도 DB만 지워서 실제 Storage 파일은 안 지워진다. 이건 BE가 Firebase Admin SDK 등으로 Storage에 접근해 지워야 하는 별도 작업이라 이슈로 올려서 진행하기로 함.
     - **"저장 안 하고 나가기" 정리 (2026-09-13 추가)**: 사진을 새로 올렸다가 지우기(X)는 안 누르고 화면만 벗어나도 orphan이 남는 걸 막았다. `ReviewFormPage`는 나가기 확인 모달에서 "나가기"를 확정하는 시점(`handleConfirmLeave`)에 `newlyUploadedPhotoUrls`에 남아있는(=끝내 저장 안 된) 사진을 전부 지운다. `MyPage`는 이 화면이 언마운트될 때(`useEffect` cleanup) `previousDraftPhotoUrl`이 아직 남아있으면(=저장 성공으로 안 비워졌으면) 그 임시 업로드본을 지운다. 브라우저 탭을 그냥 닫아버리는 경우는 비동기 삭제 요청을 안정적으로 보낼 방법이 없어 FE로 못 막는 한계로 남겨둔다.
   - **압축 포맷 JPEG → WebP 전환 (2026-09-13)**: `compressImage.ts`가 재인코딩할 때 쓰던 `image/jpeg`를 `image/webp`로 바꿨다(`OUTPUT_MIME_TYPE`/`OUTPUT_QUALITY`로 이름도 변경, 품질 0.8은 동일). 같은 화질 기준으로 파일이 더 작아져 저장 용량·다운로드 비용 둘 다 줄어든다. 모바일 전용 서비스라 지원 브라우저 문제는 거의 없다고 보고 결정(2026-09-13 사용자 결정). `DISPLAYABLE_TYPES`에 이미 `image/webp`가 있어서 표시 쪽 코드는 변경 불필요.
+- **명소·작품 이미지 없을 때 플레이스홀더 (2026-09-13 추가)**: 지금까지 명소(`photo_url`)·작품(`poster_url`)이 빈 문자열이면 그냥 깨진 `<img>`로 보였는데, 사용자가 준 일러스트 2장(`src/assets/placeholder/spot.png` 3:2, `work.png` 2:3, "아직 이미지가 없어요!" 문구 포함)으로 대체하게 했다. 리뷰 사진처럼 사용자가 직접 올리는 사진은 이 범위가 아니다(기존 방식대로 빈 박스 유지).
+  - **공용 컴포넌트 `src/components/PlaceholderImage.tsx`**: `src`가 있으면 실제 사진 + `object-cover`, 없으면 `placeholder` + `object-contain`(+ `bg-accent/15`)으로 자동 전환한다. `object-fit`을 호출부 className에 넣지 말고 이 컴포넌트가 정하게 한다.
+  - **object-contain으로 전환하는 이유 (명소 상세에서 발견)**: 처음엔 실제 사진과 똑같이 플레이스홀더도 `object-cover`로 채웠는데, 플레이스홀더 일러스트의 원본 비율(spot.png 3:2, work.png 2:3)이 실제 쓰이는 박스 비율과 달라서 좌우(또는 상하)가 잘려 보였다. 플레이스홀더는 어차피 고정된 일러스트라 잘리면 문구·마스코트가 어색하게 잘릴 수 있어, 사진이 없을 때만 `object-contain`으로 전체가 다 보이게 바꿨다.
+  - 적용 화면: `Hero`(추천 명소 슬라이드), `RecommendedSpots`, `TopPlacesCarousel`, `BookmarksPage`, `MyPage`(즐겨찾기 목록), `RatingModal`, `ReviewFeedPage`(피드 카드, 리뷰 사진도 없으면 명소 사진까지 순서대로 대체), `ReviewFormPage`(상단 명소 썸네일), `SearchPage`(작품·명소 검색 결과, `ResultRow`가 `thumbnail`/`thumbnailPlaceholder`를 따로 받음), `WorkDetailPage`(포스터 + 촬영지 목록), `SpotDetailPage`(대표 사진).
+- **명소 상세 "주요 촬영작" 링크 스타일 (2026-09-13)**: 작품 제목이 `text-ink-secondary no-underline`이라 클릭 가능해 보이지 않는다는 피드백으로, 로그인 화면 약관 링크와 같은 방식(`underline`)으로 바꿨다.
 - **나가기 확인 모달 (2026-09-13, `window.confirm` → 커스텀 모달로 교체)**: 처음엔 `window.confirm`(브라우저 기본 alert)으로 만들었다가, 커스텀 모달로 바꿔달라는 요청에 따라 `LeaveConfirmModal`(같은 파일 내 로컬 컴포넌트, `RatingModal.tsx`와 같은 반투명 배경 + 흰 카드 스타일)로 교체했다. 다음 세 가지 이탈 시도를 전부 이 모달로 가로챈다(2026-09-13 사용자가 범위 확정):
   1. 헤더 뒤로가기 버튼
   2. 브라우저 자체 뒤로가기 버튼 — 이 라우터가 데이터 라우터(`createBrowserRouter`)가 아니라 `<Routes>` 선언형이라 `useBlocker`를 못 써서, 진입 시 같은 주소로 `history.pushState`를 한 번 더 쌓아두고(더미) `popstate`가 뜨면 즉시 다시 채워 넣어 화면이 안 바뀐 것처럼 만든 뒤 모달을 띄우는 방식으로 우회했다. 확인 시 `history.go(-2)`로 더미+원본 두 칸을 한 번에 건너뛴다.
