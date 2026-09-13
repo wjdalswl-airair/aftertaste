@@ -45,6 +45,7 @@ class ReviewFeedListView(APIView):
         description="관리자가 감추지 않은 모든 명소의 리뷰를 정렬·페이지네이션해 반환한다. 로그인이 필요 없다.",
         parameters=[
             OpenApiParameter(name="ordering", type=str, required=False, description="latest(기본, 최신순) 또는 popular(좋아요순)"),
+            OpenApiParameter(name="work_id", type=int, required=False, description="이 작품이 해시태그로 달린 리뷰만 본다 (issue #60)"),
             OpenApiParameter(name="page", type=int, required=False, description="페이지 번호(1부터)"),
             OpenApiParameter(name="page_size", type=int, required=False, description="페이지당 개수(기본 20, 최대 50)"),
         ],
@@ -54,8 +55,12 @@ class ReviewFeedListView(APIView):
         reviews = (
             Review.objects.filter(is_hidden=False)
             .select_related("place", "member")
-            .prefetch_related("photos")
+            .prefetch_related("photos", "works")
         )
+        # lat/lng(RecommendView)와 같은 방식: 값이 이상하면 에러 내지 않고 필터를 그냥 건너뛴다.
+        work_id = request.query_params.get("work_id")
+        if work_id is not None and work_id.isdigit():
+            reviews = reviews.filter(works__id=work_id)
         if request.query_params.get("ordering") == "popular":
             reviews = reviews.annotate(annotated_like_count=Count("likes")).order_by(
                 "-annotated_like_count", "-created_at"
@@ -118,7 +123,7 @@ class PlaceReviewListCreateView(APIView):
             place = Place.objects.get(pk=place_id)
         except Place.DoesNotExist:
             return Response({"detail": NOT_FOUND_MESSAGE}, status=404)
-        serializer = ReviewWriteSerializer(data=request.data)
+        serializer = ReviewWriteSerializer(data=request.data, context={"place": place})
         serializer.is_valid(raise_exception=True)
         review = serializer.save(member=request.user, place=place)
         return Response({"reviewId": review.id}, status=201)

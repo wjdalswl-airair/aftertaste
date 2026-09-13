@@ -13,7 +13,7 @@ from rest_framework.test import APIClient
 from accounts.firebase import InvalidFirebaseToken
 from accounts.models import Member
 from config.constants import PHOTO_URL_MAX_LENGTH
-from places.models import Place
+from places.models import Place, PlaceWork, Work
 from reviews.models import (
     REVIEW_CONTENT_MAX_LENGTH,
     REVIEW_MAX_PHOTOS,
@@ -807,6 +807,152 @@ class ReviewFeedTests(TestCase):
         self.assertEqual(review_data["place_name"], "경복궁")
         self.assertEqual(review_data["place_photo_url"], "http://example.com/gbg.jpg")
         self.assertEqual(review_data["author_nickname"], "닉네임1")
+
+
+class ReviewWorkTagTests(TestCase):
+    """리뷰-작품 해시태그 issue #60. 태그 가능한 작품은 이 리뷰의 명소에 연결된 것만 허용한다."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.auth_header = {"HTTP_AUTHORIZATION": "Bearer fake-token"}
+        self.place = Place.objects.create(name="경복궁", address="서울시 종로구")
+        self.other_place = Place.objects.create(name="남산타워", address="서울시 용산구")
+        self.member = create_member("tag-writer-uid")
+
+        self.work1 = Work.objects.create(title="작품1", category=Work.Category.MOVIE)
+        self.work2 = Work.objects.create(title="작품2", category=Work.Category.DRAMA)
+        self.unrelated_work = Work.objects.create(title="관계없는작품", category=Work.Category.MOVIE)
+        PlaceWork.objects.create(place=self.place, work=self.work1)
+        PlaceWork.objects.create(place=self.place, work=self.work2)
+        PlaceWork.objects.create(place=self.other_place, work=self.unrelated_work)
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_can_tag_works_connected_to_the_place(self, mock_verify):
+        mock_verify.return_value = make_decoded_token("tag-writer-uid")
+
+        response = self.client.post(
+            reviews_url(self.place.id),
+            {"rating": 5, "content": "태그 테스트", "language": "ko", "work_ids": [self.work1.id, self.work2.id]},
+            format="json",
+            **self.auth_header,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        review = Review.objects.get(pk=response.data["reviewId"])
+        self.assertEqual(set(review.works.values_list("id", flat=True)), {self.work1.id, self.work2.id})
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_omitting_work_ids_leaves_no_tags(self, mock_verify):
+        mock_verify.return_value = make_decoded_token("tag-writer-uid")
+
+        response = self.client.post(
+            reviews_url(self.place.id),
+            {"rating": 5, "content": "태그 없음", "language": "ko"},
+            format="json",
+            **self.auth_header,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        review = Review.objects.get(pk=response.data["reviewId"])
+        self.assertEqual(review.works.count(), 0)
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_tagging_work_not_connected_to_place_is_rejected(self, mock_verify):
+        mock_verify.return_value = make_decoded_token("tag-writer-uid")
+
+        response = self.client.post(
+            reviews_url(self.place.id),
+            {"rating": 5, "content": "잘못된 태그", "language": "ko", "work_ids": [self.unrelated_work.id]},
+            format="json",
+            **self.auth_header,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("work_ids", response.data)
+        self.assertEqual(Review.objects.count(), 0)
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_tagging_nonexistent_work_id_is_rejected(self, mock_verify):
+        mock_verify.return_value = make_decoded_token("tag-writer-uid")
+
+        response = self.client.post(
+            reviews_url(self.place.id),
+            {"rating": 5, "content": "없는 작품", "language": "ko", "work_ids": [999999]},
+            format="json",
+            **self.auth_header,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("work_ids", response.data)
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_patch_without_work_ids_key_preserves_existing_tags(self, mock_verify):
+        mock_verify.return_value = make_decoded_token("tag-writer-uid")
+        review = Review.objects.create(member=self.member, place=self.place, rating=4, content="원본", language="ko")
+        review.works.set([self.work1])
+
+        response = self.client.patch(
+            review_detail_url(review.id), {"content": "수정됨"}, format="json", **self.auth_header
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        review.refresh_from_db()
+        self.assertEqual(list(review.works.values_list("id", flat=True)), [self.work1.id])
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_patch_with_empty_work_ids_clears_tags(self, mock_verify):
+        mock_verify.return_value = make_decoded_token("tag-writer-uid")
+        review = Review.objects.create(member=self.member, place=self.place, rating=4, content="원본", language="ko")
+        review.works.set([self.work1])
+
+        response = self.client.patch(
+            review_detail_url(review.id), {"work_ids": []}, format="json", **self.auth_header
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        review.refresh_from_db()
+        self.assertEqual(review.works.count(), 0)
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_patch_replaces_tags_with_new_set(self, mock_verify):
+        mock_verify.return_value = make_decoded_token("tag-writer-uid")
+        review = Review.objects.create(member=self.member, place=self.place, rating=4, content="원본", language="ko")
+        review.works.set([self.work1])
+
+        response = self.client.patch(
+            review_detail_url(review.id), {"work_ids": [self.work2.id]}, format="json", **self.auth_header
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        review.refresh_from_db()
+        self.assertEqual(list(review.works.values_list("id", flat=True)), [self.work2.id])
+
+    def test_feed_read_serializer_exposes_tagged_works(self):
+        review = Review.objects.create(member=self.member, place=self.place, rating=5, content="확인", language="ko")
+        review.works.set([self.work1])
+
+        response = self.client.get(REVIEW_FEED_URL)
+
+        works = response.data["reviews"][0]["works"]
+        self.assertEqual(works, [{"id": self.work1.id, "title": "작품1"}])
+
+    def test_feed_filters_by_work_id(self):
+        tagged = Review.objects.create(member=self.member, place=self.place, rating=5, content="태그됨", language="ko")
+        tagged.works.set([self.work1])
+        Review.objects.create(member=self.member, place=self.place, rating=4, content="태그안됨", language="ko")
+
+        response = self.client.get(REVIEW_FEED_URL, {"work_id": self.work1.id})
+
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["reviews"][0]["id"], tagged.id)
+
+    def test_feed_with_invalid_work_id_ignores_filter_instead_of_erroring(self):
+        Review.objects.create(member=self.member, place=self.place, rating=5, content="아무거나", language="ko")
+
+        response = self.client.get(REVIEW_FEED_URL, {"work_id": "not-a-number"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 1)
         self.assertEqual(review_data["author_profile_image_url"], "http://example.com/profile1.jpg")
 
     def test_withdrawn_author_profile_image_hidden(self):

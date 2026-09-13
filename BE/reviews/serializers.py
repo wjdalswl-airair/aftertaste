@@ -2,7 +2,17 @@ from django.db import transaction
 from rest_framework import serializers
 
 from config.constants import PHOTO_URL_MAX_LENGTH
+from places.models import Work
 from reviews.models import REVIEW_MAX_PHOTOS, Review, ReviewPhoto
+
+
+class ReviewWorkTagSerializer(serializers.ModelSerializer):
+    """리뷰에 붙은 작품 해시태그 하나. 이름·번역 없이 id/제목만 보여준다 (issue #60)."""
+
+    class Meta:
+        model = Work
+        fields = ["id", "title"]
+        read_only_fields = fields
 
 
 class ReviewReportSerializer(serializers.Serializer):
@@ -26,6 +36,7 @@ class ReviewSerializer(serializers.ModelSerializer):
     place_name = serializers.CharField(source="place.name", read_only=True)
     place_photo_url = serializers.CharField(source="place.photo_url", read_only=True)
     photos = ReviewPhotoSerializer(many=True, read_only=True)
+    works = ReviewWorkTagSerializer(many=True, read_only=True)
     like_count = serializers.SerializerMethodField()
     is_liked_by_me = serializers.SerializerMethodField()
 
@@ -42,6 +53,7 @@ class ReviewSerializer(serializers.ModelSerializer):
             "content",
             "language",
             "photos",
+            "works",
             "like_count",
             "is_liked_by_me",
             "created_at",
@@ -105,27 +117,46 @@ class ReviewWriteSerializer(serializers.ModelSerializer):
         allow_empty=True,
         write_only=True,
     )
+    # 작품 해시태그(issue #60). 존재하는 Work id인지는 PrimaryKeyRelatedField가 먼저 걸러주고,
+    # "이 리뷰의 명소와 연결된 작품인지"는 validate_work_ids에서 추가로 확인한다.
+    # 개수 제한은 두지 않는다 — 어차피 한 명소에 연결된 작품 수로 자연스럽게 제한된다.
+    work_ids = serializers.PrimaryKeyRelatedField(
+        queryset=Work.objects.all(), many=True, required=False, write_only=True
+    )
 
     class Meta:
         model = Review
-        fields = ["rating", "content", "language", "photo_urls"]
+        fields = ["rating", "content", "language", "photo_urls", "work_ids"]
 
     def validate_photo_urls(self, value):
         if len(value) > REVIEW_MAX_PHOTOS:
             raise serializers.ValidationError(f"사진은 최대 {REVIEW_MAX_PHOTOS}장까지 등록할 수 있습니다")
         return value
 
+    def validate_work_ids(self, value):
+        # 새 리뷰(place가 아직 인스턴스에 없음)는 뷰가 context로 넘겨준 place를 본다.
+        # 수정(PATCH)은 이미 있는 리뷰의 place를 그대로 쓴다.
+        place = self.context.get("place") or (self.instance.place if self.instance else None)
+        valid_ids = set(Work.objects.filter(place_works__place=place).values_list("id", flat=True))
+        invalid_ids = [work.id for work in value if work.id not in valid_ids]
+        if invalid_ids:
+            raise serializers.ValidationError(f"이 명소와 연결되지 않은 작품입니다: {invalid_ids}")
+        return value
+
     def create(self, validated_data):
         photo_urls = validated_data.pop("photo_urls", [])
+        work_ids = validated_data.pop("work_ids", [])
         with transaction.atomic():
             review = Review.objects.create(**validated_data)
             ReviewPhoto.objects.bulk_create(
                 [ReviewPhoto(review=review, photo_url=url) for url in photo_urls]
             )
+            review.works.set(work_ids)
         return review
 
     def update(self, instance, validated_data):
         photo_urls = validated_data.pop("photo_urls", None)
+        work_ids = validated_data.pop("work_ids", None)
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
@@ -134,4 +165,6 @@ class ReviewWriteSerializer(serializers.ModelSerializer):
             ReviewPhoto.objects.bulk_create(
                 [ReviewPhoto(review=instance, photo_url=url) for url in photo_urls]
             )
+        if work_ids is not None:
+            instance.works.set(work_ids)
         return instance
