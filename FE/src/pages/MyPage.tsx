@@ -7,18 +7,21 @@ import { getMyFavorites, type Favorite } from '../api/bookmarks'
 import { getMyCourses, type Course } from '../api/courses'
 import { getMyReviews, type ReviewItem } from '../api/reviews'
 import { getPlaceDetail } from '../api/spots'
+import profileCardBg from '../assets/background/profile.svg'
 import spotPlaceholder from '../assets/placeholder/spot.png'
 import { BottomNav } from '../components/BottomNav'
 import { BottomSheet } from '../components/BottomSheet'
 import { LanguageSheet } from '../components/LanguageSheet'
 import { PlaceholderImage } from '../components/PlaceholderImage'
 import { Skeleton } from '../components/Skeleton'
-import { resetLocationConsent } from '../hooks/useGeolocation'
+import { queryNativeGeolocationPermission, resetLocationConsent } from '../hooks/useGeolocation'
 import { PhotoTooLargeError, UnsupportedImageError } from '../lib/compressImage'
 import { deleteProfilePhoto, uploadProfilePhoto } from '../lib/profilePhotoUpload'
 import { useAuthStore } from '../store/useAuthStore'
 
 const NICKNAME_MAX_LENGTH = 20
+// 버그 신고 받는 메일 주소 (2026-09-13 결정). 별도 폼/이슈 트래커 없이 mailto 링크로 바로 연결한다.
+const BUG_REPORT_EMAIL = 'hyeee513@naver.com'
 
 export function MyPage() {
   const { t } = useTranslation()
@@ -43,6 +46,7 @@ export function MyPage() {
   const [saving, setSaving] = useState(false)
 
   const [confirmingWithdraw, setConfirmingWithdraw] = useState(false)
+  const [locationBlockedNotice, setLocationBlockedNotice] = useState(false)
 
   // 편집 중 새로 올린 프로필 사진 중, 저장 전에 다시 다른 사진으로 바꿔서 버려진 것만 추적한다.
   // 편집 시작 시 baseline으로 깔아둔 me.profile_image_url(기존 저장된 사진)은 여기 안 들어간다 —
@@ -153,7 +157,15 @@ export function MyPage() {
     }
   }
 
-  function handleResetLocationConsent() {
+  async function handleResetLocationConsent() {
+    // 우리 앱 기억(localStorage)만 지워서 될지, 브라우저 자체가 이미 막아놨는지 먼저 확인한다 —
+    // 브라우저가 이미 차단했으면 이 버튼으로는 못 풀어서(자바스크립트로 브라우저 권한을 직접
+    // 바꿀 방법이 없음), 안내만 보여주고 넘어간다(2026-09-13).
+    const nativeState = await queryNativeGeolocationPermission()
+    if (nativeState === 'denied') {
+      setLocationBlockedNotice(true)
+      return
+    }
     resetLocationConsent()
     navigate('/')
   }
@@ -177,80 +189,88 @@ export function MyPage() {
       </header>
 
       {me === undefined ? (
-        <div className="mx-4 flex items-center gap-8 rounded-2xl bg-white px-6 py-4 shadow-[0_4px_12px_rgba(0,0,0,0.08)]">
-          <Skeleton className="h-20 w-20 rounded-full" />
-          <div className="flex flex-1 flex-col gap-2">
-            <Skeleton className="h-4 w-24 rounded-sm" />
-            <Skeleton className="h-3 w-32 rounded-sm" />
-          </div>
-        </div>
-      ) : (
-        <section className="px-4">
-          <div className="flex items-center gap-8 rounded-2xl bg-white px-6 py-4 shadow-[0_4px_12px_rgba(0,0,0,0.08)]">
-            <div className="relative shrink-0">
-              {(editing ? photoUrl : me.profile_image_url) ? (
-                <img
-                  src={(editing ? photoUrl : me.profile_image_url) ?? undefined}
-                  alt=""
-                  className="h-20 w-20 rounded-full object-cover"
-                />
-              ) : (
-                <div className="h-20 w-20 rounded-full bg-accent/20" />
-              )}
-              {editing && (
-                <label className="absolute bottom-0 right-0 flex h-6 w-6 items-center justify-center rounded-full bg-primary">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handlePhotoSelect}
-                    disabled={uploadingPhoto}
-                  />
-                  {uploadingPhoto ? (
-                    <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  ) : (
-                    <Plus size={14} className="text-white" />
-                  )}
-                </label>
-              )}
+          <div
+            className="flex items-center bg-contain bg-center bg-no-repeat px-6 py-4"
+            style={{ backgroundImage: `url(${profileCardBg})`, aspectRatio: '1748 / 687' }}
+          >
+            <div className="mx-auto flex w-[77%] items-center gap-12">
+              <Skeleton className="h-20 w-20 rounded-full" />
+              <div className="flex flex-1 flex-col gap-2">
+                <Skeleton className="h-4 w-24 rounded-sm" />
+                <Skeleton className="h-3 w-32 rounded-sm" />
+              </div>
             </div>
-
-            <div className="flex-1">
-              {editing ? (
-                <div className="flex items-center gap-2">
-                  <input
-                    value={nickname}
-                    onChange={(event) => setNickname(event.target.value.slice(0, NICKNAME_MAX_LENGTH))}
-                    className="w-full rounded-lg border border-divider px-2 py-1 text-base font-bold text-ink outline-none"
+          </div>
+      ) : (
+          <div
+            className="flex items-center bg-contain bg-center bg-no-repeat px-6 py-4"
+            style={{ backgroundImage: `url(${profileCardBg})`, aspectRatio: '1748 / 687' }}
+          >
+            <div className="mx-auto flex w-[77%] items-center gap-12">
+              <div className="relative shrink-0">
+                {(editing ? photoUrl : me.profile_image_url) ? (
+                  <img
+                    src={(editing ? photoUrl : me.profile_image_url) ?? undefined}
+                    alt=""
+                    className="h-20 w-20 rounded-full object-cover"
                   />
-                  <span className="shrink-0 text-xs text-ink-tertiary">
-                    {nickname.length}/{NICKNAME_MAX_LENGTH}
-                  </span>
-                </div>
-              ) : (
-                <p className="text-base font-bold text-ink">{me.nickname}</p>
-              )}
-              <p className="mt-1 text-sm text-ink-tertiary">{me.email}</p>
-              <p className="mt-2 text-xs text-ink-secondary">
-                {t('myPage.reviewedPlacesLabel', { count: me.reviewed_places_count })}
-              </p>
-              <p className="text-xs text-ink-secondary">
-                {t('myPage.createdCoursesLabel', { count: me.created_courses_count })}
-              </p>
+                ) : (
+                  <div className="h-20 w-20 rounded-full bg-accent/20" />
+                )}
+                {editing && (
+                  <label className="absolute bottom-0 right-0 flex h-6 w-6 items-center justify-center rounded-full bg-primary">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handlePhotoSelect}
+                      disabled={uploadingPhoto}
+                    />
+                    {uploadingPhoto ? (
+                      <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    ) : (
+                      <Plus size={14} className="text-white" />
+                    )}
+                  </label>
+                )}
+              </div>
 
-              {editing && photoError && <p className="mt-1 text-xs text-[#e0574a]">{photoError}</p>}
+              <div className="min-w-0 flex-1">
+                {editing ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={nickname}
+                      onChange={(event) => setNickname(event.target.value.slice(0, NICKNAME_MAX_LENGTH))}
+                      className="w-full rounded-lg border border-divider px-2 py-1 text-sm font-bold text-ink outline-none"
+                    />
+                    <span className="shrink-0 text-xs text-ink-tertiary">
+                      {nickname.length}/{NICKNAME_MAX_LENGTH}
+                    </span>
+                  </div>
+                ) : (
+                  <p className="truncate text-base font-bold text-ink">{me.nickname}</p>
+                )}
+                <p className="mt-0.5 truncate text-sm text-ink-tertiary">{me.email}</p>
+                <p className="mt-1 text-xs text-ink-secondary">
+                  {t('myPage.reviewedPlacesLabel', { count: me.reviewed_places_count })}
+                </p>
+                <p className="text-xs text-ink-secondary">
+                  {t('myPage.createdCoursesLabel', { count: me.created_courses_count })}
+                </p>
 
-              <button
-                type="button"
-                onClick={editing ? handleSaveProfile : startEditing}
+                {editing && photoError && <p className="mt-1 text-xs text-[#e0574a]">{photoError}</p>}
+
+                <button
+                  type="button"
+                  onClick={editing ? handleSaveProfile : startEditing}
                 disabled={editing && saving}
-                className="mt-3 rounded-full border border-primary px-4 py-1.5 text-xs font-medium text-primary disabled:opacity-40"
+                className="mt-2 rounded-full border border-primary bg-white px-4 py-1.5 text-xs font-medium text-primary disabled:opacity-40"
               >
                 {editing ? t('myPage.profileSaveButton') : t('myPage.profileEditButton')}
               </button>
             </div>
+            </div>
           </div>
-        </section>
       )}
 
       <section className="px-4">
@@ -350,7 +370,7 @@ export function MyPage() {
         )}
       </section>
 
-      <section className="mt-auto px-4">
+      <section className="mt-auto px-4 pt-6">
         <button
           type="button"
           onClick={handleLogout}
@@ -358,20 +378,21 @@ export function MyPage() {
         >
           {t('myPage.logoutButton')}
         </button>
-        <button
-          type="button"
-          onClick={handleResetLocationConsent}
-          className="mt-3 block w-full text-center text-xs text-ink-tertiary"
-        >
-          {t('myPage.resetLocationLink')}
-        </button>
-        <button
-          type="button"
-          onClick={() => setConfirmingWithdraw(true)}
-          className="mt-3 block w-full text-center text-xs text-ink-tertiary"
-        >
-          {t('myPage.withdrawLink')}
-        </button>
+        <div className="mt-6 flex items-center justify-center gap-2 text-xs text-ink-tertiary">
+          <button type="button" onClick={handleResetLocationConsent}>
+            {t('myPage.resetLocationLink')}
+          </button>
+          <span aria-hidden="true">|</span>
+          <Link to="/terms">{t('myPage.termsMenuLink')}</Link>
+          <span aria-hidden="true">|</span>
+          <a href={`mailto:${BUG_REPORT_EMAIL}?subject=${encodeURIComponent('[여운] 버그 신고')}`}>
+            {t('myPage.bugReportLink')}
+          </a>
+          <span aria-hidden="true">|</span>
+          <button type="button" onClick={() => setConfirmingWithdraw(true)}>
+            {t('myPage.withdrawLink')}
+          </button>
+        </div>
       </section>
 
       {confirmingWithdraw && (
@@ -392,6 +413,24 @@ export function MyPage() {
             className="block w-full py-3 text-center text-sm text-ink-tertiary"
           >
             {t('myPage.withdrawCancelButton')}
+          </button>
+        </BottomSheet>
+      )}
+
+      {locationBlockedNotice && (
+        <BottomSheet onClose={() => setLocationBlockedNotice(false)}>
+          <p className="px-4 pt-4 text-center text-[15px] font-bold text-ink">
+            {t('myPage.locationBlockedTitle')}
+          </p>
+          <p className="px-4 pb-2 pt-2 text-center text-sm text-ink-secondary">
+            {t('myPage.locationBlockedBody')}
+          </p>
+          <button
+            type="button"
+            onClick={() => setLocationBlockedNotice(false)}
+            className="mt-2 block w-full py-3 text-center text-sm text-ink-tertiary"
+          >
+            {t('myPage.locationBlockedConfirm')}
           </button>
         </BottomSheet>
       )}
