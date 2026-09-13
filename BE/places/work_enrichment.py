@@ -37,6 +37,7 @@ FILLABLE_FIELDS = (
     "main_cast",
     "rating",
     "runtime",
+    "genre",
     "release_date",
     "poster_url",
 )
@@ -124,6 +125,9 @@ def _values_from_detail(detail):
 
     if detail.get("runtime"):
         values["runtime"] = detail["runtime"]
+
+    if detail.get("genre"):
+        values["genre"] = detail["genre"]
 
     release_date = _parse_release_date(detail.get("release_date"))
     if release_date is not None:

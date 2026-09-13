@@ -29,6 +29,9 @@ _MAIN_CAST_MAX_ACTORS = 6
 # Work.main_cast는 CharField(max_length=300). 넘치면 저장이 실패하므로 잘라 넣는다.
 _MAIN_CAST_MAX_LENGTH = 300
 
+# Work.genre는 CharField(max_length=200).
+_GENRE_MAX_LENGTH = 200
+
 
 def category_to_media_type(category):
     """Work.category("DRAMA"/"MOVIE") 문자열을 TMDB 미디어 종류("tv"/"movie")로 바꾼다.
@@ -83,6 +86,7 @@ def get_detail(tmdb_id, category):
       - cast: 주연배우 이름. 비중 순서(order)가 앞선 사람부터 ", "로 이어 붙인다. 없으면 빈 문자열
       - vote_average: TMDB 평점(0~10점, float). 투표가 없으면 0.0
       - runtime: 상영시간(분, int) 또는 None
+      - genre: 장르 이름들을 ", "로 이어 붙인 문자열. 없으면 빈 문자열
       - release_date: "YYYY-MM-DD" 문자열 또는 빈 문자열
       - poster_path: "/xxxx.jpg" 또는 None (CDN 주소 앞부분은 붙어 있지 않다)
     """
@@ -104,6 +108,7 @@ def get_detail(tmdb_id, category):
         "cast": _extract_cast(data),
         "vote_average": data.get("vote_average") or 0.0,
         "runtime": _extract_runtime(data, media_type),
+        "genre": _extract_genre(data),
         "release_date": (data.get("first_air_date") if media_type == "tv" else data.get("release_date")) or "",
         "poster_path": data.get("poster_path"),
     }
@@ -171,6 +176,16 @@ def _extract_runtime(data, media_type):
 
     last_episode = data.get("last_episode_to_air") or {}
     return last_episode.get("runtime") or None
+
+
+def _extract_genre(data):
+    """상세 응답의 genres 배열을 ", "로 이어붙인 문자열로 바꾼다. 없으면 빈 문자열.
+
+    한국어 번역이 없는 장르는 TMDB가 영어 이름을 그대로 준다 (2026-09 실제 API 확인,
+    드라마 일부 장르에서 발생) — 별도 처리 없이 그대로 저장한다.
+    """
+    names = [g.get("name") for g in data.get("genres", []) if g.get("name")]
+    return ", ".join(names)[:_GENRE_MAX_LENGTH]
 
 
 def _year_from_date(date_str):
