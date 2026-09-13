@@ -3,7 +3,7 @@ from django.db import models
 
 from accounts.models import Member
 from config.constants import LANGUAGE_CODE_MAX_LENGTH, PHOTO_URL_MAX_LENGTH
-from places.models import Place
+from places.models import Place, Work
 
 # 리뷰 글자 수·사진 장수 제한 (docs/DETAIL_SPEC.md 6-1 #14).
 # 2026-08-28 정정: 목업의 리뷰 작성 화면("14 / 500", "사진 첨부 0 / 5")에 맞춰 500자·5장으로 변경.
@@ -24,6 +24,10 @@ class Review(models.Model):
 
     member = models.ForeignKey(Member, on_delete=models.CASCADE, related_name="reviews")
     place = models.ForeignKey(Place, on_delete=models.CASCADE, related_name="reviews")
+    # 리뷰에 다는 작품 해시태그. 이 리뷰의 place에 연결된 작품(PlaceWork)만 태그할 수 있다는
+    # 검증은 모델이 아니라 시리얼라이저(reviews/serializers.py ReviewWriteSerializer)에서
+    # 한다 — place가 정해져야 어떤 작품이 후보인지 알 수 있어서다 (issue #60).
+    works = models.ManyToManyField(Work, related_name="reviews", blank=True)
     rating = models.PositiveSmallIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)])
     content = models.TextField(max_length=REVIEW_CONTENT_MAX_LENGTH)
     # 리뷰를 쓸 때 사용한 언어 (예: "ko", "en"). 값 자체를 검증하는 지원 언어 목록은
