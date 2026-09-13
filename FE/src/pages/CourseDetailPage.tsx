@@ -4,9 +4,11 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 import { deleteCourse, getCourseDetail, type Course, type CoursePlaceRole } from '../api/courses'
 import { getPlaceDetail, type PlaceDetail } from '../api/spots'
+import spotPlaceholder from '../assets/placeholder/spot.png'
 import { BottomNav } from '../components/BottomNav'
 import { BottomSheet } from '../components/BottomSheet'
 import { FavoriteButton } from '../components/FavoriteButton'
+import { ShareSheet } from '../components/ShareSheet'
 import { Skeleton } from '../components/Skeleton'
 import { loadKakaoMaps } from '../lib/kakaoMap'
 import { useAuthStore } from '../store/useAuthStore'
@@ -35,6 +37,7 @@ export function CourseDetailPage() {
   const [course, setCourse] = useState<Course | null | undefined>(undefined)
   const [place, setPlace] = useState<PlaceDetail | undefined>(undefined)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
 
   useEffect(() => {
     setCourse(undefined)
@@ -49,10 +52,6 @@ export function CourseDetailPage() {
       .catch(() => setCourse(null))
   }, [courseId])
 
-  function handleShare() {
-    navigator.clipboard.writeText(window.location.href).catch(() => {})
-  }
-
   async function handleDelete() {
     if (!course) {
       return
@@ -65,8 +64,8 @@ export function CourseDetailPage() {
   const isMine = Boolean(member && course && course.creator_nickname === member.nickname)
 
   return (
-    <main className="flex min-h-dvh flex-col gap-4 pb-24">
-      <header className="grid min-h-16 grid-cols-[24px_1fr_auto] items-center px-4 pt-4">
+    <main className="flex min-h-dvh flex-col gap-6 pb-24">
+      <header className="grid min-h-16 grid-cols-[24px_1fr_auto] items-center px-4 pt-2">
         <button type="button" onClick={() => navigate(-1)} aria-label="뒤로가기">
           <ArrowLeft size={24} className="text-ink" />
         </button>
@@ -80,7 +79,7 @@ export function CourseDetailPage() {
               className="relative rounded-full p-0.5"
             />
           )}
-          <button type="button" onClick={handleShare} aria-label="공유">
+          <button type="button" onClick={() => setShareOpen(true)} aria-label="공유">
             <Share2 size={20} className="text-ink" />
           </button>
           {isMine && (
@@ -162,6 +161,17 @@ export function CourseDetailPage() {
             {t('courseDetail.cancel')}
           </button>
         </BottomSheet>
+      )}
+
+      {shareOpen && course && (
+        <ShareSheet
+          url={window.location.href}
+          title={course.title}
+          description={course.description || place?.address || ''}
+          imageUrl={place?.photo_url || spotPlaceholder}
+          kakaoButtonLabel="나만의 코스 보러가기"
+          onClose={() => setShareOpen(false)}
+        />
       )}
 
       <BottomNav />

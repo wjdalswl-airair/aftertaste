@@ -1,6 +1,8 @@
 import { Star, X } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import spotPlaceholder from '../assets/placeholder/spot.png'
+import { PlaceholderImage } from './PlaceholderImage'
 
 type RatingModalProps = {
   place: { name: string; photo_url: string }
@@ -27,10 +29,11 @@ export function RatingModal({ place, onClose, onNext }: RatingModalProps) {
             <X size={24} className="text-ink" />
           </button>
 
-          <img
+          <PlaceholderImage
             src={place.photo_url}
+            placeholder={spotPlaceholder}
             alt=""
-            className="mx-auto h-[74px] w-[75px] rounded-2xl bg-divider object-cover"
+            className="mx-auto h-[74px] w-[75px] rounded-2xl"
           />
           <p className="mt-4 text-base font-bold text-ink">{place.name}</p>
           <p className="mt-1 text-xs text-ink-tertiary">{t('ratingModal.question')}</p>

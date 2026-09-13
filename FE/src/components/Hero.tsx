@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { getBanners, getHallOfFame, type Banner, type HallOfFamePlace, type HallOfFameReview } from '../api/main'
 import { getRecommendedSpots, type RecommendedSpot } from '../api/spots'
+import spotPlaceholder from '../assets/placeholder/spot.png'
+import { PlaceholderImage } from './PlaceholderImage'
 import { Skeleton } from './Skeleton'
 
 type Slide =
@@ -168,7 +170,7 @@ function HallOfFameSlide({
 function RecommendSlide({ slide, title }: { slide: Extract<Slide, { type: 'recommend' }>; title: string }) {
   return (
     <>
-      <img src={slide.spot.photo_url} alt="" className="h-full w-full object-cover" />
+      <PlaceholderImage src={slide.spot.photo_url} placeholder={spotPlaceholder} alt="" className="h-full w-full" />
       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
       <div className="absolute bottom-4 left-4 text-white">
         <p className="text-lg font-bold">{title}</p>

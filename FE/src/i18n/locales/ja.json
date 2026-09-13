@@ -1,4 +1,14 @@
 {
+  "share": {
+    "title": "共有する",
+    "subtitle": "一緒に行きたい人とシェアしましょう",
+    "copyLink": "リンクをコピー",
+    "copied": "コピーしました",
+    "kakao": "カカオトークで共有",
+    "x": "Xで共有",
+    "line": "LINEで共有",
+    "whatsapp": "WhatsAppで共有"
+  },
   "bottomNav": {
     "home": "ホーム",
     "map": "地図",
@@ -98,8 +108,13 @@
     "notFound": "見つかりません",
     "mainCast": "出演",
     "director": "監督",
+    "genre": "ジャンル",
+    "rating": "評価",
+    "runtime": "上映時間",
+    "runtimeValue": "{{minutes}}分",
     "releaseDate": "公開日",
     "storyTitle": "この作品のストーリー",
+    "storyEmpty": "情報を準備中です",
     "storyMore": "もっと見る",
     "storyLess": "閉じる",
     "detailButton": "詳しく見る",

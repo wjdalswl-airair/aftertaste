@@ -7,9 +7,11 @@ import { getMyFavorites, type Favorite } from '../api/bookmarks'
 import { getMyCourses, type Course } from '../api/courses'
 import { getMyReviews, type ReviewItem } from '../api/reviews'
 import { getPlaceDetail } from '../api/spots'
+import spotPlaceholder from '../assets/placeholder/spot.png'
 import { BottomNav } from '../components/BottomNav'
 import { BottomSheet } from '../components/BottomSheet'
 import { LanguageSheet } from '../components/LanguageSheet'
+import { PlaceholderImage } from '../components/PlaceholderImage'
 import { Skeleton } from '../components/Skeleton'
 import { resetLocationConsent } from '../hooks/useGeolocation'
 import { PhotoTooLargeError, UnsupportedImageError } from '../lib/compressImage'
@@ -168,7 +170,7 @@ export function MyPage() {
   }
 
   return (
-    <main className="flex min-h-dvh flex-col gap-4 pb-24">
+    <main className="flex min-h-dvh flex-col gap-6 pb-24">
       <header className="flex items-center justify-between px-4 pt-4">
         <Link to="/" className="font-brand text-2xl font-bold text-primary">여운</Link>
         <LanguageSheet />
@@ -267,10 +269,11 @@ export function MyPage() {
             {favorites.map((favorite) =>
               favorite.type === 'PLACE' && favorite.place ? (
                 <Link key={favorite.id} to={`/spots/${favorite.place.id}`} className="w-[110px] flex-shrink-0">
-                  <img
+                  <PlaceholderImage
                     src={favorite.place.photo_url}
+                    placeholder={spotPlaceholder}
                     alt=""
-                    className="h-[110px] w-full rounded-xl object-cover"
+                    className="h-[110px] w-full rounded-xl"
                   />
                   <p className="mt-2 truncate text-xs text-ink">{favorite.place.name}</p>
                   <p className="truncate text-xs text-ink-secondary">{favorite.place.address}</p>

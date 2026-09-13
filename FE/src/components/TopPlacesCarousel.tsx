@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { getTopPlaces, type TopPlace } from '../api/main'
+import spotPlaceholder from '../assets/placeholder/spot.png'
 import { FavoriteButton } from './FavoriteButton'
+import { PlaceholderImage } from './PlaceholderImage'
 import { Skeleton } from './Skeleton'
 
 export function TopPlacesCarousel() {
@@ -24,7 +26,7 @@ export function TopPlacesCarousel() {
         <div className="flex gap-3 px-4">
           {[0, 1, 2].map((i) => (
             <div key={i} className="w-[110px] flex-shrink-0">
-              <Skeleton className="aspect-square w-full rounded-md" />
+              <Skeleton className="aspect-square w-full rounded-lg" />
               <Skeleton className="mt-1 h-3 w-full rounded-sm" />
               <Skeleton className="mt-1 h-3 w-2/3 rounded-sm" />
             </div>
@@ -41,7 +43,12 @@ export function TopPlacesCarousel() {
           {places.map((place) => (
             <Link key={place.id} to={`/spots/${place.id}`} className="w-[110px] flex-shrink-0 snap-center">
               <div className="relative">
-                <img src={place.photo_url} alt="" className="aspect-square w-full rounded-md object-cover" />
+                <PlaceholderImage
+                  src={place.photo_url}
+                  placeholder={spotPlaceholder}
+                  alt=""
+                  className="aspect-square w-full rounded-lg"
+                />
                 <FavoriteButton placeId={place.id} initialFavorited={place.is_favorited} />
               </div>
               <p className="mt-1 truncate text-xs text-ink">{place.name}</p>

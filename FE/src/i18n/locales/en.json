@@ -1,4 +1,14 @@
 {
+  "share": {
+    "title": "Share",
+    "subtitle": "Share it with someone you'd love to go with",
+    "copyLink": "Copy link",
+    "copied": "Copied",
+    "kakao": "Share to KakaoTalk",
+    "x": "Share to X",
+    "line": "Share to LINE",
+    "whatsapp": "Share to WhatsApp"
+  },
   "bottomNav": {
     "home": "Home",
     "map": "Map",
@@ -98,8 +108,13 @@
     "notFound": "Not found",
     "mainCast": "Cast",
     "director": "Director",
+    "genre": "Genre",
+    "rating": "Rating",
+    "runtime": "Runtime",
+    "runtimeValue": "{{minutes}} min",
     "releaseDate": "Release date",
     "storyTitle": "The story",
+    "storyEmpty": "Information coming soon",
     "storyMore": "Show more",
     "storyLess": "Show less",
     "detailButton": "See more",

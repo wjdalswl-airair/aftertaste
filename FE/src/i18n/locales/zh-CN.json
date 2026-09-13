@@ -1,4 +1,14 @@
 {
+  "share": {
+    "title": "分享",
+    "subtitle": "分享给想一起去的人吧",
+    "copyLink": "复制链接",
+    "copied": "已复制",
+    "kakao": "分享到KakaoTalk",
+    "x": "分享到X",
+    "line": "分享到LINE",
+    "whatsapp": "分享到WhatsApp"
+  },
   "bottomNav": {
     "home": "首页",
     "map": "地图",
@@ -98,8 +108,13 @@
     "notFound": "不存在",
     "mainCast": "主演",
     "director": "导演",
+    "genre": "类型",
+    "rating": "评分",
+    "runtime": "片长",
+    "runtimeValue": "{{minutes}}分钟",
     "releaseDate": "上映日期",
     "storyTitle": "该作品的故事",
+    "storyEmpty": "信息准备中",
     "storyMore": "查看更多",
     "storyLess": "收起",
     "detailButton": "查看详情",

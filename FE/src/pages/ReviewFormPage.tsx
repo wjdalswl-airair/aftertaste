@@ -4,7 +4,9 @@ import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { createReview, getPlaceReviews, updateReview, type ReviewWorkTag } from '../api/reviews'
 import { getPlaceDetail, type PlaceDetail, type WorkInfo } from '../api/spots'
+import spotPlaceholder from '../assets/placeholder/spot.png'
 import { BottomNav } from '../components/BottomNav'
+import { PlaceholderImage } from '../components/PlaceholderImage'
 import { Skeleton } from '../components/Skeleton'
 import { PhotoTooLargeError, UnsupportedImageError } from '../lib/compressImage'
 import { deleteReviewPhoto, uploadReviewPhoto } from '../lib/reviewPhotoUpload'
@@ -187,7 +189,7 @@ export function ReviewFormPage() {
   }
 
   return (
-    <main className="flex min-h-dvh flex-col gap-4 pb-24">
+    <main className="flex min-h-dvh flex-col gap-6 pb-24">
       <header className="grid min-h-16 grid-cols-[24px_1fr_24px] items-center px-4 pt-4">
         <button type="button" onClick={handleBack} aria-label="뒤로가기">
           <ArrowLeft size={24} className="text-ink" />
@@ -199,7 +201,12 @@ export function ReviewFormPage() {
 
       {place ? (
         <div className="flex items-center gap-3 border-b border-divider px-4 pb-4">
-          <img src={place.photo_url} alt="" className="h-[74px] w-[75px] rounded-2xl object-cover" />
+          <PlaceholderImage
+            src={place.photo_url}
+            placeholder={spotPlaceholder}
+            alt=""
+            className="h-[74px] w-[75px] rounded-2xl"
+          />
           <div>
             <p className="text-[15px] font-bold text-ink">{place.name}</p>
             <p className="text-xs text-ink-secondary">{shortRegion(place.address)}</p>

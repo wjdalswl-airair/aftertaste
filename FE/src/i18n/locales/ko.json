@@ -1,4 +1,14 @@
 {
+  "share": {
+    "title": "공유하기",
+    "subtitle": "함께 가고 싶은 사람과 나눠보세요",
+    "copyLink": "링크 복사하기",
+    "copied": "복사되었습니다",
+    "kakao": "카카오톡 공유하기",
+    "x": "X 공유하기",
+    "line": "라인 공유하기",
+    "whatsapp": "왓츠앱 공유하기"
+  },
   "bottomNav": {
     "home": "홈",
     "map": "지도",
@@ -98,8 +108,13 @@
     "notFound": "존재하지 않습니다",
     "mainCast": "주연",
     "director": "연출",
+    "genre": "장르",
+    "rating": "평점",
+    "runtime": "상영시간",
+    "runtimeValue": "{{minutes}}분",
     "releaseDate": "방영날짜",
     "storyTitle": "이 작품의 이야기",
+    "storyEmpty": "정보를 준비중입니다",
     "storyMore": "더보기",
     "storyLess": "접기",
     "detailButton": "자세히 보러가기",

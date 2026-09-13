@@ -1,10 +1,14 @@
-import { ArrowLeft, CalendarDays, Clapperboard, ExternalLink, Share2, Users } from 'lucide-react'
+import { ArrowLeft, CalendarDays, Clapperboard, Clock, ExternalLink, Share2, Star, Tag, Users } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { getWorkDetail, type WorkDetail } from '../api/works'
+import spotPlaceholder from '../assets/placeholder/spot.png'
+import workPlaceholder from '../assets/placeholder/work.png'
 import { BottomNav } from '../components/BottomNav'
 import { FavoriteButton } from '../components/FavoriteButton'
+import { PlaceholderImage } from '../components/PlaceholderImage'
+import { ShareSheet } from '../components/ShareSheet'
 import { Skeleton } from '../components/Skeleton'
 
 export function WorkDetailPage() {
@@ -14,6 +18,7 @@ export function WorkDetailPage() {
 
   // undefined: 로딩 중, null: 존재하지 않거나 실패
   const [work, setWork] = useState<WorkDetail | null | undefined>(undefined)
+  const [shareOpen, setShareOpen] = useState(false)
 
   useEffect(() => {
     setWork(undefined)
@@ -22,18 +27,14 @@ export function WorkDetailPage() {
       .catch(() => setWork(null))
   }, [workId])
 
-  function handleShare() {
-    navigator.clipboard.writeText(window.location.href).catch(() => {})
-  }
-
   return (
-    <main className="flex min-h-dvh flex-col gap-4 pb-24">
-      <header className="grid min-h-16 grid-cols-[24px_1fr_24px] items-center px-4 pt-4">
+    <main className="flex min-h-dvh flex-col gap-6 pb-24">
+      <header className="grid min-h-16 grid-cols-[24px_1fr_24px] items-center px-4 pt-2">
         <button type="button" onClick={() => navigate(-1)} aria-label="뒤로가기">
           <ArrowLeft size={24} className="text-ink" />
         </button>
         <div />
-        <button type="button" onClick={handleShare} aria-label="공유" className="justify-self-end">
+        <button type="button" onClick={() => setShareOpen(true)} aria-label="공유" className="justify-self-end">
           <Share2 size={22} className="text-ink" />
         </button>
       </header>
@@ -46,25 +47,30 @@ export function WorkDetailPage() {
 
       {work && (
         <>
-          <div className="px-4">
-            <img
-              src={work.poster_url}
-              alt=""
-              className="h-[230px] w-full rounded-2xl object-cover"
-            />
+          <div className="flex flex-col gap-1 px-4">
+            <p className="text-sm text-primary">
+              {work.category === 'DRAMA' ? t('searchPage.filters.drama') : t('searchPage.filters.movie')}
+            </p>
+            <p className="text-xl font-bold text-ink">{work.title}</p>
           </div>
 
-          <div className="flex flex-col gap-6 px-4">
-            <div className="flex flex-col gap-1">
-              <p className="text-sm text-primary">
-                {work.category === 'DRAMA' ? t('searchPage.filters.drama') : t('searchPage.filters.movie')}
-              </p>
-              <p className="text-xl font-bold text-ink">{work.title}</p>
-            </div>
-
-            <div className="flex flex-col gap-4 rounded-2xl bg-accent/15 p-5">
+          <div className="flex items-stretch gap-3 px-4">
+            <PlaceholderImage
+              src={work.poster_url}
+              placeholder={workPlaceholder}
+              alt=""
+              className="w-[42%] shrink-0 rounded-xl"
+            />
+            <div className="flex flex-1 flex-col justify-center gap-3 rounded-xl bg-accent/15 p-4">
               <InfoRow icon={<Users size={14} />} label={t('workDetail.mainCast')} value={work.main_cast} />
               <InfoRow icon={<Clapperboard size={14} />} label={t('workDetail.director')} value={work.director} />
+              <InfoRow icon={<Tag size={14} />} label={t('workDetail.genre')} value={work.genre} />
+              <InfoRow icon={<Star size={14} />} label={t('workDetail.rating')} value={work.rating ?? ''} />
+              <InfoRow
+                icon={<Clock size={14} />}
+                label={t('workDetail.runtime')}
+                value={work.runtime != null ? t('workDetail.runtimeValue', { minutes: work.runtime }) : ''}
+              />
               <InfoRow
                 icon={<CalendarDays size={14} />}
                 label={t('workDetail.releaseDate')}
@@ -98,10 +104,11 @@ export function WorkDetailPage() {
                 {work.places.map((place) => (
                   <Link key={place.id} to={`/spots/${place.id}`}>
                     <div className="relative">
-                      <img
+                      <PlaceholderImage
                         src={place.photo_url}
+                        placeholder={spotPlaceholder}
                         alt=""
-                        className="aspect-square w-full rounded-xl object-cover"
+                        className="aspect-square w-full rounded-lg"
                       />
                       <FavoriteButton placeId={place.id} />
                     </div>
@@ -113,6 +120,22 @@ export function WorkDetailPage() {
             )}
           </section>
         </>
+      )}
+
+      {shareOpen && work && (
+        <ShareSheet
+          url={window.location.href}
+          title={work.title}
+          description={
+            work.description ||
+            [work.category === 'DRAMA' ? t('searchPage.filters.drama') : t('searchPage.filters.movie'), work.genre]
+              .filter(Boolean)
+              .join(' · ')
+          }
+          imageUrl={work.poster_url || workPlaceholder}
+          kakaoButtonLabel="작품 보러가기"
+          onClose={() => setShareOpen(false)}
+        />
       )}
 
       <BottomNav />
@@ -134,8 +157,18 @@ function WorkDescription({ description }: { description: string }) {
     }
   }, [description])
 
+  // 설명이 아직 안 채워진 작품은 "정보를 준비중입니다" 같은 임시 문구로 대신 보여준다
+  // (2026-09-13 사용자 결정, 실제 데이터가 채워지면 자연히 안 뜬다).
+  if (!description) {
+    return (
+      <div className="rounded-xl bg-accent/15 p-5">
+        <p className="text-sm text-ink-tertiary">{t('workDetail.storyEmpty')}</p>
+      </div>
+    )
+  }
+
   return (
-    <div className="rounded-2xl bg-accent/15 p-5">
+    <div className="rounded-xl bg-accent/15 p-5">
       <p
         ref={textRef}
         className={`text-sm leading-[1.7] text-ink-secondary ${expanded ? '' : 'line-clamp-3'}`}
@@ -170,13 +203,15 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
 
 function WorkDetailSkeleton() {
   return (
-    <div className="flex flex-col gap-8 px-4">
-      <Skeleton className="h-[230px] w-full rounded-2xl" />
+    <div className="flex flex-col gap-4 px-4">
       <div className="flex flex-col gap-2">
         <Skeleton className="h-3 w-1/4 rounded-sm" />
         <Skeleton className="h-6 w-2/3 rounded-sm" />
       </div>
-      <Skeleton className="h-32 w-full rounded-2xl" />
+      <div className="flex gap-3">
+        <Skeleton className="h-[230px] w-[42%] shrink-0 rounded-xl" />
+        <Skeleton className="h-[230px] flex-1 rounded-xl" />
+      </div>
     </div>
   )
 }
