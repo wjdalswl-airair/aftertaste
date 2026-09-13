@@ -53,7 +53,7 @@ export function ReviewListPage() {
             key={option}
             type="button"
             onClick={() => setSort(option)}
-            className={`pb-2 text-base ${
+            className={`pb-2 text-sm ${
               sort === option ? 'border-b-2 border-primary font-bold text-ink' : 'text-ink-tertiary'
             }`}
           >
@@ -78,7 +78,12 @@ export function ReviewListPage() {
                 className="relative aspect-square overflow-hidden rounded-none bg-divider"
               >
                 {review.photos[0] && (
-                  <img src={review.photos[0].photo_url} alt="" className="h-full w-full object-cover" />
+                  <img
+                    src={review.photos[0].photo_url}
+                    alt=""
+                    loading="lazy"
+                    className="h-full w-full object-cover"
+                  />
                 )}
               </Link>
             ))}
