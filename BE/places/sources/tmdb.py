@@ -81,6 +81,7 @@ def get_detail(tmdb_id, category):
       - overview: 줄거리(요청 언어 기준, 없으면 빈 문자열)
       - director: 감독/연출 이름. 여러 명이면 ", "로 이어 붙인다. 없으면 빈 문자열
       - cast: 주연배우 이름. 비중 순서(order)가 앞선 사람부터 ", "로 이어 붙인다. 없으면 빈 문자열
+      - vote_average: TMDB 평점(0~10점, float). 투표가 없으면 0.0
       - release_date: "YYYY-MM-DD" 문자열 또는 빈 문자열
       - poster_path: "/xxxx.jpg" 또는 None (CDN 주소 앞부분은 붙어 있지 않다)
     """
@@ -100,6 +101,7 @@ def get_detail(tmdb_id, category):
         "overview": (data.get("overview") or "").strip(),
         "director": _extract_director(data, media_type),
         "cast": _extract_cast(data),
+        "vote_average": data.get("vote_average") or 0.0,
         "release_date": (data.get("first_air_date") if media_type == "tv" else data.get("release_date")) or "",
         "poster_path": data.get("poster_path"),
     }

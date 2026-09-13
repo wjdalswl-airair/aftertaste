@@ -7,6 +7,7 @@
 """
 
 import datetime
+from decimal import Decimal
 from unittest.mock import patch
 
 from django.core.management import call_command
@@ -34,6 +35,7 @@ def _detail(
     overview="줄거리입니다",
     director="김감독",
     cast="주연1, 주연2",
+    vote_average=8.49,
     release_date="2016-12-02",
     poster_path="/abc.jpg",
 ):
@@ -42,6 +44,7 @@ def _detail(
         "overview": overview,
         "director": director,
         "cast": cast,
+        "vote_average": vote_average,
         "release_date": release_date,
         "poster_path": poster_path,
     }
@@ -127,12 +130,14 @@ class EnrichWorkTest(TestCase):
 
         self.assertEqual(status, "matched")
         self.assertEqual(
-            set(filled), {"description", "director", "main_cast", "release_date", "poster_url"}
+            set(filled),
+            {"description", "director", "main_cast", "rating", "release_date", "poster_url"},
         )
         work.refresh_from_db()
         self.assertEqual(work.description, "줄거리입니다")
         self.assertEqual(work.director, "김감독")
         self.assertEqual(work.main_cast, "주연1, 주연2")
+        self.assertEqual(work.rating, Decimal("8.5"))
         self.assertEqual(work.release_date, datetime.date(2016, 12, 2))
         self.assertEqual(work.poster_url, "https://image.tmdb.org/t/p/w500/abc.jpg")
 
@@ -148,7 +153,7 @@ class EnrichWorkTest(TestCase):
             status, filled = enrich_work(work)
 
         self.assertEqual(status, "matched")
-        self.assertEqual(set(filled), {"main_cast", "release_date", "poster_url"})
+        self.assertEqual(set(filled), {"main_cast", "rating", "release_date", "poster_url"})
         work.refresh_from_db()
         self.assertEqual(work.description, "관리자가 쓴 감성 줄거리")
         self.assertEqual(work.director, "관리자입력 감독")
@@ -201,7 +206,9 @@ class EnrichWorkTest(TestCase):
 
     def test_matched_but_tmdb_values_empty_reports_no_change(self):
         work = Work.objects.create(title="도깨비", category=Work.Category.DRAMA)
-        detail = _detail(1, overview="", director="", cast="", release_date="", poster_path=None)
+        detail = _detail(
+            1, overview="", director="", cast="", vote_average=0.0, release_date="", poster_path=None
+        )
         search, get_detail = self._mock([_candidate(1, "도깨비")], detail)
         with search, get_detail:
             status, filled = enrich_work(work)
