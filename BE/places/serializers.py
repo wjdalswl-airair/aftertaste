@@ -86,7 +86,19 @@ class WorkDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Work
-        fields = ["id", "title", "description", "category", "release_date", "main_cast", "director", "poster_url"]
+        fields = [
+            "id",
+            "title",
+            "description",
+            "category",
+            "release_date",
+            "main_cast",
+            "director",
+            "poster_url",
+            "rating",
+            "runtime",
+            "genre",
+        ]
         read_only_fields = fields
 
     def get_title(self, obj):
@@ -143,6 +155,9 @@ class WorkPageSerializer(serializers.ModelSerializer):
             "main_cast",
             "director",
             "poster_url",
+            "rating",
+            "runtime",
+            "genre",
             "places",
         ]
         read_only_fields = fields
