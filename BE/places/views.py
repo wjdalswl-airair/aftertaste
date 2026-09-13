@@ -25,6 +25,8 @@ from reviews.models import Review
 from places.serializers import (
     AutocompleteResponseSerializer,
     PlaceDetailSerializer,
+    PlaceMapResponseSerializer,
+    PlaceMapSerializer,
     PlaceSearchSerializer,
     PopularKeywordsResponseSerializer,
     RecommendResponseSerializer,
@@ -499,6 +501,45 @@ class RecommendationView(APIView):
         }
         return Response(
             {"places": PlaceSearchSerializer(places, many=True, context=context).data}
+        )
+
+
+class PlaceMapListView(APIView):
+    """지도 탭에 마커로 뿌릴 전체 명소 목록 (issue #63). 로그인 여부와 상관없이 호출할 수 있다.
+
+    좌표·페이지네이션 필터 없이 전체를 반환한다 — 명소 수가 (2026-09 기준) 약 2,900건으로
+    이슈에 적힌 "몇 백 개"보다 많지만, id/name/latitude/longitude만 담은 응답이라 한 번에
+    받아도 부담이 크지 않다. Place에는 명소 승인 상태(is_hidden) 같은 필드가 없어서 —
+    Review와 달리 명소는 처음부터 관리자 확인을 거쳐 등록된다 — 별도로 거를 값은 없고,
+    좌표가 비어 있는 명소만 뺀다(마커를 찍을 수 없으므로).
+
+    SearchView와 같은 이유로 perform_authentication을 오버라이드한다: 로그인이 필요 없는
+    API라 토큰이 무효/만료돼도 조회 자체는 막지 않는다.
+    """
+
+    def perform_authentication(self, request):
+        try:
+            request.user
+        except AuthenticationFailed:
+            pass
+
+    @extend_schema(
+        summary="지도용 전체 명소 목록",
+        description="좌표가 있는 모든 명소를 id/name/latitude/longitude만 담아 필터·페이지네이션 없이 반환한다.",
+        parameters=[
+            OpenApiParameter("lang", str, description="응답 언어 (예: en). 안 주면 로그인 회원의 언어 → 한국어 순"),
+        ],
+        responses={200: PlaceMapResponseSerializer},
+    )
+    def get(self, request):
+        language = resolve_language(request)
+        places = (
+            Place.objects.filter(latitude__isnull=False, longitude__isnull=False)
+            .prefetch_related("translations")
+            .order_by("id")
+        )
+        return Response(
+            {"places": PlaceMapSerializer(places, many=True, context={"language": language}).data}
         )
 
 
