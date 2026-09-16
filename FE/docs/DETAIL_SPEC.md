@@ -86,6 +86,8 @@ React Router로 화면 단위 페이지를 분리한다 (PRD 6장 결정).
 **하단 탭 5개로 확장 (2026-09-12)**: 기존 홈/검색/프로필 3탭에 지도·리뷰를 추가했다. 순서는 홈(큐레이션 진입점) → 지도·검색(명소 찾기 두 가지 방법) → 리뷰(다녀온 뒤 보는 콘텐츠) → 프로필(계정, 다른 앱들 관례상 맨 끝). 지도는 다른 브랜치에서 별도로 작업 예정이라 `MapPage.tsx`는 "아직 준비 중이에요" 문구만 있는 자리만 잡은 화면이다. 리뷰 피드는 이번에 실제로 구현했다(아래).
 - 모든 하단 탭 화면(`MapPage`·`SearchPage`·`ReviewFeedPage`·`MyPage`)은 홈과 같은 기본 헤더(`여운` 로고 + `LanguageSheet`)를 공통으로 쓴다 — 서브 화면(뒤로가기 화살표 헤더)과는 다른 패턴이다.
 
+**검색 탭 → 헤더 아이콘으로 이동, 그 자리에 코스 탭 (2026-09-16)**: 하단 탭의 "검색"을 없애고 `MainPage.tsx` 헤더에 검색 아이콘을 추가했다(로고 오른쪽에 검색 → `LanguageSheet`(지구본) → 로그인 순). `/search`(`SearchPage.tsx`) 라우트 자체는 그대로 남아있고, 헤더 검색 아이콘이 그리로 링크한다. 검색이 빠진 하단 탭 자리엔 "코스"를 넣었다(`/courses`, `CoursePage.tsx`) — 지금은 `MapPage.tsx`가 처음에 그랬던 것처럼 "아직 준비 중이에요" 문구만 있는 자리 표시 화면이고, 실제 코스 둘러보기 화면은 이후 Phase에서 구현한다. 하단 탭 순서는 홈 → 지도 → 코스 → 리뷰 → 프로필.
+
 **리뷰 탭 — 전체 리뷰 피드 (2026-09-12 구현, `pages/ReviewFeedPage.tsx`)**:
 - **BE에 이미 완성돼 있던 `feature/be/review-community` 브랜치 구현(BE DETAIL_SPEC 6-1 #32)을 기준으로 맞췄다.** 처음엔 이 브랜치를 확인 안 하고 별도로 만들었다가, 이미 완성된 설계(페이지네이션·정렬 옵션 포함)가 있다는 걸 뒤늦게 알고 그쪽 API 계약에 맞게 FE를 다시 맞췄다 — 같은 기능을 두 번 만들지 않도록, 새 API를 붙이기 전엔 관련 기능이 다른 브랜치에 이미 있는지 먼저 확인한다.
 - API: `GET /api/reviews/?ordering=latest|popular&page=N` → `{ count, next, previous, reviews: [...] }` (`src/api/reviews.ts`의 `getReviewFeed`). `ReviewSerializer`(명소별 리뷰·내 리뷰와 공용) 자체에 `place_name`·`place_photo_url`·`author_profile_image_url`이 추가돼 있어서, 이 세 필드는 이제 다른 리뷰 목록 API 응답에도 함께 온다.
@@ -193,7 +195,8 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 - **Apple 로그인 최종 제외 (2026-09-13)**: Phase 1 당시(2026-08-29) "Apple Developer 계정 생기면 나중에 추가"로 보류했던 걸, 2026-09-13 사용자가 아예 지원하지 않기로 최종 결정했다. Google/Kakao 두 개만 지원(`src/lib/firebase.ts` 주석에는 이미 2026-09-04자로 이 결정이 반영돼 있었음 — Phase 문서만 "보류" 상태로 안 갱신된 채 남아있었어서 이번에 정리함).
 
 ### S-02. 메인 — `pages/MainPage.tsx` (Phase 2, 구현 완료 — 2026-08-30 Figma 실제 목업에 맞춰 리디자인)
-- 컴포넌트: `Hero`(배너+명예의전당 병합), `LanguageSheet`(언어 선택 바텀시트), `BottomNav`(홈/지도/검색/리뷰/프로필, 2026-09-12부터 5탭), `TopPlacesCarousel`, `RecommendedSpots`
+- 컴포넌트: `Hero`(배너+명예의전당 병합), `LanguageSheet`(언어 선택 바텀시트), `BottomNav`(홈/지도/코스/리뷰/프로필, 2026-09-12부터 5탭·2026-09-16 검색→코스로 교체), `TopPlacesCarousel`, `RecommendedSpots`
+- 헤더 아이콘 순서(2026-09-16): 검색(`/search`로 이동) → `LanguageSheet`(지구본, 언어 선택) → 로그인(비로그인 시에만). 검색이 하단 탭에서 헤더로 옮겨오면서 하단 탭 자리엔 코스가 들어왔다(위 "검색 탭 → 헤더 아이콘으로 이동" 참고).
 - API (전부 확정, 실제 BE 코드로 확인함 — 2026-08-29):
   - `GET /api/banners/` → `{ banners: [{ id, image_url, link_url, order }] }`
   - `GET /api/main/hall-of-fame/` → `{ review: {...} | null }` (없으면 `null`, 200 정상 응답)
