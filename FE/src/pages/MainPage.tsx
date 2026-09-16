@@ -1,4 +1,4 @@
-import { LogIn } from 'lucide-react'
+import { LogIn, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { BottomNav } from '../components/BottomNav'
@@ -18,6 +18,9 @@ export function MainPage() {
       <header className="flex items-center justify-between px-4 pt-4">
         <Link to="/" className="font-brand text-2xl font-bold text-primary">여운</Link>
         <div className="flex items-center gap-4">
+          <Link to="/search" aria-label="검색">
+            <Search size={22} className="text-ink" />
+          </Link>
           <LanguageSheet />
           {!isLoading && !member && (
             <Link to="/login" aria-label="로그인">

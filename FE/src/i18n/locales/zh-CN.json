@@ -12,9 +12,13 @@
   "bottomNav": {
     "home": "首页",
     "map": "地图",
-    "search": "搜索",
+    "course": "路线",
     "review": "评价",
     "profile": "我的"
+  },
+  "coursePage": {
+    "title": "路线",
+    "empty": "敬请期待"
   },
   "mapPage": {
     "title": "地图",

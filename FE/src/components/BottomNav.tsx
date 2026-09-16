@@ -1,12 +1,13 @@
-import { Home, Map, Search, Star, User } from 'lucide-react'
+import { Home, Map, Route, Star, User } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation } from 'react-router-dom'
 
-// 순서: 홈(큐레이션 진입점) → 지도·검색(명소 찾기) → 리뷰(다녀온 뒤 보는 콘텐츠) → 프로필(계정, 관례상 맨 끝).
+// 순서: 홈(큐레이션 진입점) → 지도(명소 찾기) → 코스(주변 코스 둘러보기) → 리뷰(다녀온 뒤 보는 콘텐츠) → 프로필(계정, 관례상 맨 끝).
+// 검색은 2026-09-16부터 이 탭이 아니라 메인 페이지 헤더의 검색 아이콘으로 들어간다(MainPage.tsx 참고).
 const TABS = [
   { to: '/', labelKey: 'bottomNav.home', icon: Home },
   { to: '/map', labelKey: 'bottomNav.map', icon: Map },
-  { to: '/search', labelKey: 'bottomNav.search', icon: Search },
+  { to: '/courses', labelKey: 'bottomNav.course', icon: Route },
   { to: '/reviews', labelKey: 'bottomNav.review', icon: Star },
   { to: '/mypage', labelKey: 'bottomNav.profile', icon: User },
 ]

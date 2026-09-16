@@ -12,9 +12,13 @@
   "bottomNav": {
     "home": "홈",
     "map": "지도",
-    "search": "검색",
+    "course": "코스",
     "review": "리뷰",
     "profile": "프로필"
+  },
+  "coursePage": {
+    "title": "코스",
+    "empty": "아직 준비 중이에요"
   },
   "mapPage": {
     "title": "지도",
@@ -46,12 +50,12 @@
       "empty": "아직 준비 중이에요"
     },
     "topPlaces": {
-      "title": "전국 Top 10 촬영지",
+      "title": "여운 사용자들이 픽한! 전국 Top 10 촬영지",
       "empty": "아직 준비 중이에요"
     },
     "recommend": {
       "title": "내 주변 명소",
-      "titleNearby": "\"{{dong}}\" 근처 명소",
+      "titleNearby": "\"{{dong}}\" 근처 촬영지",
       "empty": "아직 준비 중이에요"
     }
   },

@@ -12,9 +12,13 @@
   "bottomNav": {
     "home": "首頁",
     "map": "地圖",
-    "search": "搜尋",
+    "course": "路線",
     "review": "評價",
     "profile": "我的"
+  },
+  "coursePage": {
+    "title": "路線",
+    "empty": "敬請期待"
   },
   "mapPage": {
     "title": "地圖",

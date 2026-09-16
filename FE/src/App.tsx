@@ -5,6 +5,7 @@ import { useInitAuth } from './hooks/useInitAuth'
 import { BookmarksPage } from './pages/BookmarksPage'
 import { CourseCreatePage } from './pages/CourseCreatePage'
 import { CourseDetailPage } from './pages/CourseDetailPage'
+import { CoursePage } from './pages/CoursePage'
 import { LoginPage } from './pages/LoginPage'
 import { MainPage } from './pages/MainPage'
 import { MapPage } from './pages/MapPage'
@@ -31,6 +32,7 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/map" element={<MapPage />} />
         <Route path="/search" element={<SearchPage />} />
+        <Route path="/courses" element={<CoursePage />} />
         <Route path="/reviews" element={<ReviewFeedPage />} />
         <Route path="/spots/:placeId" element={<SpotDetailPage />} />
         <Route path="/spots/:placeId/reviews" element={<ReviewListPage />} />

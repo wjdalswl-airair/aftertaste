@@ -12,9 +12,13 @@
   "bottomNav": {
     "home": "Home",
     "map": "Map",
-    "search": "Search",
+    "course": "Course",
     "review": "Review",
     "profile": "Profile"
+  },
+  "coursePage": {
+    "title": "Course",
+    "empty": "Coming soon"
   },
   "mapPage": {
     "title": "Map",
