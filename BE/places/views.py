@@ -1,8 +1,10 @@
 import logging
 import random
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 
 from django.contrib.postgres.search import TrigramSimilarity
+from django.core.cache import cache
 from django.db.models import Count, Q
 from django.db.models.functions import Upper
 from django.utils import timezone
@@ -31,11 +33,12 @@ from places.serializers import (
     PopularKeywordsResponseSerializer,
     RecommendResponseSerializer,
     SearchResponseSerializer,
+    TourismInfoResponseSerializer,
     WorkPageSerializer,
     WorkSearchSerializer,
 )
 from places.services import haversine_distance_meters, to_decimal
-from places.sources import kakao_geocoding
+from places.sources import kakao_geocoding, tour_api
 from places.translation import pick_translated_text, resolve_language
 
 logger = logging.getLogger(__name__)
@@ -74,6 +77,18 @@ NO_RESULT_MESSAGE = "검색결과가 존재하지 않습니다"
 NEARBY_PLACES_CATEGORY_CODES = ["FD6", "CE7", "AT4"]  # 음식점, 카페, 관광명소
 NEARBY_PLACES_RADIUS_METERS = 1000
 NEARBY_PLACES_LIMIT = 15
+
+# 주변 관광정보(한국관광공사 TourAPI) 설정 (docs/DETAIL_SPEC.md 3-3, 이슈 #76).
+# 공모전 규칙상 결과를 DB에 저장하지 않고 요청 때마다 실시간으로 받아온다. 다만 개발계정 일일 호출
+# 한도(1,000회)를 아끼려고 서버 메모리에만 몇 분 잠깐 기억해 둔다(DB 아님, 서버가 꺼지면 사라진다).
+# 카테고리별 개수·기본 반경·캐시 시간은 문서에 정해진 값이 없어 임의로 정했다.
+TOURISM_INFO_DEFAULT_RADIUS_METERS = 1000
+TOURISM_INFO_MAX_RADIUS_METERS = 20000  # TourAPI가 받는 반경 최대값
+TOURISM_INFO_LIMIT_PER_CATEGORY = 10
+TOURISM_INFO_CACHE_SECONDS = 300
+TOURISM_INFO_UNAVAILABLE_MESSAGE = "관광정보를 잠시 불러올 수 없습니다."
+TOURISM_INFO_BAD_CATEGORY_MESSAGE = "잘못된 category 값입니다."
+TOURISM_INFO_BAD_RADIUS_MESSAGE = "radius는 1 이상 20000 이하의 정수(미터)여야 합니다."
 
 # 구분 조회 값. WORK는 드라마+영화 전부, DRAMA/MOVIE는 해당 구분만.
 VALID_SEARCH_TYPES = {"", "WORK", "DRAMA", "MOVIE"}
@@ -634,6 +649,119 @@ class PlaceDetailView(APIView):
         return Response(
             PlaceDetailSerializer(place, context={"request": request, "language": language}).data
         )
+
+
+def _fetch_tourism_category(place, category, radius):
+    """한 카테고리의 주변 관광정보를 가져온다. 같은 조건이면 몇 분간 서버 메모리에 기억한 값을 쓴다.
+
+    실패(예외)는 캐시하지 않고 그대로 올린다 — 호출하는 쪽이 카테고리별로 잡는다.
+    """
+    cache_key = f"tourism:nearby:{float(place.latitude):.4f}:{float(place.longitude):.4f}:{radius}:{category}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    items = tour_api.search_nearby(
+        float(place.latitude),
+        float(place.longitude),
+        radius,
+        category,
+        TOURISM_INFO_LIMIT_PER_CATEGORY,
+    )
+    cache.set(cache_key, items, TOURISM_INFO_CACHE_SECONDS)
+    return items
+
+
+class PlaceTourismInfoView(APIView):
+    """명소 주변 관광정보 (한국관광공사 TourAPI). 로그인 여부와 상관없이 호출할 수 있다 (이슈 #76).
+
+    명소 좌표를 기준으로 음식·숙박·체험·역사·자연·문화 카테고리별 가까운 관광정보를 돌려준다.
+    카카오 주변 상권(명소 상세의 nearby_places)과는 별개이며, 결과는 저장하지 않고 요청 때마다
+    실시간으로 받아온다. PlaceDetailView와 같은 이유로 perform_authentication을 오버라이드한다:
+    토큰이 무효/만료돼도 조회 자체는 막지 않는다.
+    """
+
+    def perform_authentication(self, request):
+        try:
+            request.user
+        except AuthenticationFailed:
+            pass
+
+    @extend_schema(
+        summary="명소 주변 관광정보",
+        description=(
+            "명소 좌표 근처의 관광정보를 한국관광공사 TourAPI에서 실시간으로 받아 카테고리별로 가까운 순서로 반환한다. "
+            "DB에는 저장하지 않는다.\n\n"
+            "category 값: food(음식) / lodging(숙박) / experience(체험관광) / history(역사관광) / "
+            "nature(자연관광) / culture(문화관광). 쉼표로 여러 개를 줄 수 있고, 생략하면 전체. "
+            "이미지·전화가 없으면 빈 문자열이다."
+        ),
+        parameters=[
+            OpenApiParameter(
+                "category", str, description="쉼표로 구분한 카테고리 (예: food,lodging). 생략하면 6개 전체"
+            ),
+            OpenApiParameter("radius", int, description="검색 반경(미터). 기본 1000, 최대 20000"),
+        ],
+        responses={
+            200: TourismInfoResponseSerializer,
+            400: OpenApiResponse(description="category 또는 radius 값이 잘못됨"),
+            404: OpenApiResponse(description="해당 명소가 존재하지 않음"),
+            503: OpenApiResponse(description="한국관광공사 API가 응답하지 못함(일일 호출 한도 초과 포함)"),
+        },
+    )
+    def get(self, request, place_id):
+        raw_category = request.query_params.get("category", "")
+        categories = []
+        for name in raw_category.split(","):
+            name = name.strip()
+            if not name:
+                continue
+            if name not in tour_api.NEARBY_CATEGORY_CODES:
+                return Response({"detail": TOURISM_INFO_BAD_CATEGORY_MESSAGE}, status=400)
+            if name not in categories:
+                categories.append(name)
+        if not categories:
+            categories = list(tour_api.NEARBY_CATEGORY_CODES)
+
+        raw_radius = request.query_params.get("radius")
+        if raw_radius in (None, ""):
+            radius = TOURISM_INFO_DEFAULT_RADIUS_METERS
+        else:
+            try:
+                radius = int(raw_radius)
+            except ValueError:
+                return Response({"detail": TOURISM_INFO_BAD_RADIUS_MESSAGE}, status=400)
+            if not 1 <= radius <= TOURISM_INFO_MAX_RADIUS_METERS:
+                return Response({"detail": TOURISM_INFO_BAD_RADIUS_MESSAGE}, status=400)
+
+        try:
+            place = Place.objects.get(pk=place_id)
+        except Place.DoesNotExist:
+            return Response({"detail": NOT_FOUND_MESSAGE}, status=404)
+
+        # 좌표가 없으면 검색할 수 없으므로 빈 목록 (주변 상권과 같은 규칙).
+        if place.latitude is None or place.longitude is None:
+            return Response({"results": []})
+
+        # 카테고리마다 따로 호출한다. 동시에 불러야 카테고리가 여러 개여도 화면이 덜 기다린다.
+        def fetch(category):
+            try:
+                return _fetch_tourism_category(place, category, radius)
+            except Exception:
+                logger.warning(
+                    "TourAPI 주변 관광정보 조회 실패 (place_id=%s, category=%s)", place.id, category, exc_info=True
+                )
+                return None
+
+        with ThreadPoolExecutor(max_workers=len(categories)) as executor:
+            fetched = list(executor.map(fetch, categories))
+
+        # 전부 실패하면 빈 목록으로 속이지 않고 실패를 알린다. 일부만 실패하면 성공한 것만 준다.
+        if all(items is None for items in fetched):
+            return Response({"detail": TOURISM_INFO_UNAVAILABLE_MESSAGE}, status=503)
+
+        results = [item for items in fetched if items for item in items]
+        return Response({"results": results})
 
 
 class WorkDetailView(APIView):

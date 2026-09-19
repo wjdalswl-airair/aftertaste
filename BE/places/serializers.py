@@ -211,6 +211,23 @@ class NearbyPlaceSerializer(serializers.Serializer):
     category_name = serializers.CharField(allow_null=True, allow_blank=True)
 
 
+class TourismInfoItemSerializer(serializers.Serializer):
+    """한국관광공사 TourAPI에서 받아온 주변 관광정보 하나. 우리 DB에는 저장하지 않는다."""
+
+    category = serializers.CharField()
+    name = serializers.CharField()
+    address = serializers.CharField(allow_blank=True)
+    image_url = serializers.CharField(allow_blank=True)
+    latitude = serializers.FloatField(allow_null=True)
+    longitude = serializers.FloatField(allow_null=True)
+    distance = serializers.IntegerField(allow_null=True)
+    tel = serializers.CharField(allow_blank=True)
+
+
+class TourismInfoResponseSerializer(serializers.Serializer):
+    results = TourismInfoItemSerializer(many=True)
+
+
 class PlaceDetailSerializer(serializers.ModelSerializer):
     """GET /api/places/<id>/ 응답. 명소 기본 정보 + 등장 작품 + 주변 상권 + 리뷰를 한 화면 분량으로 담는다.
 
