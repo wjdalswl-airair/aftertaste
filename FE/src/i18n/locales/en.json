@@ -23,6 +23,7 @@
   "mapPage": {
     "title": "Map",
     "unavailable": "The map isn't available right now",
+    "locateButton": "Go to my location",
     "workSearchPlaceholder": "Search for a work",
     "workEmpty": "No filming spots registered for this work"
   },

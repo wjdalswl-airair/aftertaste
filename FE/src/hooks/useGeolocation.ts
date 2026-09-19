@@ -222,5 +222,21 @@ export function useGeolocation() {
     setState({ status: 'denied', coords: null })
   }
 
-  return { ...state, showConsentModal, handleAllow, handleDeny }
+  // 지도의 "내 위치로 이동" 버튼처럼, 사용자가 명시적으로 위치를 다시 요청할 때 쓴다.
+  // decide()와 달리 저장된 동의나 재요청 주기를 보지 않고, 매번 브라우저 상태를 새로 확인한다.
+  async function requestLocation() {
+    const nativeState = await queryNativeGeolocationPermission()
+    if (nativeState === 'denied') {
+      setState({ status: 'denied', coords: null })
+      return
+    }
+    if (nativeState === 'granted') {
+      requestPosition()
+      return
+    }
+    // 'prompt' 또는 확인 불가 — 커스텀 동의 모달부터 보여준다.
+    setShowConsentModal(true)
+  }
+
+  return { ...state, showConsentModal, handleAllow, handleDeny, requestLocation }
 }

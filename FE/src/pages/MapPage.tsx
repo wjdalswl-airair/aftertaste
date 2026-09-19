@@ -1,4 +1,4 @@
-import { Search, X } from 'lucide-react'
+import { LocateFixed, Search, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
@@ -8,7 +8,7 @@ import { getWorkDetail } from '../api/works'
 import { BottomNav } from '../components/BottomNav'
 import { LocationPermissionModal } from '../components/LocationPermissionModal'
 import { useGeolocation } from '../hooks/useGeolocation'
-import { loadKakaoMaps, pinIconDataUrl } from '../lib/kakaoMap'
+import { loadKakaoMaps, myLocationDotDataUrl, pinIconDataUrl } from '../lib/kakaoMap'
 
 // index.css의 --color-primary와 맞춘 값 (다른 지도 화면과 동일 톤, SpotDetailPage.tsx 참고).
 const MAP_PIN_COLOR = '#f47c5c'
@@ -21,7 +21,7 @@ const DEFAULT_CENTER = { lat: 37.5665, lng: 126.978 }
 // 지도 위 검색창에서 작품을 고르면 그 작품이 촬영된 명소만 걸러서 보여준다.
 export function MapPage() {
   const { t } = useTranslation()
-  const { coords, showConsentModal, handleAllow, handleDeny } = useGeolocation()
+  const { coords, showConsentModal, handleAllow, handleDeny, requestLocation } = useGeolocation()
   // undefined: 로딩 중, []: 응답은 왔는데 명소 없음(또는 API 실패)
   const [places, setPlaces] = useState<MapPlace[] | undefined>(undefined)
 
@@ -87,7 +87,7 @@ export function MapPage() {
         <div />
       </header>
 
-      <div className="px-4">
+      <div>
         <div className="relative">
           <div className="absolute inset-x-3 top-3 z-10">
             <div className="flex items-center gap-2 rounded-lg bg-white p-4 shadow-md">
@@ -134,7 +134,12 @@ export function MapPage() {
             )}
           </div>
 
-          <SpotsMap places={visiblePlaces} coords={coords} fitTrigger={fitTrigger} />
+          <SpotsMap
+            places={visiblePlaces}
+            coords={coords}
+            fitTrigger={fitTrigger}
+            requestLocation={requestLocation}
+          />
         </div>
       </div>
 
@@ -149,19 +154,26 @@ function SpotsMap({
   places,
   coords,
   fitTrigger,
+  requestLocation,
 }: {
   places: MapPlace[] | undefined
   coords: { lat: number; lng: number } | null
   fitTrigger: number
+  requestLocation: () => void
 }) {
   const { t } = useTranslation()
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<kakao.maps.Map | null>(null)
   const clustererRef = useRef<kakao.maps.MarkerClusterer | null>(null)
-  const infoWindowRef = useRef<kakao.maps.InfoWindow | null>(null)
+  // 마커 클릭 시 뜨는 말풍선. InfoWindow 대신 CustomOverlay를 써서 모서리를 둥글게 만든다.
+  const infoOverlayRef = useRef<kakao.maps.CustomOverlay | null>(null)
+  // "내 위치" 파란 점 마커 — coords가 바뀔 때마다 지우고 새로 그린다(클러스터 마커와 동일 패턴).
+  const myLocationMarkerRef = useRef<kakao.maps.Marker | null>(null)
   // 위치 권한이 허용된 순간 딱 한 번만 사용자 위치로 재중심한다 — 안 그러면 GPS 좌표가
   // 미세하게 갱신될 때마다, 혹은 사용자가 지도를 직접 움직인 뒤에도 자꾸 되돌아간다.
   const recenteredRef = useRef(false)
+  // "내 위치로 이동" 버튼을 누르면 true — recenteredRef가 이미 true여도 한 번 더 재중심하게 한다.
+  const pendingRecenterRef = useRef(false)
   // 마지막으로 처리한 fitTrigger 값 — 바뀐 경우에만 지도를 명소들에 맞춰 재조정한다.
   const lastFitTriggerRef = useRef(0)
   const [status, setStatus] = useState<'loading' | 'ready' | 'unavailable'>('loading')
@@ -180,7 +192,8 @@ function SpotsMap({
           return
         }
         const center = new kakaoSdk.maps.LatLng(DEFAULT_CENTER.lat, DEFAULT_CENTER.lng)
-        mapInstanceRef.current = new kakaoSdk.maps.Map(mapRef.current, { center, level: 8 })
+        // 카카오맵 레벨-축척 대응표 기준 level 6 = 500m (level 8 = 2km였음, 2026-09-19 사용자 요청).
+        mapInstanceRef.current = new kakaoSdk.maps.Map(mapRef.current, { center, level: 6 })
         setStatus('ready')
       })
       .catch(() => setStatus('unavailable'))
@@ -192,11 +205,29 @@ function SpotsMap({
 
   useEffect(() => {
     const map = mapInstanceRef.current
-    if (status !== 'ready' || !coords || recenteredRef.current || !map) {
+    if (status !== 'ready' || !coords || !map) {
+      return
+    }
+    if (recenteredRef.current && !pendingRecenterRef.current) {
       return
     }
     recenteredRef.current = true
+    pendingRecenterRef.current = false
     map.setCenter(new window.kakao.maps.LatLng(coords.lat, coords.lng))
+  }, [status, coords])
+
+  useEffect(() => {
+    const kakaoSdk = window.kakao
+    const map = mapInstanceRef.current
+    if (status !== 'ready' || !kakaoSdk?.maps || !map || !coords) {
+      return
+    }
+    myLocationMarkerRef.current?.setMap(null)
+    myLocationMarkerRef.current = new kakaoSdk.maps.Marker({
+      position: new kakaoSdk.maps.LatLng(coords.lat, coords.lng),
+      map,
+      image: new kakaoSdk.maps.MarkerImage(myLocationDotDataUrl(), new kakaoSdk.maps.Size(32, 32)),
+    })
   }, [status, coords])
 
   useEffect(() => {
@@ -225,16 +256,22 @@ function SpotsMap({
         image: new kakaoSdk.maps.MarkerImage(pinIconDataUrl(MAP_PIN_COLOR), new kakaoSdk.maps.Size(28, 36)),
       })
       kakaoSdk.maps.event.addListener(marker, 'click', () => {
-        infoWindowRef.current?.close()
-        const infoWindow = new kakaoSdk.maps.InfoWindow({
+        infoOverlayRef.current?.setMap(null)
+        const overlay = new kakaoSdk.maps.CustomOverlay({
+          position,
+          xAnchor: 0.5,
+          yAnchor: 1.1,
           content: `
-            <a href="/spots/${place.id}" class="block px-3 py-2 text-center text-xs font-medium text-ink no-underline">
-              ${place.name}
-            </a>
+            <div class="relative">
+              <a href="/spots/${place.id}" class="block whitespace-nowrap rounded-lg bg-white px-3 py-2 text-center text-xs font-medium text-ink no-underline shadow-md">
+                ${place.name}
+              </a>
+              <span class="absolute left-1/2 top-full -translate-x-1/2 border-x-[6px] border-x-transparent border-t-[6px] border-t-white"></span>
+            </div>
           `,
         })
-        infoWindow.open(map, marker)
-        infoWindowRef.current = infoWindow
+        overlay.setMap(map)
+        infoOverlayRef.current = overlay
       })
       return marker
     })
@@ -255,6 +292,19 @@ function SpotsMap({
   return (
     <div className="relative h-[80dvh] w-full overflow-hidden bg-accent/15">
       <div ref={mapRef} className="h-full w-full" />
+      {status === 'ready' && (
+        <button
+          type="button"
+          onClick={() => {
+            pendingRecenterRef.current = true
+            requestLocation()
+          }}
+          aria-label={t('mapPage.locateButton')}
+          className="absolute bottom-4 right-4 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-white text-ink shadow-md"
+        >
+          <LocateFixed size={20} />
+        </button>
+      )}
       {status !== 'ready' && (
         <div className="absolute inset-0 flex items-center justify-center bg-accent/15 text-sm text-ink-tertiary">
           {status === 'loading' ? '' : t('mapPage.unavailable')}

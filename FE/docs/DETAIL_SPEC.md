@@ -88,6 +88,8 @@ React Router로 화면 단위 페이지를 분리한다 (PRD 6장 결정).
 
 **검색 탭 → 헤더 아이콘으로 이동, 그 자리에 코스 탭 (2026-09-16)**: 하단 탭의 "검색"을 없애고 `MainPage.tsx` 헤더에 검색 아이콘을 추가했다(로고 오른쪽에 검색 → `LanguageSheet`(지구본) → 로그인 순). `/search`(`SearchPage.tsx`) 라우트 자체는 그대로 남아있고, 헤더 검색 아이콘이 그리로 링크한다. 검색이 빠진 하단 탭 자리엔 "코스"를 넣었다(`/courses`, `CoursePage.tsx`) — 지금은 `MapPage.tsx`가 처음에 그랬던 것처럼 "아직 준비 중이에요" 문구만 있는 자리 표시 화면이고, 실제 코스 둘러보기 화면은 이후 Phase에서 구현한다. 하단 탭 순서는 홈 → 지도 → 코스 → 리뷰 → 프로필.
 
+**헤더 검색 아이콘 → 헤더 아래 검색창으로 교체 (2026-09-19)**: `MainPage.tsx` 헤더에서 검색 아이콘을 없애고(헤더엔 `LanguageSheet` → 로그인만 남음), 그 대신 헤더 바로 아래에 검색창(`<input>`)을 하나 두었다. 이 입력창은 메인 화면에서 실제로 검색어를 처리하지 않는다 — 포커스가 잡히는 순간(`onFocus`) 바로 `/search`(`SearchPage.tsx`)로 이동시키고, 실제 검색은 그 화면에서 이뤄진다. 플레이스홀더는 `SearchPage.tsx`와 동일한 `searchPage.placeholder` 문구를 재사용한다.
+
 **리뷰 탭 — 전체 리뷰 피드 (2026-09-12 구현, `pages/ReviewFeedPage.tsx`)**:
 - **BE에 이미 완성돼 있던 `feature/be/review-community` 브랜치 구현(BE DETAIL_SPEC 6-1 #32)을 기준으로 맞췄다.** 처음엔 이 브랜치를 확인 안 하고 별도로 만들었다가, 이미 완성된 설계(페이지네이션·정렬 옵션 포함)가 있다는 걸 뒤늦게 알고 그쪽 API 계약에 맞게 FE를 다시 맞췄다 — 같은 기능을 두 번 만들지 않도록, 새 API를 붙이기 전엔 관련 기능이 다른 브랜치에 이미 있는지 먼저 확인한다.
 - API: `GET /api/reviews/?ordering=latest|popular&page=N` → `{ count, next, previous, reviews: [...] }` (`src/api/reviews.ts`의 `getReviewFeed`). `ReviewSerializer`(명소별 리뷰·내 리뷰와 공용) 자체에 `place_name`·`place_photo_url`·`author_profile_image_url`이 추가돼 있어서, 이 세 필드는 이제 다른 리뷰 목록 API 응답에도 함께 온다.
@@ -166,6 +168,7 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 | `--color-primary` | `#F47C5C` | `bg-primary`, `text-primary` |
 | `--color-accent` | `#F8B08B` | `bg-accent` |
 | `--color-background` | `#FFFFFF` | `bg-background` (2026-08-30 변경) |
+| `--color-app-frame` | `#E8DED7` | `body` 배경 전용 (2026-09-19 추가) |
 | `--color-ink` / `-secondary` / `-tertiary` | `#2B2320` / `#9C8AB0` / `#C9BAB0` | `text-ink`, `text-ink-secondary` |
 | `--color-divider` | `#F0E4DC` | `border-divider` |
 | `--radius-xs`~`--radius-2xl` | 8~28px | `rounded-lg` 등 |
@@ -175,6 +178,8 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 새 색상·radius가 필요하면 Figma가 먼저 바뀌어야 하고, 코드에서 임의로 값을 추가하지 않는다.
 
 아이콘은 `lucide-react`를 사용하고, Figma에 명시된 대로 Rounded Outline 스타일(20~28px)을 유지한다.
+
+**모바일 프레임 + 바깥 배경 구분 (2026-09-19)**: 모바일 전용 서비스라 넓은 화면(데스크톱 브라우저 등)에서 콘텐츠가 화면 끝까지 늘어지는 걸 막기 위해, `App.tsx`가 `<Routes>` 전체를 `mx-auto max-w-[480px] bg-background`로 감싼다. 480px은 기존에 `Modal`/`BottomSheet`/`ReviewFormPage`의 풀스크린 오버레이(`fixed inset-0 mx-auto max-w-[480px]`)에서 이미 쓰던 앱 최대 너비 기준을 그대로 재사용한 것이다(2026-09-19, 사용자 확인 — "우리 최대 기준으로"). 콘텐츠 영역 바깥(뷰포트가 480px보다 넓을 때 양옆)은 `body` 배경(`--color-app-frame`, 살짝 어두운 색)이 보여서 콘텐츠 영역과 시각적으로 구분된다. 데스크톱 반응형 레이아웃을 새로 만든 게 아니라, 이미 있던 모바일 화면을 넓은 뷰포트에서도 앱처럼 보이게 감싸기만 한 것이다.
 
 **바텀시트는 `src/components/BottomSheet.tsx`를 공통으로 쓴다 (2026-09-06 통일).** 원래 `LanguageSheet`(언어 선택)만 패딩·드래그 핸들바가 다르게 만들어져 있었는데, 리뷰 상세(`ReviewDetailPage`)의 수정/삭제 메뉴 스타일(드래그 핸들바 + `pb-8 pt-2` + 항목 `py-4 text-[15px]`)을 기준으로 통일했다. 새 바텀시트가 필요하면 이 컴포넌트를 감싸서(`<BottomSheet onClose={...}>항목들</BottomSheet>`) 쓰고, 개별 항목 스타일도 `block w-full py-4 text-center text-[15px] font-medium`을 기본으로 맞춘다(취소 버튼만 `text-ink-tertiary`, 위험한 동작은 `text-[#e0574a]`). 가운데 뜨는 모달은 `Modal.tsx`를 그대로 쓴다 — 둘은 다른 컴포넌트다.
 
@@ -196,7 +201,7 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 
 ### S-02. 메인 — `pages/MainPage.tsx` (Phase 2, 구현 완료 — 2026-08-30 Figma 실제 목업에 맞춰 리디자인)
 - 컴포넌트: `Hero`(배너+명예의전당 병합), `LanguageSheet`(언어 선택 바텀시트), `BottomNav`(홈/지도/코스/리뷰/프로필, 2026-09-12부터 5탭·2026-09-16 검색→코스로 교체), `TopPlacesCarousel`, `RecommendedSpots`
-- 헤더 아이콘 순서(2026-09-16): 검색(`/search`로 이동) → `LanguageSheet`(지구본, 언어 선택) → 로그인(비로그인 시에만). 검색이 하단 탭에서 헤더로 옮겨오면서 하단 탭 자리엔 코스가 들어왔다(위 "검색 탭 → 헤더 아이콘으로 이동" 참고).
+- 헤더 아이콘 순서(2026-09-19): `LanguageSheet`(지구본, 언어 선택) → 로그인(비로그인 시에만). 검색은 더 이상 헤더 아이콘이 아니라 헤더 바로 아래 검색창으로 옮겨왔다(위 "헤더 검색 아이콘 → 헤더 아래 검색창으로 교체" 참고). 검색이 하단 탭에서 헤더로 옮겨온 이력은 "검색 탭 → 헤더 아이콘으로 이동" 항목 참고 — 그 결과로 하단 탭 자리엔 코스가 들어왔다.
 - API (전부 확정, 실제 BE 코드로 확인함 — 2026-08-29):
   - `GET /api/banners/` → `{ banners: [{ id, image_url, link_url, order }] }`
   - `GET /api/main/hall-of-fame/` → `{ review: {...} | null }` (없으면 `null`, 200 정상 응답)
@@ -204,6 +209,7 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
   - `PATCH /api/account/locale/` → `{ nationality?, language? }` 요청, `{ language }` 응답. 로그인 불필요(선택), 비로그인이면 검증만 하고 저장은 프론트가 `useLocaleStore`(localStorage)로 한다.
 - 처음엔 BE 번역 지원 언어가 영어만으로 결정된 것에 맞춰 국적 선택(한국(ko)/해외(en) 2개)으로 만들었으나(2026-08-29), **2026-09-04부터 국적이 아니라 화면 언어를 직접 고르는 방식**으로 바꿨다 — 지원 언어가 5개(ko/en/ja/zh-CN/zh-TW)로 늘면서 국적↔언어 1:1 매핑이 안 맞아서다 (BE 합의, 7장 참고). UI는 Figma처럼 헤더 지구본 아이콘 → 바텀시트, 이제 5개 언어 목록이 뜬다.
 - 명예의전당·Top10은 BE 자체 문서엔 "Phase3 전엔 못 채운다"고 되어 있지만, 실제 코드는 스텁이 아니라 진짜 랭킹 로직이 이미 구현돼 있다. 데이터가 없으면 각각 `null`/`[]`을 정상 응답하므로 그 값 그대로 빈 상태 UI를 보여준다.
+- **Top10 제목 두 줄 표시 (2026-09-19)**: `mainPage.topPlaces.title`(ko.json)에 줄바꿈(`\n`)을 넣어 "여운 사용자들 Pick!"/"전국 Top 10 촬영지" 두 줄로 보여준다. `TopPlacesCarousel`이 번역 문자열을 `\n` 기준으로 나눠서, 둘째 줄이 있으면 첫 줄은 작게(`text-base font-semibold`)·둘째 줄은 크게(`text-lg font-bold`) 렌더링하고, 줄바꿈이 없는 다른 언어는 기존처럼 한 줄(`text-lg`)로 보여준다.
 - **Hero(배너+명예의전당 병합, 2026-08-30 캐러셀로 확장)**: "금주의 명예의 전당"(`GET /api/main/hall-of-fame/`)과 "이 장소, 어떠세요?"(`GET /api/places/recommend/`의 첫 번째 결과) 두 슬라이드를 4초마다 자동 전환 + 손가락 스와이프로 넘겨볼 수 있는 캐러셀로 보여준다. 둘 다 없으면 `GET /api/banners/`로 대체하고, 그마저 없으면 아무것도 안 보인다.
 - **배너 데이터 연동은 FE 쪽엔 이미 완성돼 있다 (2026-09-04 재확인)**. 배포 서버(`/api/banners/`)가 빈 배열을 돌려주는 건 코드 문제가 아니라 배포 DB에 배너 데이터(관리자 등록)가 아직 없어서다 — FE에서 추가로 할 일 없음, BE/운영 쪽에서 데이터만 채우면 된다.
 - **즐겨찾기 (2026-08-30 추가, `src/api/bookmarks.ts`)**: Top10·추천 카드 썸네일 위에 별 아이콘. `POST/DELETE /api/places/{id}/favorite/` 연동, 로그인 필요(`authorizedFetch` 재사용, `auth.ts`에서 export). 비로그인 상태로 누르면 `/login`으로 이동하며 "로그인이 필요한 기능입니다" 안내.
@@ -357,9 +363,14 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 
 **지도 탭 — 전체 명소 지도 (2026-09-13 구현, `pages/MapPage.tsx`)**:
 - "아직 준비 중이에요" 자리 표시 화면이었던 것을 실제로 구현했다. 현재 위치를 중심으로 지도가 뜨고, 등록된 모든 명소가 마커로 표시된다. 축소하면 개수 뱃지로 뭉치고(클러스터) 확대하면 개별 마커로 흩어진다.
+- **기본 줌 레벨 500m로 축소 (2026-09-19 변경)**: 처음엔 `level: 8`(카카오맵 축척 2km)이었는데, 진입 시 너무 넓게 보여서 `level: 6`(축척 500m)로 줄였다.
 - **BE에 아직 없는 API에 기대고 있다**: `GET /api/places/map/` → `{ places: [{ id, name, latitude, longitude }, ...] }`. 로그인 불필요, 승인된 명소만, **좌표 필터·페이지네이션 없이 전체 반환**(명소 수가 몇 백 개 수준이라 감당 가능, BE DETAIL_SPEC 5장 참고, 2026-09-13 사용자 확인). `api/spots.ts`의 `getMapPlaces`는 `getWorkDetail`(`api/works.ts`)과 같은 패턴 — BE 미구현 엔드포인트 스펙대로 먼저 만들어뒀다. BE 구현 전까진 호출이 실패해서 지도에 마커가 안 뜬다(빈 배열로 처리, 화면은 안 깨짐).
 - **API 호출은 화면 진입(마운트)마다 딱 1번**이다. 반경/바운딩박스로 나눠 받는 방식(지도를 움직일 때마다 재호출) 대신 전체를 한 번에 받아서, 클러스터링·확대/축소·마커 클릭을 전부 클라이언트에서만 처리하고 추가 네트워크 요청이 없다(2026-09-13 사용자 결정).
 - 위치 권한이 없거나 거부됐을 때 지도 기본 중심은 **서울시청**(37.5665, 126.978, `DEFAULT_CENTER`)이다. 권한이 허용되는 순간에만 **한 번** 사용자 위치로 재중심하고(`recenteredRef`), 그 뒤로는 GPS 좌표가 미세하게 갱신되거나 사용자가 지도를 직접 움직여도 다시 안 튄다. 위치 권한 흐름은 `useGeolocation`·`LocationPermissionModal`(메인 화면 "내 주변 명소"와 동일 컴포넌트, `RecommendedSpots.tsx` 참고)을 그대로 재사용했다.
+- **"내 위치로 이동" 버튼 (2026-09-19 추가)**: 위 자동 재중심은 딱 한 번뿐이라, 지도를 다른 곳으로 옮긴 뒤 다시 내 위치로 돌아갈 방법이 없었다. 지도 우측 하단에 GPS 아이콘 버튼(`lucide-react`의 `LocateFixed`)을 추가해 언제든 눌러서 재중심할 수 있게 했다. 위치 권한이 이미 허용된 상태면 바로 지도를 이동하고, 아직 결정 안 됐거나 거부된 상태면 `LocationPermissionModal`을 다시 띄운다(사용자 결정). `useGeolocation`에 `requestLocation()` 함수를 새로 추가했다 — 기존 `decide()`는 저장된 동의·재요청 주기까지 따지는 자동 판단 로직이라 버튼 클릭 같은 명시적 재요청에는 안 맞아서, 네이티브 권한 상태만 확인하고 바로 분기하는 별도 함수로 뺐다. `SpotsMap`의 재중심 `useEffect`는 `recenteredRef`(최초 1회 여부)와 별도로 `pendingRecenterRef`(버튼을 눌렀는지)를 두어, 버튼을 누르면 이미 한 번 재중심했어도 다시 실행되게 했다.
+- **버튼 커서 전역 수정 (2026-09-19)**: Tailwind v4 preflight는 `<button>`에 기본 pointer 커서를 안 준다 — 위 "내 위치로 이동" 버튼에서 발견됐지만 앱 전체 버튼이 다 같은 상태였다. 화면 지원 범위는 모바일 전용이라 실사용에는 영향 없지만, 데스크톱 브라우저로 개발/확인할 때의 혼란을 없애기 위해 개별 버튼에 `cursor-pointer`를 넣는 대신 `src/index.css`에 `button:not(:disabled) { cursor: pointer; }`를 전역으로 추가했다.
+- **"내 위치" 파란 점 마커 (2026-09-19 추가)**: `coords`가 있을 때 현재 위치에 파란 점 마커를 그린다(`kakaoMap.ts`의 `myLocationDotDataUrl` — 명소 핀(물방울 모양)과 구분되는 원형). `coords`가 바뀔 때마다 기존 마커를 지우고 새로 그리는 방식으로, 명소 마커 클러스터러와 같은 패턴을 따른다.
+- **지도 화면 끝까지 채우기 시도했다가 되돌림 (2026-09-19)**: `-mx-2`로 `#root`의 8px 여백을 상쇄해 지도를 화면 끝까지 채우려 했으나, 실제로는 지도가 480px 프레임보다 넓게 튀어나오는 문제가 있어(원인 미확인) 원래의 `px-4` 패딩 있는 상태로 되돌렸다. 다시 시도하려면 원인부터 밝혀야 한다.
 - 클러스터링은 카카오맵 SDK의 `MarkerClusterer`를 그대로 쓴다(커스텀 로직 없음) — `index.html`의 SDK 스크립트에 `libraries=services,clusterer`를 추가해야 쓸 수 있다. 타입 선언은 `src/types/kakao.d.ts`에 실제로 쓰는 옵션(`gridSize`/`averageCenter`/`minLevel`)·메서드(`addMarkers`/`clear`)만 최소로 추가했다.
 - 개별 마커(클러스터에 안 묶인 것) 클릭 시 `InfoWindow`로 명소 이름만 보여주고, 그 텍스트가 `/spots/{id}`로 가는 링크다(2026-09-13 사용자 결정 — 처음엔 이름+사진이었다가 이름만으로 단순화).
 - **지도 컨테이너는 `flex-1`/`h-full`이 아니라 고정 높이(`h-[80dvh]`)를 쓴다.** `flex-1`로 만들었다가 조상(`<main>`)이 `min-h-dvh`(확정 높이 아님)만 갖고 있어서 지도 영역 높이가 0이 되어 화면에 배경색만 보이는 버그를 겪었다 — 자세한 증상·원인은 `docs/troubleshooting.md` "지도 탭에서 지도가 아예 안 뜨고 회색 박스만 보임" 참고.
@@ -383,6 +394,8 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 - **AI 코스 추천 연동 (2026-09-08, GitHub 이슈 #38)**: 코스가 없으면 로그인 확인 후 `POST /api/places/{place_id}/courses/ai-recommend/`(`src/api/courses.ts`의 `aiRecommendCourse`)를 호출해 Claude가 주변 상권 중 식당 1+카페 1+그 외 1로 코스를 자동 생성한다(성공 시 201, 생성된 코스 상세로 바로 이동). 이전엔 수동 생성 화면(`/spots/{placeId}/courses/new`, `CourseCreatePage.tsx`)으로 보냈으나 이걸로 대체했다 — 그 라우트/페이지 자체는 남아있지만 지금은 도달할 진입점이 없다.
   - 버튼 클릭 시 로딩 중엔 "AI가 코스를 만드는 중..."으로 문구가 바뀌고 비활성화된다.
   - 에러(400 이미 코스 있음 / 422 주변 후보 부족 / 503 AI 호출 실패)는 BE가 주는 한국어 `detail` 메시지를 그대로 버튼 아래에 보여준다 — FE에서 상태 코드별로 문구를 따로 만들지 않는다.
+- **방문 순서 번호 마커 (2026-09-19 추가)**: 코스 상세 지도에 명소는 1번, `course_places`는 등록 순서대로 2번부터 숫자가 적힌 마커를 그린다(`kakaoMap.ts`의 `pinIconDataUrl`에 숫자 라벨 옵션 추가, `CourseMap`에서 사용) — 아래 방문 순서 목록의 번호와 맞춰서 어디가 몇 번째인지 지도에서 바로 알 수 있게 했다. 마커가 커지면서 지도 높이도 `h-[200px]`에서 `h-[240px]`로 늘렸다(스켈레톤 높이도 동일하게 맞춤).
+- **내가 만든 코스면 즐겨찾기 버튼 숨김 (2026-09-19 수정)**: 본인이 만든 코스에 스스로 즐겨찾기를 누르는 건 의미가 없어서, 헤더의 `FavoriteButton`을 `isMine`(닉네임 비교, 위 참고)일 때는 렌더링하지 않는다.
 
 ### S-09. 공유 — 명소 상세/코스 화면 내부 기능 (Phase 4·8에서 이미 구현됨, Phase9은 확인만)
 - 링크 복사만 구현 (PRD 5장). 별도 공유 API 없음 — `navigator.clipboard.writeText(location.href)`.

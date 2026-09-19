@@ -23,6 +23,7 @@
   "mapPage": {
     "title": "地図",
     "unavailable": "地図を表示できません",
+    "locateButton": "現在地に移動",
     "workSearchPlaceholder": "作品を検索してください",
     "workEmpty": "この作品の撮影地は登録されていません"
   },

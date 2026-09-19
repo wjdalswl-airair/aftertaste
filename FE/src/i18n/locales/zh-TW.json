@@ -23,6 +23,7 @@
   "mapPage": {
     "title": "地圖",
     "unavailable": "暫時無法顯示地圖",
+    "locateButton": "移動到我的位置",
     "workSearchPlaceholder": "搜尋作品",
     "workEmpty": "這部作品尚無已登記的拍攝地"
   },
