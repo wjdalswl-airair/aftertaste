@@ -4,6 +4,7 @@ from django.db.models.functions import Upper
 
 from accounts.models import Member
 from config.constants import LANGUAGE_CODE_MAX_LENGTH, PHOTO_URL_MAX_LENGTH
+from places.regions import extract_region
 
 
 class Place(models.Model):
@@ -17,6 +18,9 @@ class Place(models.Model):
     address = models.CharField(max_length=300, blank=True)
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    # 시/도 공식 명칭(예: "경기도"). 주소에서 저장할 때마다 자동으로 계산되는 값이라
+    # 직접 고치지 않는다(관리자 화면에도 입력칸이 없다). 못 찾으면 빈 문자열.
+    region = models.CharField(max_length=20, blank=True, editable=False, db_index=True)
 
     # 관리자가 직접 채우는 값 (가져오기로 덮어쓰지 않는다)
     description = models.TextField(blank=True)
@@ -44,6 +48,14 @@ class Place(models.Model):
                 name="place_name_upper_trgm",
             ),
         ]
+
+    def save(self, *args, **kwargs):
+        # 관리자 화면·가져오기 명령어 모두 save()를 지나므로 여기서 한 번에 맞춘다.
+        self.region = extract_region(self.address)
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None and "address" in update_fields:
+            kwargs["update_fields"] = {*update_fields, "region"}
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.name

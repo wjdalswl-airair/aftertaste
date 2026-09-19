@@ -36,7 +36,7 @@ class WorkSourceInline(admin.TabularInline):
 
 @admin.register(Place)
 class PlaceAdmin(admin.ModelAdmin):
-    list_display = ("name", "address", "created_at")
+    list_display = ("name", "region", "address", "created_at")
     search_fields = ("name", "address")
     inlines = [PlaceSourceInline, PlaceWorkInline]
 
