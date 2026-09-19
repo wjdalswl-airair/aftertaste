@@ -24,7 +24,7 @@ from rest_framework.response import Response
 
 from courses.views import MyCourseListView
 from favorites.views import MyFavoriteListView
-from main.views import HallOfFameView, TopPlacesView
+from main.views import HallOfFameView, TopPlacesByRegionView, TopPlacesView
 from places.dev_views import place_work_verify_page
 from places.views import PopularKeywordsView, WorkDetailView
 from reviews.views import MyReviewListView
@@ -54,6 +54,11 @@ urlpatterns = [
     # MyFavoriteListView와 같은 방식으로 여기서 바로 라우팅한다 (PHASES/PHASE3.md 6번).
     path("api/main/hall-of-fame/", HallOfFameView.as_view(), name="hall-of-fame"),
     path("api/main/top-places/", TopPlacesView.as_view(), name="top-places"),
+    path(
+        "api/main/top-places/by-region/",
+        TopPlacesByRegionView.as_view(),
+        name="top-places-by-region",
+    ),
     # 추천(인기) 검색어. 여운_API명세서 흐름상 /search/ 아래에 두는 게 자연스러워서
     # places.urls(/api/places/) 밑이 아니라 여기서 바로 라우팅한다 (DETAIL_SPEC 6-1 #23).
     path("api/search/popular/", PopularKeywordsView.as_view(), name="search-popular"),

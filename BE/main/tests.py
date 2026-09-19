@@ -370,3 +370,132 @@ class TopPlacesViewIsFavoritedTest(TestCase):
         by_id = {p["id"]: p["is_favorited"] for p in response.data["places"]}
         self.assertIs(by_id[self.saved.id], True)
         self.assertIs(by_id[self.not_saved.id], False)
+
+
+TOP_PLACES_BY_REGION_URL = "/api/main/top-places/by-region/"
+
+
+def create_place_in(name, address):
+    return Place.objects.create(name=name, address=address)
+
+
+def favorite_times(place, times, prefix):
+    """명소를 서로 다른 회원 times명이 즐겨찾기 하게 만든다."""
+    for i in range(times):
+        Favorite.objects.create(member=create_member(f"{prefix}-{i}"), place=place)
+
+
+class TopPlacesByRegionViewTest(TestCase):
+    """GET /api/main/top-places/by-region/ (이슈 #75)"""
+
+    def setUp(self):
+        self.client = APIClient()
+
+    def test_places_are_grouped_by_region_and_ordered_by_favorite_count(self):
+        seoul_low = create_place_in("서울적음", "서울특별시 종로구 청와대로 1")
+        seoul_high = create_place_in("서울많음", "서울 마포구 월드컵로 137")
+        busan = create_place_in("부산명소", "부산광역시 해운대구 해운대해변로 264")
+        favorite_times(seoul_low, 1, "seoul-low")
+        favorite_times(seoul_high, 3, "seoul-high")
+        favorite_times(busan, 1, "busan")
+
+        response = self.client.get(TOP_PLACES_BY_REGION_URL)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        by_region = {r["region"]: [p["name"] for p in r["places"]] for r in response.data["regions"]}
+        self.assertEqual(by_region["서울특별시"], ["서울많음", "서울적음"])
+        self.assertEqual(by_region["부산광역시"], ["부산명소"])
+
+    def test_regions_ordered_by_total_favorites_then_name(self):
+        favorite_times(create_place_in("제주", "제주특별자치도 제주시"), 1, "jeju")
+        favorite_times(create_place_in("강원", "강원도 강릉시"), 1, "gangwon")
+        favorite_times(create_place_in("서울", "서울특별시 종로구"), 5, "seoul")
+
+        response = self.client.get(TOP_PLACES_BY_REGION_URL)
+
+        regions = [r["region"] for r in response.data["regions"]]
+        # 서울(5) 먼저, 동점(1)인 강원특별자치도·제주특별자치도는 가나다순.
+        self.assertEqual(regions, ["서울특별시", "강원특별자치도", "제주특별자치도"])
+
+    def test_each_region_returns_at_most_ten_places(self):
+        for rank in range(1, 12):
+            favorite_times(create_place_in(f"서울{rank}", "서울특별시 종로구"), rank, f"s{rank}")
+        favorite_times(create_place_in("부산1", "부산광역시 중구"), 1, "b1")
+
+        response = self.client.get(TOP_PLACES_BY_REGION_URL)
+
+        by_region = {r["region"]: [p["name"] for p in r["places"]] for r in response.data["regions"]}
+        self.assertEqual(len(by_region["서울특별시"]), 10)
+        self.assertNotIn("서울1", by_region["서울특별시"])  # 즐겨찾기가 가장 적은 11번째는 빠진다
+        self.assertIn("서울11", by_region["서울특별시"])
+        self.assertEqual(by_region["부산광역시"], ["부산1"])  # 다른 지역은 영향 없음
+
+    def test_places_without_favorites_are_excluded_and_empty_region_omitted(self):
+        create_place_in("찜없음", "경기도 파주시")
+        favorite_times(create_place_in("서울", "서울특별시 종로구"), 1, "seoul")
+
+        response = self.client.get(TOP_PLACES_BY_REGION_URL)
+
+        regions = [r["region"] for r in response.data["regions"]]
+        self.assertEqual(regions, ["서울특별시"])
+
+    def test_places_with_unknown_region_are_excluded(self):
+        favorite_times(create_place_in("주소모름", "알 수 없는 주소"), 2, "unknown")
+
+        response = self.client.get(TOP_PLACES_BY_REGION_URL)
+
+        self.assertEqual(response.data["regions"], [])
+
+    def test_no_data_returns_empty_list_not_error(self):
+        response = self.client.get(TOP_PLACES_BY_REGION_URL)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {"regions": []})
+
+    def test_place_item_has_same_fields_as_national_top_places(self):
+        favorite_times(create_place_in("서울", "서울특별시 종로구"), 1, "seoul")
+
+        response = self.client.get(TOP_PLACES_BY_REGION_URL)
+
+        self.assertEqual(
+            set(response.data["regions"][0]["places"][0]),
+            {"id", "name", "address", "photo_url", "favorite_count", "is_favorited"},
+        )
+
+    def test_national_top_places_is_unchanged(self):
+        favorite_times(create_place_in("서울", "서울특별시 종로구"), 1, "seoul")
+
+        response = self.client.get(TOP_PLACES_URL)
+
+        self.assertEqual([p["name"] for p in response.data["places"]], ["서울"])
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_logged_in_user_sees_is_favorited_true_only_for_saved_place(self, mock_verify):
+        mock_verify.return_value = _decoded_token("region-fav-uid")
+        me = create_member("region-fav-uid")
+        saved = create_place_in("찜함", "서울특별시 종로구")
+        not_saved = create_place_in("안찜함", "서울특별시 중구")
+        favorite_times(saved, 1, "seed-saved")
+        favorite_times(not_saved, 1, "seed-not-saved")
+        Favorite.objects.create(member=me, place=saved)
+
+        response = self.client.get(TOP_PLACES_BY_REGION_URL, HTTP_AUTHORIZATION="Bearer fake-token")
+
+        by_id = {p["id"]: p["is_favorited"] for p in response.data["regions"][0]["places"]}
+        self.assertIs(by_id[saved.id], True)
+        self.assertIs(by_id[not_saved.id], False)
+
+    def test_anonymous_user_gets_is_favorited_false(self):
+        favorite_times(create_place_in("서울", "서울특별시 종로구"), 1, "seoul")
+
+        response = self.client.get(TOP_PLACES_BY_REGION_URL)
+
+        self.assertIs(response.data["regions"][0]["places"][0]["is_favorited"], False)
+
+    @patch("accounts.authentication.verify_id_token")
+    def test_invalid_token_does_not_return_401(self, mock_verify):
+        mock_verify.side_effect = InvalidFirebaseToken("expired")
+
+        response = self.client.get(TOP_PLACES_BY_REGION_URL, HTTP_AUTHORIZATION="Bearer fake-token")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
