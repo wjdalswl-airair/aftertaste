@@ -18,9 +18,22 @@ export function TopPlacesCarousel() {
       .catch(() => setPlaces([]))
   }, [])
 
+  // 제목에 줄바꿈(\n)이 있으면 두 줄로 나눠서 보여준다 (ko.json 참고).
+  const [titleFirstLine, ...titleRestLines] = t('mainPage.topPlaces.title').split('\n')
+  const titleSecondLine = titleRestLines.join('\n')
+
   return (
     <section>
-      <h2 className="mb-3 px-4 text-lg font-bold text-ink">{t('mainPage.topPlaces.title')}</h2>
+      <h2 className="mb-3 px-4 text-ink">
+        {titleSecondLine ? (
+          <>
+            <span className="block text-base font-semibold">{titleFirstLine}</span>
+            <span className="block text-lg font-bold">{titleSecondLine}</span>
+          </>
+        ) : (
+          <span className="text-lg">{titleFirstLine}</span>
+        )}
+      </h2>
 
       {places === undefined && (
         <div className="flex gap-3 px-4">
