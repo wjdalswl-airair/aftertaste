@@ -15,6 +15,7 @@ from main.serializers import (
     HallOfFamePlaceSerializer,
     HallOfFameResponseSerializer,
     TopPlaceListResponseSerializer,
+    TopPlacesByRegionResponseSerializer,
     TopPlaceSerializer,
 )
 from places.models import Place
@@ -25,6 +26,8 @@ from reviews.serializers import ReviewSerializer
 
 # Top10 캐러셀에 보여줄 명소 개수 (PRD F-02, PHASES/PHASE3.md 6번).
 TOP_PLACES_COUNT = 10
+# 지역별 Top10에서 시/도 하나당 보여줄 명소 개수 (이슈 #75).
+TOP_PLACES_PER_REGION = 10
 
 
 class BannerListView(ListAPIView):
@@ -155,4 +158,59 @@ class TopPlacesView(APIView):
         context = {"favorited_place_ids": favorited_place_ids_for(request.user, places)}
         return Response(
             {"places": TopPlaceSerializer(places, many=True, context=context).data}
+        )
+
+
+class TopPlacesByRegionView(TopPlacesView):
+    """시/도별 Top10 (이슈 #75). 시/도마다 즐겨찾기가 많은 명소 10곳씩을 묶어서 보여준다.
+
+    로그인 여부 처리(무효 토큰이어도 조회 허용)는 TopPlacesView와 같아서 그대로 물려받는다.
+    기존 전국 Top10(TopPlacesView)은 바꾸지 않았다.
+
+    - 즐겨찾기가 하나도 없는 명소는 뺀다(전국 Top10과 같은 규칙). 그래서 그런 명소뿐인 지역은
+      목록에 나오지 않는다. 시/도를 알 수 없는 명소(region이 빈 값)도 뺀다.
+    - 지역 순서: 그 지역 명소들의 즐겨찾기 합이 큰 지역이 먼저, 같으면 이름(가나다) 순.
+    - 명소가 하나도 없으면 빈 목록을 돌려준다(오류로 처리하지 않음).
+    """
+
+    @extend_schema(
+        summary="시/도별 Top10 명소 조회",
+        description=(
+            "시/도마다 즐겨찾기가 많은 명소 10곳을 즐겨찾기 수 내림차순으로 묶어서 반환한다. "
+            "지역은 즐겨찾기 합이 큰 순서다."
+        ),
+        responses={200: TopPlacesByRegionResponseSerializer},
+    )
+    def get(self, request):
+        # 즐겨찾기가 있는 명소만 가져오므로 양이 많지 않다. 지역별로 나누는 건 파이썬에서 한다.
+        places = Place.objects.exclude(region="").annotate(favorite_count=Count("favorited_by"))
+        places = places.filter(favorite_count__gt=0).order_by("-favorite_count", "id")
+
+        places_by_region = {}
+        favorite_total_by_region = {}
+        for place in places:
+            region_places = places_by_region.setdefault(place.region, [])
+            favorite_total_by_region[place.region] = (
+                favorite_total_by_region.get(place.region, 0) + place.favorite_count
+            )
+            if len(region_places) < TOP_PLACES_PER_REGION:
+                region_places.append(place)
+
+        ordered_regions = sorted(
+            places_by_region, key=lambda region: (-favorite_total_by_region[region], region)
+        )
+        shown_places = [place for region in ordered_regions for place in places_by_region[region]]
+        context = {"favorited_place_ids": favorited_place_ids_for(request.user, shown_places)}
+        return Response(
+            {
+                "regions": [
+                    {
+                        "region": region,
+                        "places": TopPlaceSerializer(
+                            places_by_region[region], many=True, context=context
+                        ).data,
+                    }
+                    for region in ordered_regions
+                ]
+            }
         )

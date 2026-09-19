@@ -73,7 +73,7 @@ class HallOfFameResponseSerializer(serializers.Serializer):
 
 
 class TopPlaceSerializer(serializers.ModelSerializer):
-    """Top10 캐러셀에 보여줄 명소 정보. favorite_count는 뷰의 annotate로 채워진다.
+    """Top10 캐러셀(전국·지역별 공통)에 보여줄 명소 정보. favorite_count는 뷰의 annotate로 채워진다.
 
     is_favorited는 "지금 로그인한 사람이 이 명소를 이미 즐겨찾기 했는지"다. 뷰가
     context["favorited_place_ids"]에 그 사람의 즐겨찾기 place_id 집합을 넣어줘야 하고,
@@ -96,3 +96,16 @@ class TopPlaceListResponseSerializer(serializers.Serializer):
     """GET /api/main/top-places/ 응답 형태."""
 
     places = TopPlaceSerializer(many=True)
+
+
+class RegionTopPlacesSerializer(serializers.Serializer):
+    """시/도 하나와 그 지역의 Top 명소들."""
+
+    region = serializers.CharField()
+    places = TopPlaceSerializer(many=True)
+
+
+class TopPlacesByRegionResponseSerializer(serializers.Serializer):
+    """GET /api/main/top-places/by-region/ 응답 형태 (이슈 #75)."""
+
+    regions = RegionTopPlacesSerializer(many=True)
