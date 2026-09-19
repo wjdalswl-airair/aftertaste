@@ -65,6 +65,43 @@ class CourseListResponseSerializer(serializers.Serializer):
     courses = CourseSerializer(many=True)
 
 
+class CourseSummarySerializer(serializers.ModelSerializer):
+    """코스 탭 전체 목록용 요약 표현 (issue #74).
+
+    코스 자체엔 좌표가 없어서 지도에 찍을 위치로 기준 명소(anchor place)의 좌표를 그대로 쓴다.
+    favorite_count는 뷰의 annotate로 채워진다. 좌표는 모델의 DecimalField가 문자열로 나가지 않게
+    FloatField로 선언한다 (PlaceMapSerializer와 같은 이유). 기준 명소에 좌표가 없으면 null이다.
+    """
+
+    place_id = serializers.IntegerField(source="place.id", read_only=True)
+    place_name = serializers.CharField(source="place.name", read_only=True)
+    latitude = serializers.FloatField(source="place.latitude", read_only=True)
+    longitude = serializers.FloatField(source="place.longitude", read_only=True)
+    favorite_count = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Course
+        fields = [
+            "id",
+            "title",
+            "place_id",
+            "place_name",
+            "latitude",
+            "longitude",
+            "favorite_count",
+        ]
+        read_only_fields = fields
+
+
+class CourseSummaryListResponseSerializer(serializers.Serializer):
+    """GET /api/courses/ 응답 형태 (CourseListPagination이 만드는 모양과 맞춘다)."""
+
+    count = serializers.IntegerField()
+    next = serializers.URLField(allow_null=True)
+    previous = serializers.URLField(allow_null=True)
+    courses = CourseSummarySerializer(many=True)
+
+
 class CoursePlaceWriteSerializer(serializers.ModelSerializer):
     """코스 생성·수정 요청에서 장소 하나(식당/카페/그 외)를 받는 입력.
 
