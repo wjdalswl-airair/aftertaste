@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.db.models import Count
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
 from rest_framework.permissions import IsAuthenticated
@@ -8,15 +9,56 @@ from rest_framework.views import APIView
 from config.api_messages import NOT_FOUND_MESSAGE
 from courses.ai_recommendation import CourseAiError, recommend_course
 from courses.models import Course, CoursePlace
+from courses.pagination import CourseListPagination
 from courses.serializers import (
     CourseListResponseSerializer,
     CourseSerializer,
+    CourseSummaryListResponseSerializer,
+    CourseSummarySerializer,
     CourseWriteSerializer,
 )
 from places.models import Place
 
 # 주변 상권 조회는 명소 상세와 똑같은 로직을 쓴다 (카카오 카테고리 검색 프록시).
 from places.views import _fetch_nearby_places
+
+
+class CourseListView(APIView):
+    """코스 탭에 보여줄 전체 코스 목록 (issue #74). 로그인 여부와 상관없이 호출할 수 있다.
+
+    명소 1곳에 한정된 PlaceCourseListCreateView, 로그인한 내 코스에 한정된 MyCourseListView와
+    달리 모든 코스를 가로지르는 목록이라 이 엔드포인트에만 페이지네이션을 붙인다.
+    최신순(-created_at, -id)으로 정렬해 페이지를 넘겨도 순서가 흔들리지 않게 한다.
+
+    PlaceCourseListCreateView와 같은 이유로 perform_authentication을 오버라이드한다:
+    로그인이 필요 없는 API라 토큰이 무효/만료돼도 조회 자체는 막지 않는다.
+    """
+
+    pagination_class = CourseListPagination
+
+    def perform_authentication(self, request):
+        try:
+            request.user
+        except AuthenticationFailed:
+            pass
+
+    @extend_schema(
+        summary="전체 코스 목록 조회",
+        description=(
+            "등록된 모든 코스를 최신순으로 페이지네이션해 반환한다. 각 코스에 기준 명소의 좌표와 "
+            "즐겨찾기 수가 함께 담긴다. 로그인이 필요 없다."
+        ),
+        responses={200: CourseSummaryListResponseSerializer},
+    )
+    def get(self, request):
+        courses = (
+            Course.objects.select_related("place")
+            .annotate(favorite_count=Count("favorited_by"))
+            .order_by("-created_at", "-id")
+        )
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(courses, request, view=self)
+        return paginator.get_paginated_response(CourseSummarySerializer(page, many=True).data)
 
 
 class PlaceCourseListCreateView(APIView):
