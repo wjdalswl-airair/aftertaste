@@ -12,13 +12,18 @@
   "bottomNav": {
     "home": "Home",
     "map": "Map",
-    "search": "Search",
+    "course": "Course",
     "review": "Review",
     "profile": "Profile"
+  },
+  "coursePage": {
+    "title": "Course",
+    "empty": "Coming soon"
   },
   "mapPage": {
     "title": "Map",
     "unavailable": "The map isn't available right now",
+    "locateButton": "Go to my location",
     "workSearchPlaceholder": "Search for a work",
     "workEmpty": "No filming spots registered for this work"
   },

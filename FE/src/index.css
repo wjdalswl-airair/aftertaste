@@ -116,6 +116,7 @@
   --color-primary: #f47c5c;
   --color-accent: #f8b08b;
   --color-background: #ffffff;
+  --color-app-frame: #f5f2f0;
   --color-ink: #2b2320;
   --color-ink-secondary: #9c8ab0;
   --color-ink-tertiary: #c9bab0;
@@ -132,9 +133,17 @@
   --font-brand: '푸른숲체', serif;
 }
 
+/* Tailwind v4 preflight는 <button>에 기본 pointer 커서를 안 준다 — 앱 전체 버튼에 일괄 적용
+   (disabled 버튼은 제외해서 클릭 못 한다는 걸 커서로도 알 수 있게 둔다). */
+button:not(:disabled) {
+  cursor: pointer;
+}
+
 body {
   margin: 0;
-  background: var(--color-background);
+  /* 화면 폭이 앱 콘텐츠 최대 너비(480px)보다 넓을 때 양옆에 보이는 배경.
+     콘텐츠 영역(App.tsx의 max-w-[480px] 래퍼)은 흰 배경(--color-background)이라 이 색과 구분된다. */
+  background: var(--color-app-frame);
   color: var(--color-ink);
 }
 

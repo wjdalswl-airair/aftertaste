@@ -38,6 +38,14 @@ declare global {
       close(): void
     }
 
+    // InfoWindow는 카카오 SDK가 만드는 고정 마크업이라 모서리를 둥글게 못 바꾼다 —
+    // 말풍선을 직접 꾸며야 할 때(예: 마커 클릭 말풍선 rounded 처리)는 CustomOverlay로
+    // 우리가 만든 HTML을 그대로 지도 위에 올린다.
+    class CustomOverlay {
+      constructor(options: { position: LatLng; content: string; xAnchor?: number; yAnchor?: number; zIndex?: number })
+      setMap(map: Map | null): void
+    }
+
     // 지도 탭 명소 마커 클러스터링에 쓴다. 실제로 쓰는 옵션·메서드만 선언한다
     // (공식 문서: gridSize·averageCenter·minLevel·disableClickZoom가 생성자 옵션,
     // addMarkers·clear가 마커 일괄 등록/제거 메서드).

@@ -12,13 +12,18 @@
   "bottomNav": {
     "home": "首頁",
     "map": "地圖",
-    "search": "搜尋",
+    "course": "路線",
     "review": "評價",
     "profile": "我的"
+  },
+  "coursePage": {
+    "title": "路線",
+    "empty": "敬請期待"
   },
   "mapPage": {
     "title": "地圖",
     "unavailable": "暫時無法顯示地圖",
+    "locateButton": "移動到我的位置",
     "workSearchPlaceholder": "搜尋作品",
     "workEmpty": "這部作品尚無已登記的拍攝地"
   },

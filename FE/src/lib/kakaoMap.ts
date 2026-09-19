@@ -56,7 +56,21 @@ export async function getDongName(lat: number, lng: number): Promise<string | nu
 
 // 카카오맵 기본 마커(빨간 핀)를 index.css --color-primary 색으로 바꾼 SVG 데이터 URL을 만든다.
 // kakao.maps.MarkerImage에 이 값을 넘기면 원하는 색의 핀 마커를 그릴 수 있다.
-export function pinIconDataUrl(color: string): string {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="36" viewBox="0 0 28 36"><path d="M14 0C6.3 0 0 6.3 0 14c0 10.5 14 22 14 22s14-11.5 14-22C28 6.3 21.7 0 14 0z" fill="${color}"/><circle cx="14" cy="14" r="5" fill="white"/></svg>`
+// label을 주면 가운데 흰 원 안에 그 숫자를 넣는다 (코스 상세의 방문 순서 표시용).
+export function pinIconDataUrl(color: string, label?: string | number): string {
+  // label이 있을 땐 숫자가 잘 보이게 흰 원을 조금 더 키운다 (label 없는 기존 핀들은 그대로 r=5).
+  const circleRadius = label === undefined ? 5 : 6.5
+  const labelMarkup =
+    label === undefined
+      ? ''
+      : `<text x="14" y="14.5" text-anchor="middle" dominant-baseline="central" font-size="11" font-weight="700" font-family="sans-serif" fill="${color}">${label}</text>`
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="36" viewBox="0 0 28 36"><path d="M14 0C6.3 0 0 6.3 0 14c0 10.5 14 22 14 22s14-11.5 14-22C28 6.3 21.7 0 14 0z" fill="${color}"/><circle cx="14" cy="14" r="${circleRadius}" fill="white"/>${labelMarkup}</svg>`
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
+}
+
+// "내 위치"를 나타내는 파란 점 마커용 SVG 데이터 URL. 명소 핀(pinIconDataUrl, 물방울 모양)과
+// 모양을 다르게 해서 지도에서 한눈에 구분되게 한다(흐린 파란 원 + 흰 테두리의 진한 파란 점).
+export function myLocationDotDataUrl(): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#4285F4" fill-opacity="0.25"/><circle cx="16" cy="16" r="9" fill="#4285F4" stroke="white" stroke-width="3"/></svg>`
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
 }

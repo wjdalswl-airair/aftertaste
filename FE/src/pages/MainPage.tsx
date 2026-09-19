@@ -1,6 +1,6 @@
-import { LogIn } from 'lucide-react'
+import { LogIn, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { BottomNav } from '../components/BottomNav'
 import { Hero } from '../components/Hero'
 import { LanguageSheet } from '../components/LanguageSheet'
@@ -10,6 +10,7 @@ import { useAuthStore } from '../store/useAuthStore'
 
 export function MainPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const member = useAuthStore((state) => state.member)
   const isLoading = useAuthStore((state) => state.isLoading)
 
@@ -26,6 +27,18 @@ export function MainPage() {
           )}
         </div>
       </header>
+
+      <div className="px-4">
+        <div className="flex items-center gap-2 rounded-lg bg-accent/15 p-4">
+          <Search size={16} className="text-ink-tertiary" />
+          <input
+            type="text"
+            onFocus={() => navigate('/search')}
+            placeholder={t('searchPage.placeholder')}
+            className="flex-1 bg-transparent text-sm text-ink placeholder:text-ink-tertiary outline-none"
+          />
+        </div>
+      </div>
 
       <div className="px-4">
         <h1 className="text-xl font-bold text-ink">

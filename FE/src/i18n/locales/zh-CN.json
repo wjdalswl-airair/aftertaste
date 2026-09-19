@@ -12,13 +12,18 @@
   "bottomNav": {
     "home": "首页",
     "map": "地图",
-    "search": "搜索",
+    "course": "路线",
     "review": "评价",
     "profile": "我的"
+  },
+  "coursePage": {
+    "title": "路线",
+    "empty": "敬请期待"
   },
   "mapPage": {
     "title": "地图",
     "unavailable": "暂时无法显示地图",
+    "locateButton": "移动到我的位置",
     "workSearchPlaceholder": "搜索作品",
     "workEmpty": "该作品暂无已登记的拍摄地"
   },

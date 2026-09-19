@@ -12,13 +12,18 @@
   "bottomNav": {
     "home": "ホーム",
     "map": "地図",
-    "search": "検索",
+    "course": "コース",
     "review": "レビュー",
     "profile": "プロフィール"
+  },
+  "coursePage": {
+    "title": "コース",
+    "empty": "近日公開予定です"
   },
   "mapPage": {
     "title": "地図",
     "unavailable": "地図を表示できません",
+    "locateButton": "現在地に移動",
     "workSearchPlaceholder": "作品を検索してください",
     "workEmpty": "この作品の撮影地は登録されていません"
   },
