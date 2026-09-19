@@ -74,7 +74,7 @@ export function CourseDetailPage() {
         </button>
         <p className="truncate text-center text-lg font-bold text-ink">{course?.title}</p>
         <div className="flex items-center gap-3 justify-self-end">
-          {course && (
+          {course && !isMine && (
             <FavoriteButton
               placeId={course.id}
               type="course"
