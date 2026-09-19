@@ -25,7 +25,7 @@ function App() {
   useInitAuth()
 
   return (
-    <>
+    <div className="mx-auto max-w-[480px] bg-background">
       <ScrollToTop />
       <Routes>
         <Route path="/" element={<MainPage />} />
@@ -51,7 +51,7 @@ function App() {
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </>
+    </div>
   )
 }
 
