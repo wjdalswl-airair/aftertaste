@@ -10,10 +10,13 @@ import { BottomSheet } from '../components/BottomSheet'
 import { FavoriteButton } from '../components/FavoriteButton'
 import { ShareSheet } from '../components/ShareSheet'
 import { Skeleton } from '../components/Skeleton'
-import { loadKakaoMaps } from '../lib/kakaoMap'
+import { loadKakaoMaps, pinIconDataUrl } from '../lib/kakaoMap'
 import { useAuthStore } from '../store/useAuthStore'
 import { shortRegion } from '../utils/address'
 import { getDistanceKm } from '../utils/distance'
+
+// index.css의 --color-primary와 맞춘 값 (다른 지도 화면과 동일 톤, SpotDetailPage.tsx 참고).
+const COURSE_PIN_COLOR = '#f47c5c'
 
 const ROLE_LABEL: Record<CoursePlaceRole, string> = {
   RESTAURANT: '맛집',
@@ -207,13 +210,23 @@ function CourseMap({ course, place }: { course: Course; place: PlaceDetail | und
         }
         const center = new kakaoSdk.maps.LatLng(lat, lng)
         const map = new kakaoSdk.maps.Map(mapRef.current, { center, level: 5 })
-        new kakaoSdk.maps.Marker({ position: center, map, title: place.name })
+        // 마커 위 숫자는 아래 방문 순서 목록(명소=1, course_places=index+2)과 맞춘다.
+        new kakaoSdk.maps.Marker({
+          position: center,
+          map,
+          title: place.name,
+          image: new kakaoSdk.maps.MarkerImage(pinIconDataUrl(COURSE_PIN_COLOR, 1), new kakaoSdk.maps.Size(28, 36)),
+        })
 
-        course.course_places.forEach((coursePlace) => {
+        course.course_places.forEach((coursePlace, index) => {
           new kakaoSdk.maps.Marker({
             position: new kakaoSdk.maps.LatLng(coursePlace.latitude, coursePlace.longitude),
             map,
             title: coursePlace.name,
+            image: new kakaoSdk.maps.MarkerImage(
+              pinIconDataUrl(COURSE_PIN_COLOR, index + 2),
+              new kakaoSdk.maps.Size(28, 36),
+            ),
           })
         })
 
@@ -227,7 +240,7 @@ function CourseMap({ course, place }: { course: Course; place: PlaceDetail | und
   }, [course, hasCoords, lat, lng, place])
 
   return (
-    <div className="relative h-[200px] w-full overflow-hidden rounded-2xl bg-accent/15">
+    <div className="relative h-[240px] w-full overflow-hidden rounded-2xl bg-accent/15">
       <div ref={mapRef} className="h-full w-full" />
       {status !== 'ready' && (
         <div className="absolute inset-0 flex items-center justify-center bg-accent/15 text-sm text-ink-tertiary" />
@@ -240,7 +253,7 @@ function CourseDetailSkeleton() {
   return (
     <div className="flex flex-col gap-4 px-4">
       <Skeleton className="h-4 w-40 rounded-sm" />
-      <Skeleton className="h-[200px] w-full rounded-2xl" />
+      <Skeleton className="h-[240px] w-full rounded-2xl" />
       {[0, 1, 2, 3].map((i) => (
         <div key={i} className="flex items-center gap-3">
           <Skeleton className="h-6 w-6 rounded-full" />
