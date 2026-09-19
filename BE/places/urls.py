@@ -2,7 +2,14 @@ from django.urls import path
 
 from courses.views import PlaceCourseAiRecommendView, PlaceCourseListCreateView
 from favorites.views import PlaceFavoriteView
-from places.views import PlaceDetailView, PlaceMapListView, RecommendationView, SearchAutocompleteView, SearchView
+from places.views import (
+    PlaceDetailView,
+    PlaceMapListView,
+    PlaceTourismInfoView,
+    RecommendationView,
+    SearchAutocompleteView,
+    SearchView,
+)
 from reviews.views import PlaceReviewListCreateView
 
 urlpatterns = [
@@ -11,6 +18,7 @@ urlpatterns = [
     path("recommend/", RecommendationView.as_view(), name="place-recommend"),
     path("map/", PlaceMapListView.as_view(), name="place-map"),
     path("<int:place_id>/", PlaceDetailView.as_view(), name="place-detail"),
+    path("<int:place_id>/tourism-info/", PlaceTourismInfoView.as_view(), name="place-tourism-info"),
     path("<int:place_id>/reviews/", PlaceReviewListCreateView.as_view(), name="place-reviews"),
     path("<int:place_id>/favorite/", PlaceFavoriteView.as_view(), name="place-favorite"),
     path("<int:place_id>/courses/", PlaceCourseListCreateView.as_view(), name="place-courses"),

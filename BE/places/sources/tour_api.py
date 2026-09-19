@@ -22,6 +22,7 @@ from django.conf import settings
 _HOST = "https://apis.data.go.kr/B551011/KorService2"
 _SEARCH_URL = f"{_HOST}/searchKeyword2"
 _DETAIL_URL = f"{_HOST}/detailCommon2"
+_NEARBY_URL = f"{_HOST}/locationBasedList2"
 # data.go.kr 관광정보 API는 응답이 느리다 — 정상 호출도 8~10초가 예사라, 넉넉히 잡는다.
 _TIMEOUT_SECONDS = 30
 
@@ -44,6 +45,24 @@ _NUM_OF_ROWS = 30
 
 _MOBILE_OS = "ETC"
 _MOBILE_APP = "aftertaste"
+
+# 주변 관광정보(locationBasedList2)는 화면을 열 때마다 실시간으로 부른다. 위 배치용 값(30초·재시도 2번,
+# 최악 1분 넘게 걸림)을 그대로 쓰면 화면이 멈춘 것처럼 보이므로 더 짧게 잡는다.
+# 재시도를 0이 아니라 1로 둔 이유: 카테고리를 동시에 여러 개 부르면 초당 제한(429)에 걸릴 수 있어서다.
+_REALTIME_TIMEOUT_SECONDS = 10
+_REALTIME_MAX_RETRIES = 1
+
+# 주변 관광정보 카테고리 이름 → TourAPI 신 분류체계 대분류(lclsSystm1) 코드.
+NEARBY_CATEGORY_CODES = {
+    "food": "FD",  # 음식
+    "lodging": "AC",  # 숙박
+    "experience": "EX",  # 체험관광
+    "history": "HS",  # 역사관광
+    "nature": "NA",  # 자연관광
+    "culture": "VE",  # 문화관광
+}
+# arrange=E : 가까운 순서
+_ARRANGE_DISTANCE = "E"
 
 
 class TourApiDailyLimitError(RuntimeError):
@@ -123,7 +142,48 @@ def get_detail(content_id):
     return _normalize_item(row)
 
 
-def _call(url, extra_params):
+def search_nearby(latitude, longitude, radius, category, num_of_rows):
+    """좌표 근처의 관광정보를 카테고리 하나 골라서 가까운 순으로 가져온다 (locationBasedList2).
+
+    category는 NEARBY_CATEGORY_CODES의 키(food, lodging, ...). 화면 요청 중에 부르는 실시간 호출이라
+    타임아웃·재시도를 짧게 잡았고, 결과는 저장하지 않는다.
+
+    반환: dict 리스트(가까운 순). 각 dict는 아래 키를 가진다.
+      - category: 요청한 카테고리 이름
+      - name / address: 장소 이름 / 주소(addr1 + addr2)
+      - image_url: 대표 이미지 URL. 없으면 ""
+      - latitude / longitude: 위경도(float) 또는 None
+      - distance: 검색 중심에서 떨어진 거리(미터, 정수) 또는 None
+      - tel: 전화번호. 없으면 ""
+    """
+    body = _call(
+        _NEARBY_URL,
+        {
+            "mapX": longitude,
+            "mapY": latitude,
+            "radius": radius,
+            "lclsSystm1": NEARBY_CATEGORY_CODES[category],
+            "arrange": _ARRANGE_DISTANCE,
+            "numOfRows": num_of_rows,
+            "pageNo": 1,
+        },
+        timeout=_REALTIME_TIMEOUT_SECONDS,
+        max_retries=_REALTIME_MAX_RETRIES,
+    )
+    items = body.get("items")
+    # 결과가 없으면 items가 빈 문자열("")로 온다.
+    if not items:
+        return []
+
+    rows = items.get("item", [])
+    # 결과가 1건이면 리스트가 아니라 dict 하나로 오는 경우가 있다.
+    if isinstance(rows, dict):
+        rows = [rows]
+
+    return [_normalize_nearby_item(row, category) for row in rows]
+
+
+def _call(url, extra_params, timeout=_TIMEOUT_SECONDS, max_retries=_MAX_RETRIES):
     """TourAPI 한 곳을 호출하고 response.body를 돌려준다. 공통 파라미터·에러 처리 포함."""
     params = {
         "serviceKey": _get_service_key(),
@@ -132,7 +192,7 @@ def _call(url, extra_params):
         "_type": "json",
         **extra_params,
     }
-    response = _get_with_retry(url, params)
+    response = _get_with_retry(url, params, timeout, max_retries)
 
     try:
         data = response.json()
@@ -151,16 +211,16 @@ def _call(url, extra_params):
     return data.get("response", {}).get("body", {})
 
 
-def _get_with_retry(url, params):
+def _get_with_retry(url, params, timeout=_TIMEOUT_SECONDS, max_retries=_MAX_RETRIES):
     """TourAPI를 호출한다. 429·5xx·타임아웃이면 잠깐 쉬고 다시 시도한다.
 
     Retry-After 헤더가 있으면 그 값을, 없으면 _RETRY_BACKOFF_SECONDS를 따른다.
     재시도를 모두 소진하면 마지막 예외를 그대로 올린다.
     """
     last_exc = None
-    for attempt in range(_MAX_RETRIES + 1):
+    for attempt in range(max_retries + 1):
         try:
-            response = requests.get(url, params=params, timeout=_TIMEOUT_SECONDS)
+            response = requests.get(url, params=params, timeout=timeout)
             response.raise_for_status()
             return response
         except (requests.HTTPError, requests.ConnectionError, requests.Timeout) as exc:
@@ -174,7 +234,7 @@ def _get_with_retry(url, params):
             retryable = status in _RETRY_STATUS_CODES or isinstance(
                 exc, (requests.ConnectionError, requests.Timeout)
             )
-            if not retryable or attempt == _MAX_RETRIES:
+            if not retryable or attempt == max_retries:
                 raise
             wait = _retry_after_seconds(exc) or _RETRY_BACKOFF_SECONDS[attempt]
             time.sleep(wait)
@@ -214,6 +274,24 @@ def _normalize_item(row):
         "latitude": _to_float(row.get("mapy")),
         "longitude": _to_float(row.get("mapx")),
         "first_image": row.get("firstimage") or row.get("firstimage2") or "",
+    }
+
+
+def _normalize_nearby_item(row, category):
+    address = " ".join(part for part in (row.get("addr1"), row.get("addr2")) if part).strip()
+    try:
+        distance = round(float(row.get("dist")))
+    except (TypeError, ValueError):
+        distance = None
+    return {
+        "category": category,
+        "name": row.get("title") or "",
+        "address": address,
+        "image_url": row.get("firstimage") or row.get("firstimage2") or "",
+        "latitude": _to_float(row.get("mapy")),
+        "longitude": _to_float(row.get("mapx")),
+        "distance": distance,
+        "tel": row.get("tel") or "",
     }
 
 
