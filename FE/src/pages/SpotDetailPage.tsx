@@ -19,9 +19,12 @@ import spotPlaceholder from '../assets/placeholder/spot.png'
 import { BottomNav } from '../components/BottomNav'
 import { PlaceholderImage } from '../components/PlaceholderImage'
 import { FavoriteButton } from '../components/FavoriteButton'
+import { LoginRequiredModal } from '../components/LoginRequiredModal'
 import { RatingModal } from '../components/RatingModal'
 import { ShareSheet } from '../components/ShareSheet'
 import { Skeleton } from '../components/Skeleton'
+import { WeatherConditionIcon } from '../components/WeatherWidget'
+import { useWeather } from '../hooks/useWeather'
 import { loadKakaoMaps, pinIconDataUrl } from '../lib/kakaoMap'
 import { useAuthStore } from '../store/useAuthStore'
 import { shortRegion } from '../utils/address'
@@ -41,6 +44,7 @@ export function SpotDetailPage() {
   const [shareOpen, setShareOpen] = useState(false)
   const [courseAiLoading, setCourseAiLoading] = useState(false)
   const [courseAiError, setCourseAiError] = useState<string | null>(null)
+  const [showLoginModal, setShowLoginModal] = useState(false)
 
   useEffect(() => {
     setPlace(undefined)
@@ -49,9 +53,15 @@ export function SpotDetailPage() {
       .catch(() => setPlace(null))
   }, [placeId])
 
+  // latitude/longitude는 DecimalField라 API가 문자열로 내려준다 (SpotMap의 같은 변환 참고).
+  const lat = place?.latitude != null ? Number(place.latitude) : null
+  const lng = place?.longitude != null ? Number(place.longitude) : null
+  const weatherCoords = lat !== null && lng !== null && !Number.isNaN(lat) && !Number.isNaN(lng) ? { lat, lng } : null
+  const weather = useWeather(weatherCoords)
+
   function requireLogin() {
     if (!member) {
-      navigate('/login', { state: { message: '로그인이 필요한 기능입니다' } })
+      setShowLoginModal(true)
       return false
     }
     return true
@@ -137,7 +147,7 @@ export function SpotDetailPage() {
             />
           </div>
 
-          <div className="flex flex-col gap-6 px-4">
+          <div className="flex flex-col gap-4 px-4">
             <div className="flex items-start justify-between">
               <div className="flex flex-col gap-1">
                 <p className="text-sm text-ink-tertiary">{shortRegion(place.address)}</p>
@@ -169,6 +179,16 @@ export function SpotDetailPage() {
                 value={place.etiquette}
               />
             </div>
+
+            {weather && (
+              <div className="flex gap-3 items-center rounded-xl bg-accent/15 p-5 text-ink-secondary">
+                <p className="flex-1 text-base font-medium text-ink">{t('spotDetail.weatherLabel')}</p>
+                <WeatherConditionIcon condition={weather.condition} size={20} />
+                <span>
+                  {weather.description} {weather.tempC}°
+                </span>
+              </div>
+            )}
 
             <button
               type="button"
@@ -256,6 +276,8 @@ export function SpotDetailPage() {
           onClose={() => setShareOpen(false)}
         />
       )}
+
+      {showLoginModal && <LoginRequiredModal onClose={() => setShowLoginModal(false)} />}
 
       <BottomNav />
     </main>
@@ -435,7 +457,7 @@ function SpotDetailSkeleton() {
     <div className="flex flex-col gap-6">
       <Skeleton className="mx-4 h-[230px] rounded-2xl" />
 
-      <div className="flex flex-col gap-6 px-4">
+      <div className="flex flex-col gap-4 px-4">
         <div className="flex flex-col gap-1">
           <Skeleton className="h-3 w-1/3 rounded-sm" />
           <Skeleton className="h-6 w-2/3 rounded-sm" />

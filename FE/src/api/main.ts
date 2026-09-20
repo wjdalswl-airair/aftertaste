@@ -63,3 +63,16 @@ export function getHallOfFame(): Promise<{ review: HallOfFameReview; place: Hall
 export function getTopPlaces(): Promise<TopPlace[]> {
   return publicFetch<{ places: TopPlace[] }>('/api/main/top-places/').then((res) => res.places)
 }
+
+// 시/도별 Top10. region은 BE places/regions.py의 정식 명칭("서울특별시" 등)이다.
+export type RegionTopPlaces = {
+  region: string
+  places: TopPlace[]
+}
+
+// 지역 하나만 쿼리로 받는 API가 아니다 — 즐겨찾기가 있는 모든 지역을 한 번에 묶어서 돌려준다
+// (BE PR #78, `TopPlacesByRegionView`). 그래서 지역을 바꿀 때마다 다시 부르지 않고, 화면 진입
+// 시 한 번만 불러서 클라이언트에서 골라 보여준다 (docs/troubleshooting.md 참고).
+export function getTopPlacesByRegion(): Promise<RegionTopPlaces[]> {
+  return publicFetch<{ regions: RegionTopPlaces[] }>('/api/main/top-places/by-region/').then((res) => res.regions)
+}

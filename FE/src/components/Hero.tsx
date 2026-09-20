@@ -145,9 +145,6 @@ function HallOfFameSlide({
   slide: Extract<Slide, { type: 'hallOfFame' }>
   title: string
 }) {
-  const work = slide.place?.work
-  const workPrefix = work?.category === 'MOVIE' ? '영화' : work?.category === 'DRAMA' ? '드라마' : null
-
   return (
     <>
       {slide.review.photos[0] && (
@@ -156,12 +153,9 @@ function HallOfFameSlide({
       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
       <div className="absolute bottom-4 left-4 text-white">
         <p className="text-lg font-bold">{title}</p>
-        {slide.place && (
-          <p className="text-sm text-white/90">
-            {workPrefix && work?.title ? `${workPrefix} <${work.title}> ` : ''}
-            {slide.place.name}
-          </p>
-        )}
+        <p className="text-sm text-white/90">
+          {slide.place?.name ? `${slide.review.author_nickname}님의 <${slide.place.name}>` : slide.review.author_nickname}
+        </p>
       </div>
     </>
   )

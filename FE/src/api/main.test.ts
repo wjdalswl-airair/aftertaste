@@ -143,4 +143,60 @@ describe('src/api/main.ts', () => {
       await expect(getTopPlaces()).rejects.toThrow('서버 오류')
     })
   })
+
+  describe('getTopPlacesByRegion', () => {
+    it('성공하면 지역별로 묶인 배열을 그대로 반환한다 (쿼리 파라미터 없음)', async () => {
+      const { getTopPlacesByRegion } = await import('./main')
+      const regions = [
+        {
+          region: '서울특별시',
+          places: [
+            {
+              id: 1,
+              name: '경복궁',
+              address: '서울 종로구',
+              photo_url: 'https://a.com/1.png',
+              favorite_count: 5,
+              is_favorited: false,
+            },
+          ],
+        },
+      ]
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ regions }) }),
+      )
+
+      const result = await getTopPlacesByRegion()
+
+      expect(result).toEqual(regions)
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/api/main/top-places/by-region/'), expect.anything())
+    })
+
+    it('즐겨찾기 있는 지역이 없으면 빈 배열을 반환한다 (에러 아님)', async () => {
+      const { getTopPlacesByRegion } = await import('./main')
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ regions: [] }) }),
+      )
+
+      const result = await getTopPlacesByRegion()
+
+      expect(result).toEqual([])
+    })
+
+    it('실패하면 에러를 던진다', async () => {
+      const { getTopPlacesByRegion } = await import('./main')
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 500,
+          json: async () => ({ detail: '서버 오류' }),
+        }),
+      )
+
+      await expect(getTopPlacesByRegion()).rejects.toThrow('서버 오류')
+    })
+  })
 })

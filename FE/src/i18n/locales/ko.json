@@ -54,6 +54,11 @@
       "title": "여운 사용자들 Pick!\n전국 Top 10 촬영지",
       "empty": "아직 준비 중이에요"
     },
+    "regionalTop": {
+      "title": "지역별 Top 10 촬영지",
+      "empty": "이 지역엔 아직 인기 촬영지가 없어요",
+      "selectRegion": "지역 선택"
+    },
     "recommend": {
       "title": "내 주변 명소",
       "titleNearby": "\"{{dong}}\" 근처 촬영지",
@@ -96,6 +101,7 @@
     "businessHours": "운영시간",
     "recommendedTime": "추천 방문 시간",
     "etiquette": "주의할 점",
+    "weatherLabel": "현재 이 위치의 날씨는?",
     "reviewButton": "리뷰 남기기",
     "reviewsTitle": "방문자 리뷰",
     "reviewsEmpty": "아직 리뷰가 없어요",
@@ -127,7 +133,7 @@
     "placesEmpty": "아직 등록된 촬영지가 없어요"
   },
   "bookmarksPage": {
-    "title": "내가 저장한 명소",
+    "title": "내가 저장한 촬영지",
     "empty": "아직 저장한 명소가 없어요"
   },
   "ratingModal": {
@@ -162,14 +168,16 @@
     "edit": "수정하기",
     "delete": "삭제하기",
     "report": "신고하기",
-    "cancel": "취소"
+    "cancel": "취소",
+    "prevPhoto": "이전 사진",
+    "nextPhoto": "다음 사진"
   },
   "myPage": {
     "profileEditButton": "프로필 편집",
     "profileSaveButton": "프로필 저장",
     "reviewedPlacesLabel": "방문 인증한 촬영지 : {{count}}",
     "createdCoursesLabel": "제안한 코스 : {{count}}",
-    "favoritesTitle": "내가 저장한 명소",
+    "favoritesTitle": "내가 저장한 촬영지",
     "favoritesMore": "더보기",
     "favoritesEmpty": "아직 저장한 명소가 없어요",
     "myReviewsTitle": "내가 쓴 리뷰",

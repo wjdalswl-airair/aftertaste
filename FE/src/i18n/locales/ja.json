@@ -54,6 +54,11 @@
       "title": "全国撮影地Top10",
       "empty": "近日公開予定です"
     },
+    "regionalTop": {
+      "title": "地域別Top10撮影地",
+      "empty": "この地域にはまだ人気の撮影地がありません",
+      "selectRegion": "地域を選択"
+    },
     "recommend": {
       "title": "近くの名所",
       "titleNearby": "\"{{dong}}\"周辺のスポット",
@@ -96,6 +101,7 @@
     "businessHours": "営業時間",
     "recommendedTime": "おすすめの訪問時間",
     "etiquette": "注意事項",
+    "weatherLabel": "現在のこの場所の天気は?",
     "reviewButton": "レビューを書く",
     "reviewsTitle": "訪問者レビュー",
     "reviewsEmpty": "まだレビューがありません",
@@ -162,7 +168,9 @@
     "edit": "編集",
     "delete": "削除",
     "report": "通報",
-    "cancel": "キャンセル"
+    "cancel": "キャンセル",
+    "prevPhoto": "前の写真",
+    "nextPhoto": "次の写真"
   },
   "myPage": {
     "profileEditButton": "プロフィール編集",
