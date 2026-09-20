@@ -171,9 +171,12 @@ function ReviewFeedCard({ review }: { review: ReviewItem }) {
         loading="lazy"
         className="block h-auto w-full"
       />
-      <div className="absolute bottom-2 right-2 flex items-center gap-1 rounded-full bg-black/40 px-1.5 py-0.5">
-        <Heart size={12} className={`text-white ${review.is_liked_by_me ? 'fill-white' : ''}`} />
-        <span className="text-[10px] font-medium text-white">{review.like_count}</span>
+      <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-gradient-to-t from-black/60 to-transparent px-2 pb-2 pt-4">
+        <span className="truncate text-[10px] font-medium text-white">{review.place_name}</span>
+        <div className="flex shrink-0 items-center gap-1 rounded-full bg-black/40 px-1.5 py-0.5">
+          <Heart size={12} className={`text-white ${review.is_liked_by_me ? 'fill-white' : ''}`} />
+          <span className="text-[10px] font-medium text-white">{review.like_count}</span>
+        </div>
       </div>
     </Link>
   )

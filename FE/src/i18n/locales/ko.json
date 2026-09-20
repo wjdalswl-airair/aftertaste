@@ -81,9 +81,17 @@
     "recentSearchesTitle": "최근 검색어",
     "recentSearchesClear": "전체 삭제",
     "resultsTitle": "\"{{query}}\" 검색 결과",
-    "placesFoundTitle": "명소에서 검색됨",
-    "worksFoundTitle": "작품에서 검색됨",
     "noResults": "검색 결과가 존재하지 않습니다",
+    "popularKeywordsInfo": "최근 많이 검색된 검색어예요",
+    "tabs": {
+      "place": "촬영지",
+      "work": "작품"
+    },
+    "placeFilters": {
+      "all": "전체",
+      "name": "촬영지명",
+      "address": "주소명"
+    },
     "filters": {
       "all": "전체",
       "drama": "드라마",

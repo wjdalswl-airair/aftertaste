@@ -81,9 +81,17 @@
     "recentSearchesTitle": "最近の検索",
     "recentSearchesClear": "すべて削除",
     "resultsTitle": "「{{query}}」の検索結果",
-    "placesFoundTitle": "名所で見つかりました",
-    "worksFoundTitle": "作品で見つかりました",
     "noResults": "検索結果がありません",
+    "popularKeywordsInfo": "最近よく検索されているキーワードです",
+    "tabs": {
+      "place": "撮影地",
+      "work": "作品"
+    },
+    "placeFilters": {
+      "all": "すべて",
+      "name": "撮影地名",
+      "address": "住所"
+    },
     "filters": {
       "all": "すべて",
       "drama": "ドラマ",

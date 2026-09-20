@@ -81,9 +81,17 @@
     "recentSearchesTitle": "最近搜索",
     "recentSearchesClear": "全部删除",
     "resultsTitle": "\"{{query}}\"的搜索结果",
-    "placesFoundTitle": "在景点中找到",
-    "worksFoundTitle": "在作品中找到",
     "noResults": "没有搜索结果",
+    "popularKeywordsInfo": "最近搜索较多的关键词",
+    "tabs": {
+      "place": "拍摄地",
+      "work": "作品"
+    },
+    "placeFilters": {
+      "all": "全部",
+      "name": "拍摄地名",
+      "address": "地址"
+    },
     "filters": {
       "all": "全部",
       "drama": "电视剧",

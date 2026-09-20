@@ -110,12 +110,12 @@ export function ReviewDetailPage() {
         <button type="button" onClick={() => navigate(-1)} aria-label="뒤로가기">
           <ArrowLeft size={24} className="text-ink" />
         </button>
-        <p className="truncate text-center text-lg font-medium text-ink">
+        <Link to={`/spots/${placeId}`} className="truncate text-center text-lg font-medium text-ink">
           {place?.name}
           {reviewCount !== undefined && (
             <span className="ml-1.5 text-xs font-normal text-ink-tertiary">{reviewCount}개</span>
           )}
-        </p>
+        </Link>
       </header>
 
       {review === undefined && (
@@ -186,6 +186,9 @@ export function ReviewDetailPage() {
                     // 나머지 사진만 지연 로딩한다.
                     loading={index === 0 ? 'eager' : 'lazy'}
                     className="block w-full flex-shrink-0 snap-center"
+                    // 빠르게 스와이프하면 스냅 지점을 건너뛰고 여러 장이 한 번에 넘어가던 문제 —
+                    // scroll-snap-stop: always로 플릭 한 번에 한 장씩만 멈추게 한다.
+                    style={{ scrollSnapStop: 'always' }}
                   />
                 ))}
               </div>
@@ -243,19 +246,25 @@ export function ReviewDetailPage() {
 
           <p className="px-4 text-base leading-[1.5] text-ink">{review.content}</p>
 
-          {review.works.length > 0 && (
-            <div className="flex flex-wrap gap-2 px-4">
-              {review.works.map((work) => (
-                <Link
-                  key={work.id}
-                  to={`/reviews?work_id=${work.id}&work_title=${encodeURIComponent(work.title)}`}
-                  className="rounded-full border border-ink-secondary px-3 py-1.5 text-xs font-bold text-ink-secondary"
-                >
-                  #{work.title}
-                </Link>
-              ))}
-            </div>
-          )}
+          <div className="flex flex-wrap gap-2 px-4">
+            {place?.name && (
+              <Link
+                to={`/spots/${placeId}/reviews`}
+                className="rounded-full border border-ink-secondary px-3 py-1.5 text-xs font-bold text-ink-secondary"
+              >
+                #{place.name}
+              </Link>
+            )}
+            {review.works.map((work) => (
+              <Link
+                key={work.id}
+                to={`/reviews?work_id=${work.id}&work_title=${encodeURIComponent(work.title)}`}
+                className="rounded-full border border-ink-secondary px-3 py-1.5 text-xs font-bold text-ink-secondary"
+              >
+                #{work.title}
+              </Link>
+            ))}
+          </div>
        </div>
       )}
 
