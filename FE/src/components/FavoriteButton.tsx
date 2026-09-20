@@ -1,8 +1,8 @@
 import { Star } from 'lucide-react'
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { addCourseFavorite, addFavorite, removeCourseFavorite, removeFavorite } from '../api/bookmarks'
 import { useAuthStore } from '../store/useAuthStore'
+import { LoginRequiredModal } from './LoginRequiredModal'
 
 type FavoriteButtonProps = {
   placeId: number
@@ -23,17 +23,17 @@ export function FavoriteButton({
   size = 16,
   className = 'absolute right-1 top-1 rounded-full p-1',
 }: FavoriteButtonProps) {
-  const navigate = useNavigate()
   const member = useAuthStore((state) => state.member)
   const [isFavorited, setIsFavorited] = useState(initialFavorited)
   const [pending, setPending] = useState(false)
+  const [showLoginModal, setShowLoginModal] = useState(false)
 
   function handleClick(event: React.MouseEvent) {
     event.preventDefault()
     event.stopPropagation()
 
     if (!member) {
-      navigate('/login', { state: { message: '로그인이 필요한 기능입니다' } })
+      setShowLoginModal(true)
       return
     }
     if (pending) {
@@ -52,8 +52,11 @@ export function FavoriteButton({
   }
 
   return (
-    <button type="button" onClick={handleClick} aria-label="즐겨찾기" className={className}>
-      <Star size={size} className={isFavorited ? 'fill-primary text-primary' : 'text-primary'} />
-    </button>
+    <>
+      <button type="button" onClick={handleClick} aria-label="즐겨찾기" className={className}>
+        <Star size={size} className={isFavorited ? 'fill-primary text-primary' : 'text-primary'} />
+      </button>
+      {showLoginModal && <LoginRequiredModal onClose={() => setShowLoginModal(false)} />}
+    </>
   )
 }

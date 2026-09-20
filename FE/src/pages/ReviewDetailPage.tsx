@@ -6,6 +6,7 @@ import { deleteReview, getPlaceReviews, likeReview, reportReview, unlikeReview, 
 import { getPlaceDetail, type PlaceDetail } from '../api/spots'
 import { BottomNav } from '../components/BottomNav'
 import { BottomSheet } from '../components/BottomSheet'
+import { LoginRequiredModal } from '../components/LoginRequiredModal'
 import { Skeleton } from '../components/Skeleton'
 import { useAuthStore } from '../store/useAuthStore'
 
@@ -20,6 +21,7 @@ export function ReviewDetailPage() {
   const [place, setPlace] = useState<PlaceDetail | undefined>(undefined)
   const [reviewCount, setReviewCount] = useState<number | undefined>(undefined)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [showLoginModal, setShowLoginModal] = useState(false)
   const [activePhotoIndex, setActivePhotoIndex] = useState(0)
   const photoScrollRef = useRef<HTMLDivElement>(null)
   const photoScrollEndTimer = useRef<number>(undefined)
@@ -54,7 +56,7 @@ export function ReviewDetailPage() {
       return
     }
     if (!member) {
-      navigate('/login', { state: { message: '로그인이 필요한 기능입니다' } })
+      setShowLoginModal(true)
       return
     }
     const next = !review.is_liked_by_me
@@ -85,7 +87,7 @@ export function ReviewDetailPage() {
 
   function handleOpenMenu() {
     if (!member) {
-      navigate('/login', { state: { message: '로그인이 필요한 기능입니다' } })
+      setShowLoginModal(true)
       return
     }
     setMenuOpen(true)
@@ -265,6 +267,8 @@ export function ReviewDetailPage() {
           </button>
         </BottomSheet>
       )}
+
+      {showLoginModal && <LoginRequiredModal onClose={() => setShowLoginModal(false)} />}
 
       <BottomNav />
     </main>
