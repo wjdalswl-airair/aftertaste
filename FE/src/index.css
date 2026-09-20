@@ -181,6 +181,5 @@ body {
 #root {
   max-width: 480px;
   margin: 0 auto;
-  padding-inline: 8px;
   min-height: 100dvh;
 }
