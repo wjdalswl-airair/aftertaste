@@ -54,6 +54,30 @@ export async function getDongName(lat: number, lng: number): Promise<string | nu
   })
 }
 
+// 위도/경도를 "하남시" 같은 시/군/구 이름으로 바꾼다. 날씨 위젯에서 쓴다 — OpenWeatherMap의
+// 지명(`name`)은 lang 파라미터를 줘도 한글로 안 오고 "Hanam"처럼 영문/로마자로만 내려주기 때문에,
+// 위경도를 카카오맵으로 다시 역지오코딩해서 한글 지명을 얻는다 (2026-09-20).
+export async function getCityName(lat: number, lng: number): Promise<string | null> {
+  const loadResult = loadKakaoMaps()
+  if (!loadResult) {
+    return null
+  }
+
+  const kakao = await loadResult
+  return new Promise((resolve) => {
+    const geocoder = new kakao.maps.services.Geocoder()
+    geocoder.coord2RegionCode(lng, lat, (result, status) => {
+      if (status !== kakao.maps.services.Status.OK || result.length === 0) {
+        resolve(null)
+        return
+      }
+      const region = result.find((r) => r.region_type === 'H') ?? result[0]
+      // 세종처럼 시/군/구가 없는 지역은 region_2depth_name이 빈 문자열로 온다 — 그때는 시/도로 대체한다.
+      resolve(region.region_2depth_name || region.region_1depth_name || null)
+    })
+  })
+}
+
 // 카카오맵 기본 마커(빨간 핀)를 index.css --color-primary 색으로 바꾼 SVG 데이터 URL을 만든다.
 // kakao.maps.MarkerImage에 이 값을 넘기면 원하는 색의 핀 마커를 그릴 수 있다.
 // label을 주면 가운데 흰 원 안에 그 숫자를 넣는다 (코스 상세의 방문 순서 표시용).

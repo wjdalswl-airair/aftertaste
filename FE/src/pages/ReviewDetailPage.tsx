@@ -1,4 +1,4 @@
-import { ArrowLeft, Flag, Heart, MoreHorizontal } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, Flag, Heart, MoreHorizontal } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router-dom'
@@ -38,6 +38,13 @@ export function ReviewDetailPage() {
       })
       .catch(() => setReview(null))
   }, [placeId, reviewId])
+
+  useEffect(() => {
+    photoScrollRef.current?.scrollTo({
+      left: activePhotoIndex * photoScrollRef.current.clientWidth,
+      behavior: 'smooth',
+    })
+  }, [activePhotoIndex])
 
   // 사진 슬라이드가 완전히 멈춘 뒤에만 활성 인덱스를 확정한다 (Hero.tsx와 같은 이유).
   function handlePhotoScroll() {
@@ -183,16 +190,37 @@ export function ReviewDetailPage() {
                 ))}
               </div>
               {review.photos.length > 1 && (
-                <div className="absolute inset-x-0 top-3 flex justify-center gap-1.5">
-                  {review.photos.map((photo, index) => (
-                    <div
-                      key={photo.id}
-                      className={`h-1.5 w-1.5 rounded-full ${
-                        index === activePhotoIndex ? 'bg-white' : 'bg-white/40'
-                      }`}
-                    />
-                  ))}
-                </div>
+                <>
+                  <div className="absolute inset-x-0 top-3 flex justify-center gap-1.5">
+                    {review.photos.map((photo, index) => (
+                      <div
+                        key={photo.id}
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          index === activePhotoIndex ? 'bg-white' : 'bg-white/40'
+                        }`}
+                      />
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setActivePhotoIndex((prev) => (prev - 1 + review.photos.length) % review.photos.length)
+                    }
+                    aria-label={t('reviewDetail.prevPhoto')}
+                    className="absolute top-1/2 left-4 z-10 -translate-y-1/2 rounded-full bg-black/30 p-1 text-white"
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActivePhotoIndex((prev) => (prev + 1) % review.photos.length)}
+                    aria-label={t('reviewDetail.nextPhoto')}
+                    className="absolute top-1/2 right-4 z-10 -translate-y-1/2 rounded-full bg-black/30 p-1 text-white"
+                  >
+                    <ChevronRight size={20} />
+                  </button>
+                </>
               )}
             </div>
           ) : (
