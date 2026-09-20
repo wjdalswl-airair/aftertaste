@@ -54,6 +54,11 @@
       "title": "Top 10 Nationwide",
       "empty": "Coming soon"
     },
+    "regionalTop": {
+      "title": "Top 10 by Region",
+      "empty": "No popular filming spots in this region yet",
+      "selectRegion": "Select region"
+    },
     "recommend": {
       "title": "Nearby Spots",
       "titleNearby": "Spots near \"{{dong}}\"",
@@ -96,6 +101,7 @@
     "businessHours": "Hours",
     "recommendedTime": "Best time to visit",
     "etiquette": "Etiquette",
+    "weatherLabel": "Weather here right now",
     "reviewButton": "Write a review",
     "reviewsTitle": "Visitor reviews",
     "reviewsEmpty": "No reviews yet",
@@ -162,7 +168,9 @@
     "edit": "Edit",
     "delete": "Delete",
     "report": "Report",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "prevPhoto": "Previous photo",
+    "nextPhoto": "Next photo"
   },
   "myPage": {
     "profileEditButton": "Edit profile",

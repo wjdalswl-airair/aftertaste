@@ -54,6 +54,11 @@
       "title": "全國拍攝地Top10",
       "empty": "敬請期待"
     },
+    "regionalTop": {
+      "title": "地區拍攝地Top10",
+      "empty": "該地區暫無熱門拍攝地",
+      "selectRegion": "選擇地區"
+    },
     "recommend": {
       "title": "附近的景點",
       "titleNearby": "\"{{dong}}\"附近的景點",
@@ -96,6 +101,7 @@
     "businessHours": "營業時間",
     "recommendedTime": "推薦造訪時間",
     "etiquette": "注意事項",
+    "weatherLabel": "這裡現在的天氣如何?",
     "reviewButton": "撰寫評論",
     "reviewsTitle": "訪客評論",
     "reviewsEmpty": "尚無評論",
@@ -162,7 +168,9 @@
     "edit": "編輯",
     "delete": "刪除",
     "report": "檢舉",
-    "cancel": "取消"
+    "cancel": "取消",
+    "prevPhoto": "上一張",
+    "nextPhoto": "下一張"
   },
   "myPage": {
     "profileEditButton": "編輯個人資料",

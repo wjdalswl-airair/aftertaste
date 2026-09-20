@@ -54,6 +54,11 @@
       "title": "全国拍摄地Top10",
       "empty": "敬请期待"
     },
+    "regionalTop": {
+      "title": "地区拍摄地Top10",
+      "empty": "该地区暂无热门拍摄地",
+      "selectRegion": "选择地区"
+    },
     "recommend": {
       "title": "附近的景点",
       "titleNearby": "\"{{dong}}\"附近的景点",
@@ -96,6 +101,7 @@
     "businessHours": "营业时间",
     "recommendedTime": "推荐访问时间",
     "etiquette": "注意事项",
+    "weatherLabel": "这里现在的天气怎么样?",
     "reviewButton": "写评论",
     "reviewsTitle": "访客评论",
     "reviewsEmpty": "还没有评论",
@@ -162,7 +168,9 @@
     "edit": "编辑",
     "delete": "删除",
     "report": "举报",
-    "cancel": "取消"
+    "cancel": "取消",
+    "prevPhoto": "上一张",
+    "nextPhoto": "下一张"
   },
   "myPage": {
     "profileEditButton": "编辑资料",
