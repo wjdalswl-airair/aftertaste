@@ -47,6 +47,9 @@ export function ReviewFormPage() {
   // 확인을 누르면 pendingLeaveAction에 담아둔 실제 이동을 실행한다.
   const [leaveModalOpen, setLeaveModalOpen] = useState(false)
   const pendingLeaveAction = useRef<(() => void) | null>(null)
+  // 제출 성공으로 화면을 뜨는 중이면 true — 아래 popstate 가드가 "나가시겠어요?" 모달을
+  // 띄우지 않고 그냥 지나가게 한다 (leaveAfterSubmit 참고).
+  const isLeavingAfterSubmitRef = useRef(false)
 
   function requestLeave(action: () => void) {
     pendingLeaveAction.current = action
@@ -81,12 +84,29 @@ export function ReviewFormPage() {
   useEffect(() => {
     window.history.pushState(null, '', window.location.href)
     function handlePopState() {
+      if (isLeavingAfterSubmitRef.current) {
+        return
+      }
       window.history.pushState(null, '', window.location.href)
       requestLeave(() => window.history.go(-2))
     }
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
+
+  // 제출 성공 후 이동할 때 쓴다. 마운트 시 쌓아둔 더미 history 항목 하나만 지우면(예: replace)
+  // 그 아래 있던 "원래 폼 진입 항목"이 그대로 남아서, 상세 화면에서 뒤로가기를 누르면 폼 화면이
+  // 다시 나오는 문제가 있었다. go(-1)로 더미 항목까지 마저 되돌아간 뒤 그 자리를 replace해서
+  // 더미+원본 두 항목을 사실상 하나로 합친다.
+  function leaveAfterSubmit(url: string) {
+    isLeavingAfterSubmitRef.current = true
+    function handleReplace() {
+      window.removeEventListener('popstate', handleReplace)
+      navigate(url, { replace: true })
+    }
+    window.addEventListener('popstate', handleReplace)
+    window.history.go(-1)
+  }
 
   useEffect(() => {
     if (!reviewId) {
@@ -164,10 +184,10 @@ export function ReviewFormPage() {
     try {
       if (isEdit) {
         await updateReview(Number(reviewId), input)
-        navigate(`/spots/${placeId}/reviews/${reviewId}`, { replace: true })
+        leaveAfterSubmit(`/spots/${placeId}/reviews/${reviewId}`)
       } else {
         const { reviewId: newId } = await createReview(Number(placeId), input)
-        navigate(`/spots/${placeId}/reviews/${newId}`, { replace: true })
+        leaveAfterSubmit(`/spots/${placeId}/reviews/${newId}`)
       }
     } catch {
       setSubmitting(false)

@@ -195,7 +195,7 @@ export function MyPage() {
 
       {me === undefined ? (
           <div
-            className="flex items-center bg-contain bg-center bg-no-repeat px-6 py-4"
+            className="flex items-center bg-contain bg-center bg-no-repeat px-6 py-4 drop-shadow-lg"
             style={{ backgroundImage: `url(${profileCardBg})`, aspectRatio: '1748 / 687' }}
           >
             <div className="mx-auto flex w-[85%] items-center gap-5 min-[376px]:gap-9 min-[441px]:gap-10">
@@ -208,7 +208,7 @@ export function MyPage() {
           </div>
       ) : (
           <div
-            className="flex items-center bg-contain bg-center bg-no-repeat px-6 py-4"
+            className="flex items-center bg-contain bg-center bg-no-repeat px-6 py-4 drop-shadow-lg"
             style={{ backgroundImage: `url(${profileCardBg})`, aspectRatio: '1748 / 687' }}
           >
             <div className="mx-auto flex w-[85%] items-center gap-5 min-[376px]:gap-9 min-[441px]:gap-10">

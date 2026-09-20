@@ -81,9 +81,17 @@
     "recentSearchesTitle": "Recent searches",
     "recentSearchesClear": "Clear all",
     "resultsTitle": "Results for \"{{query}}\"",
-    "placesFoundTitle": "Found in spots",
-    "worksFoundTitle": "Found in works",
     "noResults": "No results found",
+    "popularKeywordsInfo": "These are the most searched keywords recently",
+    "tabs": {
+      "place": "Spots",
+      "work": "Works"
+    },
+    "placeFilters": {
+      "all": "All",
+      "name": "Spot name",
+      "address": "Address"
+    },
     "filters": {
       "all": "All",
       "drama": "Drama",

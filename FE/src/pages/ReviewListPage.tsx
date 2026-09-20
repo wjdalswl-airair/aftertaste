@@ -41,10 +41,10 @@ export function ReviewListPage() {
         <button type="button" onClick={() => navigate(-1)} aria-label="뒤로가기">
           <ArrowLeft size={24} className="text-ink" />
         </button>
-        <p className="truncate text-center text-lg font-medium text-ink">
+        <Link to={`/spots/${placeId}`} className="truncate text-center text-lg font-medium text-ink">
           {place?.name ?? ''}
           {reviews && <span className="ml-1.5 text-xs font-normal text-ink-tertiary">{reviews.length}개</span>}
-        </p>
+        </Link>
       </header>
 
       <div className="flex gap-6 border-b border-divider px-4">
