@@ -118,6 +118,17 @@
     "reviewsTitle": "Visitor reviews",
     "reviewsEmpty": "No reviews yet",
     "reviewsMore": "See more",
+    "tourismTitle": "Nearby tourist info",
+    "tourismCategories": {
+      "food": "Food",
+      "lodging": "Lodging",
+      "experience": "Experience",
+      "history": "History",
+      "nature": "Nature",
+      "culture": "Culture"
+    },
+    "tourismEmpty": "No nearby info found",
+    "tourismError": "Couldn't load tourist info",
     "courseCta": "Get an AI course from this spot",
     "courseCtaLoading": "AI is building your course...",
     "courseAiError": "Couldn't create a course. Please try again.",
@@ -224,6 +235,7 @@
     },
     "candidatesEmpty": "No candidates nearby",
     "selectedLabel": "Course lineup",
+    "aiHint": "AI recommended these restaurants, cafes, and nearby spots based on the filming location!",
     "submitButton": "Submit",
     "mapUnavailable": "Map unavailable"
   },

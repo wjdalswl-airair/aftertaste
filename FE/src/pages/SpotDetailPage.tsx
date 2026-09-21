@@ -14,7 +14,14 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { aiRecommendCourse, getPlaceCourses } from '../api/courses'
-import { getPlaceDetail, type PlaceDetail, type PlaceWork } from '../api/spots'
+import {
+  getPlaceDetail,
+  getTourismInfo,
+  type PlaceDetail,
+  type PlaceWork,
+  type TourismCategory,
+  type TourismInfoItem,
+} from '../api/spots'
 import spotPlaceholder from '../assets/placeholder/spot.png'
 import { BottomNav } from '../components/BottomNav'
 import { PlaceholderImage } from '../components/PlaceholderImage'
@@ -31,6 +38,10 @@ import { shortRegion } from '../utils/address'
 
 // index.css의 --color-primary와 맞춘 값 (코스 생성 화면 마커와 동일, CourseCreatePage.tsx 참고).
 const SPOT_PIN_COLOR = '#f47c5c'
+
+// 주변 관광정보 탭 순서 (한국관광공사 TourAPI 대분류, BE places/sources/tour_api.py의
+// NEARBY_CATEGORY_CODES와 같은 순서).
+const TOURISM_CATEGORIES: TourismCategory[] = ['food', 'lodging', 'experience', 'history', 'nature', 'culture']
 
 export function SpotDetailPage() {
   const { t } = useTranslation()
@@ -237,6 +248,8 @@ export function SpotDetailPage() {
             )}
           </section>
 
+          <TourismInfoSection placeId={place.id} />
+
           <div className="px-4">
             <button
               type="button"
@@ -335,6 +348,71 @@ function MainWorksRow({ works }: { works: PlaceWork[] }) {
         )}
       </span>
     </div>
+  )
+}
+
+function TourismInfoSection({ placeId }: { placeId: number }) {
+  const { t } = useTranslation()
+  const [category, setCategory] = useState<TourismCategory>('food')
+  // undefined: 로딩 중, null: 호출 실패(예: 한국관광공사 API 오류·일일 호출 한도 초과), []: 확인 끝났는데 없음
+  const [items, setItems] = useState<TourismInfoItem[] | null | undefined>(undefined)
+
+  useEffect(() => {
+    setItems(undefined)
+    getTourismInfo(placeId, category)
+      .then(setItems)
+      .catch(() => setItems(null))
+  }, [placeId, category])
+
+  return (
+    <section className="px-4">
+      <h2 className="mb-3 text-lg font-bold text-ink">{t('spotDetail.tourismTitle')}</h2>
+
+      <div className="scrollbar-hide mb-3 flex gap-2 overflow-x-auto">
+        {TOURISM_CATEGORIES.map((option) => (
+          <button
+            key={option}
+            type="button"
+            onClick={() => setCategory(option)}
+            className={`shrink-0 rounded-full border px-3 py-1.5 text-sm ${
+              category === option ? 'border-primary bg-primary text-white' : 'border-divider text-ink-secondary'
+            }`}
+          >
+            {t(`spotDetail.tourismCategories.${option}`)}
+          </button>
+        ))}
+      </div>
+
+      {items === undefined ? (
+        <div className="scrollbar-hide flex gap-3 overflow-x-auto">
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} className="h-[150px] w-[140px] shrink-0 rounded-xl" />
+          ))}
+        </div>
+      ) : items === null ? (
+        <p className="text-sm text-ink-tertiary">{t('spotDetail.tourismError')}</p>
+      ) : items.length === 0 ? (
+        <p className="text-sm text-ink-tertiary">{t('spotDetail.tourismEmpty')}</p>
+      ) : (
+        <div className="scrollbar-hide flex gap-3 overflow-x-auto">
+          {items.map((item, index) => (
+            <div key={`${item.name}-${index}`} className="w-[140px] shrink-0">
+              <PlaceholderImage
+                src={item.image_url}
+                placeholder={spotPlaceholder}
+                alt=""
+                className="h-[100px] w-full rounded-xl"
+              />
+              <p className="mt-2 truncate text-xs font-medium text-ink">{item.name}</p>
+              <p className="truncate text-xs text-ink-tertiary">
+                {item.address}
+                {item.distance !== null && ` · ${(item.distance / 1000).toFixed(1)}km`}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   )
 }
 

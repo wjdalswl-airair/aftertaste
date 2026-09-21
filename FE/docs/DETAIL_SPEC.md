@@ -277,6 +277,10 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 - 카카오맵 SDK는 npm 타입 패키지가 없어 `src/types/kakao.d.ts`에 실제 쓰는 만큼만(`Map`/`Marker`/`LatLng`/`InfoWindow`/`load`) 최소 ambient 타입을 직접 선언했다.
 - 명소 상세로 이동하는 진입점: 메인 화면 Top10/추천 카드(`RecommendedSpots.tsx`, `TopPlacesCarousel.tsx`), 검색 결과의 명소 카드(`SearchPage.tsx`)를 이번에 `/spots/{id}`로 연결했다 (Phase2/3 때 "Phase4 끝나면 연결" 하기로 했던 부분).
 - 예외: 없는 명소 → "존재하지 않습니다"
+- **주변 관광정보 (2026-09-21 추가, GitHub 이슈 #76)**: "방문자 리뷰" 섹션 바로 아래에 새 섹션 `TourismInfoSection`을 추가했다. BE `GET /api/places/{id}/tourism-info/?category={code}`(한국관광공사 TourAPI, `src/api/spots.ts`의 `getTourismInfo`)를 호출한다 — 카카오 주변 상권(`nearby_places`)과는 완전히 별개 데이터이고, 번역이 없어(lang 파라미터 없음) 원본 그대로 보여준다.
+  - 카테고리 6개(음식/숙박/체험관광/역사관광/자연관광/문화관광) 탭 + 가로스크롤 카드. 탭을 누를 때마다 그 카테고리 하나만 새로 호출한다(6개를 한 번에 안 불러오는 대신, 탭 전환마다 API를 다시 부르는 트레이드오프를 받아들임, 사용자 확인).
+  - 카드는 이미지(`image_url`, 없으면 플레이스홀더)·이름·주소·거리(`distance`, 미터 → km로 변환해 표시)만 보여준다. `tel`은 이번 화면엔 안 씀.
+  - 로딩 중엔 스켈레톤, 호출 실패(503 등)면 에러 문구, 결과 0건이면 빈 문구 — 셋을 구분해서 보여준다.
 
 ### 작품 상세 — `pages/WorkDetailPage.tsx` (`/works/:workId`, 2026-08-30 구현)
 **PRD/Phase 문서에 없는 화면이다.** Figma엔 "작품 상세"(node-id `102:1174`, 작품 정보 + 그 작품의 촬영지 목록) 목업이 있는데, 사용자가 "라우트는 FE에서 정하면 되니까 먼저 만들고 API는 나중에 BE와 상의하겠다"고 해서 FE(라우트+화면+API 함수)만 먼저 만들었다. 나중에 어느 Phase에 넣을지는 별도로 정리해야 한다.

@@ -1,7 +1,7 @@
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ArrowLeft, GripVertical, Plus, X } from 'lucide-react'
+import { ArrowLeft, GripVertical, Info, Plus, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -257,6 +257,11 @@ export function CourseCreatePage() {
                 ))}
               </SortableContext>
             </DndContext>
+          </div>
+
+          <div className="mx-4 flex items-start gap-1.5 text-xs text-ink-tertiary">
+            <Info size={14} className="mt-0.5 shrink-0" />
+            <p>{t('courseCreate.aiHint')}</p>
           </div>
 
           <div className="flex gap-2 px-4">

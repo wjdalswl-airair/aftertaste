@@ -118,6 +118,17 @@
     "reviewsTitle": "방문자 리뷰",
     "reviewsEmpty": "아직 리뷰가 없어요",
     "reviewsMore": "더보기",
+    "tourismTitle": "주변 관광정보",
+    "tourismCategories": {
+      "food": "음식",
+      "lodging": "숙박",
+      "experience": "체험관광",
+      "history": "역사관광",
+      "nature": "자연관광",
+      "culture": "문화관광"
+    },
+    "tourismEmpty": "주변에 정보가 없어요",
+    "tourismError": "관광정보를 가져오지 못했어요",
     "courseCta": "이 장소로 AI 코스 추천받기",
     "courseCtaLoading": "AI가 코스를 만드는 중...",
     "courseAiError": "코스를 만들지 못했어요. 다시 시도해주세요.",
@@ -224,6 +235,7 @@
     },
     "candidatesEmpty": "주변에 후보가 없어요",
     "selectedLabel": "코스 구성",
+    "aiHint": "AI가 촬영지 기반으로 맛집, 카페, 주변 명소를 추천했습니다!",
     "submitButton": "등록",
     "mapUnavailable": "지도를 표시할 수 없어요"
   },

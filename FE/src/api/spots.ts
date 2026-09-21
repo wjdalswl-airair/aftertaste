@@ -114,3 +114,25 @@ export function getMapPlaces(): Promise<MapPlace[]> {
   const lang = useLocaleStore.getState().language
   return publicFetch<{ places: MapPlace[] }>(`/api/places/map/?lang=${lang}`).then((res) => res.places)
 }
+
+export type TourismCategory = 'food' | 'lodging' | 'experience' | 'history' | 'nature' | 'culture'
+
+export type TourismInfoItem = {
+  category: TourismCategory
+  name: string
+  address: string
+  image_url: string
+  latitude: number | null
+  longitude: number | null
+  distance: number | null
+  tel: string
+}
+
+// 명소 주변 관광정보 (한국관광공사 TourAPI, 이슈 #76). 카카오 주변 상권과 별개이며 번역 없이
+// 원본 그대로 온다(lang 파라미터 없음) — DB에 저장 안 하고 매번 실시간으로 받아온다.
+// 카테고리 탭 하나만 눌러도 되게, 한 번에 카테고리 1개씩만 요청한다.
+export function getTourismInfo(placeId: number, category: TourismCategory): Promise<TourismInfoItem[]> {
+  return publicFetch<{ results: TourismInfoItem[] }>(
+    `/api/places/${placeId}/tourism-info/?category=${category}`,
+  ).then((res) => res.results)
+}
