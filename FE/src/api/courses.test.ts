@@ -190,6 +190,61 @@ describe('src/api/courses.ts', () => {
     })
   })
 
+  describe('getCourseFeed', () => {
+    const summary = {
+      id: 1,
+      title: '경복궁 코스',
+      place_id: 1,
+      place_name: '경복궁',
+      latitude: 37.58,
+      longitude: 126.97,
+      favorite_count: 3,
+    }
+
+    it('성공하면 코스 목록과 페이지 정보를 반환한다', async () => {
+      const { getCourseFeed } = await import('./courses')
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          status: 200,
+          json: async () => ({ count: 1, next: null, previous: null, courses: [summary] }),
+        }),
+      )
+
+      const result = await getCourseFeed()
+
+      expect(result).toEqual({ count: 1, next: null, previous: null, courses: [summary] })
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/api/courses/?page=1'), expect.anything())
+    })
+
+    it('코스가 없으면 빈 배열을 반환한다 (에러 아님)', async () => {
+      const { getCourseFeed } = await import('./courses')
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          status: 200,
+          json: async () => ({ count: 0, next: null, previous: null, courses: [] }),
+        }),
+      )
+
+      const result = await getCourseFeed()
+
+      expect(result.courses).toEqual([])
+    })
+
+    it('실패하면 에러를 던진다', async () => {
+      const { getCourseFeed } = await import('./courses')
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({ detail: '서버 오류' }) }),
+      )
+
+      await expect(getCourseFeed()).rejects.toThrow('서버 오류')
+    })
+  })
+
   describe('aiRecommendCourse', () => {
     it('성공하면 AI가 만든 코스를 반환한다', async () => {
       const { aiRecommendCourse } = await import('./courses')

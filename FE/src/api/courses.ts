@@ -72,6 +72,31 @@ export function getMyCourses(): Promise<Course[]> {
   return authorizedFetch<{ courses: Course[] }>('/api/account/courses/').then((res) => res.courses)
 }
 
+// 코스 탭 전체 목록용 요약 표현 (issue #74). 코스 자체엔 좌표가 없어서 기준 명소(anchor place)의
+// 좌표를 그대로 쓴다. 상세 화면(Course)과 달리 course_places는 안 온다 — 목록에선 안 씀.
+export type CourseSummary = {
+  id: number
+  title: string
+  place_id: number
+  place_name: string
+  latitude: number | null
+  longitude: number | null
+  favorite_count: number
+}
+
+export type CourseFeedPage = {
+  count: number
+  next: string | null
+  previous: string | null
+  courses: CourseSummary[]
+}
+
+// 코스 탭 전체 코스 목록. 페이지당 20개, 최신순, 로그인 불필요 (issue #74).
+export function getCourseFeed(page = 1): Promise<CourseFeedPage> {
+  const params = new URLSearchParams({ page: String(page) })
+  return publicFetch<CourseFeedPage>(`/api/courses/?${params}`)
+}
+
 // AI(Claude)가 주변 상권 중에서 식당 1 + 카페 1 + 그 외 1을 골라 코스를 만들어준다. 로그인 필요.
 // 실패하면 BE가 상황별 한국어 메시지를 detail로 준다(400 이미 코스 있음 / 422 후보 부족 / 503 AI 호출 실패) —
 // authorizedFetch가 그 메시지를 그대로 Error.message로 던지므로 호출부에서 그대로 보여주면 된다.

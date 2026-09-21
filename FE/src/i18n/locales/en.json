@@ -18,7 +18,9 @@
   },
   "coursePage": {
     "title": "Course",
-    "empty": "Coming soon"
+    "empty": "No courses yet",
+    "loadMore": "Load more",
+    "loadingMore": "Loading..."
   },
   "mapPage": {
     "title": "Map",

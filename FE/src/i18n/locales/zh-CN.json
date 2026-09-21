@@ -18,7 +18,9 @@
   },
   "coursePage": {
     "title": "路线",
-    "empty": "敬请期待"
+    "empty": "还没有已注册的路线",
+    "loadMore": "查看更多",
+    "loadingMore": "加载中..."
   },
   "mapPage": {
     "title": "地图",

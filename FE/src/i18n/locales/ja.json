@@ -18,7 +18,9 @@
   },
   "coursePage": {
     "title": "コース",
-    "empty": "近日公開予定です"
+    "empty": "まだ登録されたコースがありません",
+    "loadMore": "もっと見る",
+    "loadingMore": "読み込み中..."
   },
   "mapPage": {
     "title": "地図",
