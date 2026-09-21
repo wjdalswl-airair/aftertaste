@@ -18,7 +18,11 @@
   },
   "coursePage": {
     "title": "路線",
-    "empty": "敬請期待"
+    "empty": "還沒有已註冊的路線",
+    "searchPlaceholder": "搜尋路線或拍攝地",
+    "searchEmpty": "沒有搜尋結果",
+    "loadMore": "查看更多",
+    "loadingMore": "載入中..."
   },
   "mapPage": {
     "title": "地圖",

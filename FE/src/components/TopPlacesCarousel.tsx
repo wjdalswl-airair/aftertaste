@@ -28,11 +28,11 @@ export function TopPlacesCarousel() {
         {titleSecondLine ? (
           <>
             <span className="block">
-              <span className="inline-block rounded-full bg-accent mb-1.5 px-2 py-1 text-sm font-medium text-white">
-                {titleFirstLine}
+              <span className="inline-block rounded-xs bg-accent mb-1.5 px-1.5 py-1 text-sm font-medium text-white">
+                # {titleFirstLine}
               </span>
             </span>
-            <span className="block text-lg font-semibold text-ink">{titleSecondLine}</span>
+            <span className="block text-lg font-bold text-ink">{titleSecondLine}</span>
           </>
         ) : (
           <span className="text-lg">{titleFirstLine}</span>

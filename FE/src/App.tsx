@@ -48,6 +48,7 @@ function App() {
           <Route path="/spots/:placeId/reviews/new" element={<ReviewFormPage />} />
           <Route path="/spots/:placeId/reviews/:reviewId/edit" element={<ReviewFormPage />} />
           <Route path="/spots/:placeId/courses/new" element={<CourseCreatePage />} />
+          <Route path="/courses/:courseId/edit" element={<CourseCreatePage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -1,7 +1,7 @@
 import { ArrowLeft, MoreHorizontal, Share2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { deleteCourse, getCourseDetail, type Course, type CoursePlaceRole } from '../api/courses'
 import { getPlaceDetail, type PlaceDetail } from '../api/spots'
 import spotPlaceholder from '../assets/placeholder/spot.png'
@@ -68,7 +68,7 @@ export function CourseDetailPage() {
 
   return (
     <main className="flex min-h-dvh flex-col gap-6 pb-24">
-      <header className="grid min-h-16 grid-cols-[24px_1fr_auto] items-center px-4 pt-2">
+      <header className="-mb-6 grid min-h-16 grid-cols-[24px_1fr_auto] items-center px-4 pt-2">
         <button type="button" onClick={() => navigate(-1)} aria-label="뒤로가기">
           <ArrowLeft size={24} className="text-ink" />
         </button>
@@ -149,6 +149,12 @@ export function CourseDetailPage() {
 
       {menuOpen && course && (
         <BottomSheet onClose={() => setMenuOpen(false)}>
+          <Link
+            to={`/courses/${course.id}/edit`}
+            className="block w-full py-4 text-center text-[15px] font-medium text-ink"
+          >
+            {t('courseDetail.edit')}
+          </Link>
           <button
             type="button"
             onClick={handleDelete}
@@ -210,6 +216,10 @@ function CourseMap({ course, place }: { course: Course; place: PlaceDetail | und
         }
         const center = new kakaoSdk.maps.LatLng(lat, lng)
         const map = new kakaoSdk.maps.Map(mapRef.current, { center, level: 5 })
+        // 코스 구성 4곳(명소+course_places)이 전부 들어오게 초기 화면 범위를 맞춘다.
+        const bounds = new kakaoSdk.maps.LatLngBounds()
+        bounds.extend(center)
+
         // 마커 위 숫자는 아래 방문 순서 목록(명소=1, course_places=index+2)과 맞춘다.
         new kakaoSdk.maps.Marker({
           position: center,
@@ -219,8 +229,10 @@ function CourseMap({ course, place }: { course: Course; place: PlaceDetail | und
         })
 
         course.course_places.forEach((coursePlace, index) => {
+          const position = new kakaoSdk.maps.LatLng(coursePlace.latitude, coursePlace.longitude)
+          bounds.extend(position)
           new kakaoSdk.maps.Marker({
-            position: new kakaoSdk.maps.LatLng(coursePlace.latitude, coursePlace.longitude),
+            position,
             map,
             title: coursePlace.name,
             image: new kakaoSdk.maps.MarkerImage(
@@ -230,6 +242,7 @@ function CourseMap({ course, place }: { course: Course; place: PlaceDetail | und
           })
         })
 
+        map.setBounds(bounds)
         setStatus('ready')
       })
       .catch(() => setStatus('unavailable'))
@@ -240,7 +253,7 @@ function CourseMap({ course, place }: { course: Course; place: PlaceDetail | und
   }, [course, hasCoords, lat, lng, place])
 
   return (
-    <div className="relative h-[240px] w-full overflow-hidden rounded-2xl bg-accent/15">
+    <div className="relative h-[280px] w-full overflow-hidden rounded-2xl bg-accent/15">
       <div ref={mapRef} className="h-full w-full" />
       {status !== 'ready' && (
         <div className="absolute inset-0 flex items-center justify-center bg-accent/15 text-sm text-ink-tertiary" />
@@ -253,7 +266,7 @@ function CourseDetailSkeleton() {
   return (
     <div className="flex flex-col gap-4 px-4">
       <Skeleton className="h-4 w-40 rounded-sm" />
-      <Skeleton className="h-[240px] w-full rounded-2xl" />
+      <Skeleton className="h-[280px] w-full rounded-2xl" />
       {[0, 1, 2, 3].map((i) => (
         <div key={i} className="flex items-center gap-3">
           <Skeleton className="h-6 w-6 rounded-full" />

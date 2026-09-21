@@ -18,7 +18,11 @@
   },
   "coursePage": {
     "title": "코스",
-    "empty": "아직 준비 중이에요"
+    "empty": "아직 등록된 코스가 없어요",
+    "searchPlaceholder": "코스명이나 촬영지를 검색해 보세요",
+    "searchEmpty": "검색 결과가 없어요",
+    "loadMore": "더보기",
+    "loadingMore": "불러오는 중..."
   },
   "mapPage": {
     "title": "지도",
@@ -51,7 +55,7 @@
       "empty": "아직 준비 중이에요"
     },
     "topPlaces": {
-      "title": "여운 사용자들 Pick!\n전국 Top 10 촬영지",
+      "title": "여운 사용자들's Pick\n전국 Top 10 촬영지",
       "empty": "아직 준비 중이에요"
     },
     "regionalTop": {
@@ -211,6 +215,7 @@
   },
   "courseCreate": {
     "title": "주변 코스 추천",
+    "editTitle": "코스 수정",
     "titlePlaceholder": "코스 이름을 입력해주세요",
     "tabs": {
       "FOOD_CAFE": "맛집·카페",
@@ -225,6 +230,7 @@
   "courseDetail": {
     "notFound": "존재하지 않습니다",
     "placesCountSuffix": "곳",
+    "edit": "수정하기",
     "delete": "삭제하기",
     "cancel": "취소"
   },

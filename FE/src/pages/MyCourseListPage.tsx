@@ -37,7 +37,7 @@ export function MyCourseListPage() {
 
   return (
     <main className="flex min-h-dvh flex-col gap-6 pb-24">
-      <header className="grid min-h-16 grid-cols-[24px_1fr_24px] items-center px-4 pt-2">
+      <header className="-mb-6 grid min-h-16 grid-cols-[24px_1fr_24px] items-center px-4 pt-2">
         <button type="button" onClick={() => navigate(-1)} aria-label="뒤로가기">
           <ArrowLeft size={24} className="text-ink" />
         </button>
@@ -52,20 +52,20 @@ export function MyCourseListPage() {
           <MyCourseListSkeleton />
         ) : courses.length > 0 ? (
           courses.map((course) => (
-            <div key={course.id} className="flex items-start gap-3">
-              <Link to={`/courses/${course.id}`} className="flex flex-1 flex-col gap-2">
-                <div className="h-[140px] w-full rounded-2xl bg-accent/15" />
-                <div>
-                  <p className="text-sm font-bold text-ink">{course.title}</p>
-                  <p className="text-xs text-ink-secondary">
+            <div key={course.id} className="flex flex-col gap-2">
+              <Link to={`/courses/${course.id}`} className="block h-[140px] w-full rounded-2xl bg-accent/15" />
+              <div className="flex items-start justify-between gap-3">
+                <Link to={`/courses/${course.id}`} className="flex-1">
+                  <p className="text-base font-bold text-ink">{course.title}</p>
+                  <p className="mt-1 text-xs text-ink-secondary">
                     {course.place_name} · {course.course_places.length + 1}
                     {t('myCourseList.placesCountSuffix')} · {formatDate(course.created_at)}
                   </p>
-                </div>
-              </Link>
-              <button type="button" onClick={() => setMenuTarget(course)} aria-label="더보기" className="pt-2">
-                <MoreHorizontal size={18} className="text-ink-tertiary" />
-              </button>
+                </Link>
+                <button type="button" onClick={() => setMenuTarget(course)} aria-label="더보기" className="pt-0.5">
+                  <MoreHorizontal size={18} className="text-ink-tertiary" />
+                </button>
+              </div>
             </div>
           ))
         ) : (

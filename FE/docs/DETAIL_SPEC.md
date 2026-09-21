@@ -382,22 +382,26 @@ Figma "Yeoun Design System" 프레임(node `102:1772`) 기준으로 `src/index.c
 - (2026-08-31 변경) 원래 "코스 생성 UI는 안 만든다"(PRD 5장)였으나, 사용자가 이번 Phase에서 생성 화면까지 포함하기로 결정했다. `docs/PRD.md` 5장에 이 결정 기록해둠.
 - API (전부 확정, 실제 BE 코드로 확인함 — `courses/views.py`, `favorites/views.py`):
   - `GET/POST /api/places/{place_id}/courses/` — 명소 기준 코스 목록(로그인 불필요)/생성(로그인 필요). 생성 시 `course_places`가 정확히 식당(RESTAURANT) 1 + 카페(CAFE) 1 + 그 외(OTHER) 1이어야 한다.
-  - `GET/PATCH/DELETE /api/courses/{id}/` — 상세(로그인 불필요)/수정(안 만듦)/삭제(작성자만).
+  - `GET/PATCH/DELETE /api/courses/{id}/` — 상세(로그인 불필요)/수정(작성자만, `src/api/courses.ts`의 `updateCourse`)/삭제(작성자만).
   - `GET /api/account/courses/` — 내가 만든 코스 목록 (`MyCourseListPage.tsx`, `/mycourses`). Phase7에서 마이페이지에 빈 자리로만 뒀던 걸 이번에 연동.
   - `POST/DELETE /api/courses/{id}/favorite/` — 코스 즐겨찾기. 명소 즐겨찾기와 같은 멱등 규칙, `FavoriteButton`에 `type="course"` prop을 추가해서 재사용.
 - **후보 장소는 카카오 API를 FE가 직접 안 부른다.** 명소 상세(`GET /api/places/{id}/`)가 서버에서 이미 받아온 `nearby_places`를 그대로 코스 생성 후보 목록으로 재사용한다. 이 값엔 거리·카카오place_id가 없어서, 거리는 `src/utils/distance.ts`(haversine)로 직접 계산하고 `kakao_place_id`는 항상 `null`로 보낸다.
 - **카테고리 탭(맛집·카페/체험·공방/주변명소) 분류는 대략적인 추정이다** (`src/utils/courseCategory.ts`). 카카오 `category_name` 문자열에 "음식점"/"카페"/"체험"/"공방"/"교육" 포함 여부로 나눈 것 — 정확한 카카오 카테고리 코드 기준이 아니라서 잘못 분류될 수 있다.
-- **드래그로 순서 바꾸기는 안 만들었다.** Figma엔 있지만, 후보를 뺐다 다시 추가하는 것만으로 3개 구성을 바꿀 수 있어서 별도 드래그 라이브러리 없이 MVP로 갔다.
+- ~~**드래그로 순서 바꾸기는 안 만들었다.** Figma엔 있지만, 후보를 뺐다 다시 추가하는 것만으로 3개 구성을 바꿀 수 있어서 별도 드래그 라이브러리 없이 MVP로 갔다.~~ → **정정(2026-09-21): 드래그 순서 변경을 추가했다.** 사용자 요청으로 Figma 목업대로 만들기로 하고, 새 라이브러리 `@dnd-kit/core`/`@dnd-kit/sortable`/`@dnd-kit/utilities`를 승인받아 추가했다(터치 드래그를 기본 지원하고 현재 유지보수되는 표준 라이브러리, 모바일 전용 앱이라 터치 지원이 필수). "코스 구성" 목록의 각 항목(식당/카페/그 외, `pick.role`을 고유 id로 씀)에 그립 아이콘(`GripVertical`) 핸들을 두고, 그 핸들에서만 드래그가 시작되게 했다 — 목록 자체를 터치로 스크롤하는 동작과 겹치지 않게 하기 위함. 앙커 명소(1번, 코스의 시작점)는 드래그 대상에서 제외하고 항상 고정.
 - `CourseSerializer`엔 사진 필드가 없다 — 코스 카드/썸네일은 전부 색 배경 플레이스홀더(`bg-accent/15`)다.
 - `CoursePlace`에도 거리·anchor place 좌표가 없어서, 코스 상세 화면은 `getCourseDetail`과 별개로 `getPlaceDetail(course.place_id)`를 추가로 불러서 anchor 좌표·주소·작품명을 채운다.
 - 코스 상세의 "지역" 표시(예: "경기 수원")는 anchor place `address`의 앞 두 토큰을 자른 임시 값이다 — BE에 지역명 필드가 따로 없다. `MyCourseListPage`(내가 만든 코스 목록)는 이 추가 조회(N+1)까지는 안 하고 대신 `place_name`을 보여준다(Phase7 "내가 쓴 리뷰" 갭과 같은 타협).
 - "내가 만든 코스인지" 판단은 리뷰와 동일하게 닉네임 비교로 임시 처리했다(`creator_nickname === member.nickname`) — 정확한 방법 아님, 기존 갭과 동일.
 - 명소 상세(Phase4)의 "이 장소로 AI 코스 추천받기" 버튼: 이 명소에 이미 코스가 있으면(로그인 불필요) 첫 번째 코스 상세로 이동한다.
-- **AI 코스 추천 연동 (2026-09-08, GitHub 이슈 #38)**: 코스가 없으면 로그인 확인 후 `POST /api/places/{place_id}/courses/ai-recommend/`(`src/api/courses.ts`의 `aiRecommendCourse`)를 호출해 Claude가 주변 상권 중 식당 1+카페 1+그 외 1로 코스를 자동 생성한다(성공 시 201, 생성된 코스 상세로 바로 이동). 이전엔 수동 생성 화면(`/spots/{placeId}/courses/new`, `CourseCreatePage.tsx`)으로 보냈으나 이걸로 대체했다 — 그 라우트/페이지 자체는 남아있지만 지금은 도달할 진입점이 없다.
+- **AI 코스 추천 연동 (2026-09-08, GitHub 이슈 #38)**: 코스가 없으면 로그인 확인 후 `POST /api/places/{place_id}/courses/ai-recommend/`(`src/api/courses.ts`의 `aiRecommendCourse`)를 호출해 Claude가 주변 상권 중 식당 1+카페 1+그 외 1로 코스를 자동 생성한다(성공 시 201). 이전엔 수동 생성 화면(`/spots/{placeId}/courses/new`, `CourseCreatePage.tsx`)으로 보냈으나 이걸로 대체했다 — 그 라우트/페이지 자체는 남아있지만 지금은 그쪽 진입점이 없다.
+  - **정정(2026-09-21): 생성 즉시 상세로 보내지 않고, 수정 화면(`/courses/{id}/edit`)으로 먼저 보낸다.** AI가 고른 구성을 사용자가 확인·조정(장소 교체/순서 변경)할 기회를 주기 위함 — 수정 화면에서 "등록"을 누르면 그때 `updateCourse`가 실행되고 코스 상세로 이동한다. "이미 코스가 있는 명소" 분기(기존 코스로 바로 이동)는 그대로 둔다 — AI가 새로 만든 경우에만 해당.
   - 버튼 클릭 시 로딩 중엔 "AI가 코스를 만드는 중..."으로 문구가 바뀌고 비활성화된다.
   - 에러(400 이미 코스 있음 / 422 주변 후보 부족 / 503 AI 호출 실패)는 BE가 주는 한국어 `detail` 메시지를 그대로 버튼 아래에 보여준다 — FE에서 상태 코드별로 문구를 따로 만들지 않는다.
+- **코스 수정 (2026-09-21)**: "도달할 진입점이 없다"던 `CourseCreatePage.tsx`를 진입점 없이 버려두지 않고, 리뷰 작성/수정이 `ReviewFormPage.tsx` 하나를 공유하는 것과 같은 방식으로 **생성·수정 겸용 화면**으로 바꿨다. 새 라우트 `/courses/{courseId}/edit`(로그인 필요)로 들어오면 `courseId` 유무로 `isEdit`을 판단해, `getCourseDetail`로 기존 제목·설명·`course_places`(식당/카페/그 외)를 먼저 불러와 폼에 채워 넣고, 제출 시 `createCourse` 대신 `updateCourse`(PATCH, `course_places` 통째로 교체)를 호출한다. 작성자 본인이 아니면(닉네임 비교, S-08 기존 갭과 동일 판정 방식) 코스 상세로 돌려보낸다. 진입점은 `CourseDetailPage.tsx`의 "더보기" 메뉴에 "수정하기"(리뷰 상세와 동일한 자리·문구 패턴)로 추가했다. `description`은 화면에 입력 UI가 없어서 기존 값을 그대로 들고 있다가 제출 때 같이 보낸다.
 - **방문 순서 번호 마커 (2026-09-19 추가)**: 코스 상세 지도에 명소는 1번, `course_places`는 등록 순서대로 2번부터 숫자가 적힌 마커를 그린다(`kakaoMap.ts`의 `pinIconDataUrl`에 숫자 라벨 옵션 추가, `CourseMap`에서 사용) — 아래 방문 순서 목록의 번호와 맞춰서 어디가 몇 번째인지 지도에서 바로 알 수 있게 했다. 마커가 커지면서 지도 높이도 `h-[200px]`에서 `h-[240px]`로 늘렸다(스켈레톤 높이도 동일하게 맞춤).
 - **내가 만든 코스면 즐겨찾기 버튼 숨김 (2026-09-19 수정)**: 본인이 만든 코스에 스스로 즐겨찾기를 누르는 건 의미가 없어서, 헤더의 `FavoriteButton`을 `isMine`(닉네임 비교, 위 참고)일 때는 렌더링하지 않는다.
+- **코스 전체 목록 카드 UI 통일 (2026-09-21 수정)**: `/courses`의 카드 제목 크기와 제목-메타 정보 간격을 `/mycourses`와 같은 `text-base`·`mt-1`로 맞췄다. ~~메타 정보는 기준 촬영지명 바로 옆에 생성일(`created_at`, `YYYY.MM.DD`)을 표시한다. 이를 위해 `GET /api/courses/`의 요약 응답에도 기존 코스 생성일 필드를 포함한다.~~ → **정정(2026-09-21): 생성일 표시는 취소했다.** BE `CourseSummarySerializer`에 `created_at`을 추가하는 작업까지 같이 들어갔었는데, 그 BE 변경을 취소하기로 하면서 FE도 `formatDate`/`course.created_at` 사용을 걷어내고 `CourseSummary` 타입에서 `created_at`을 뺐다 — 응답에 없는 필드를 읽으면 카드에 "NaN.NaN.NaN"이 그대로 보이는 문제가 있었다.
+- **코스 전체 목록 검색 (2026-09-21 추가)**: `/courses` 헤더 아래에 리뷰 전체 페이지와 같은 모양의 검색창을 둔다. 코스명(`title`) 또는 기준 촬영지명(`place_name`)에 검색어가 포함된 카드를, 현재까지 불러온 페이지 안에서 즉시 필터링한다. 서버 검색 파라미터는 추가하지 않으며 `더보기`로 새 페이지를 불러오면 그 결과에도 현재 검색어를 적용한다.
 
 ### S-09. 공유 — 명소 상세/코스 화면 내부 기능 (Phase 4·8에서 이미 구현됨, Phase9은 확인만)
 - 링크 복사만 구현 (PRD 5장). 별도 공유 API 없음 — `navigator.clipboard.writeText(location.href)`.
