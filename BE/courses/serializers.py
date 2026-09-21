@@ -27,6 +27,15 @@ class CoursePlaceSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+def get_course_creator_nickname(course):
+    """코스 작성자 닉네임. 코스 응답들이 같은 규칙을 쓰도록 한곳에 모아둔다."""
+    # 관리자가 admin에서 만든 코스는 creator가 없을 수 있다.
+    if course.creator is None:
+        return None
+    # 탈퇴한 사람이 만든 코스는 작성자 자리에 "탈퇴한 사용자"로 보인다 (DETAIL_SPEC 5장 공통 규칙).
+    return "탈퇴한 사용자" if course.creator.is_withdrawn else course.creator.nickname
+
+
 class CourseSerializer(serializers.ModelSerializer):
     """코스 조회(목록·상세)용 읽기 전용 표현."""
 
@@ -51,11 +60,7 @@ class CourseSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_creator_nickname(self, obj):
-        # 관리자가 admin에서 만든 코스는 creator가 없을 수 있다.
-        if obj.creator is None:
-            return None
-        # 탈퇴한 사람이 만든 코스는 작성자 자리에 "탈퇴한 사용자"로 보인다 (DETAIL_SPEC 5장 공통 규칙).
-        return "탈퇴한 사용자" if obj.creator.is_withdrawn else obj.creator.nickname
+        return get_course_creator_nickname(obj)
 
 
 class CourseListResponseSerializer(serializers.Serializer):
@@ -78,6 +83,7 @@ class CourseSummarySerializer(serializers.ModelSerializer):
     latitude = serializers.FloatField(source="place.latitude", read_only=True)
     longitude = serializers.FloatField(source="place.longitude", read_only=True)
     favorite_count = serializers.IntegerField(read_only=True)
+    creator_nickname = serializers.SerializerMethodField()
 
     class Meta:
         model = Course
@@ -86,11 +92,15 @@ class CourseSummarySerializer(serializers.ModelSerializer):
             "title",
             "place_id",
             "place_name",
+            "creator_nickname",
             "latitude",
             "longitude",
             "favorite_count",
         ]
         read_only_fields = fields
+
+    def get_creator_nickname(self, obj):
+        return get_course_creator_nickname(obj)
 
 
 class CourseSummaryListResponseSerializer(serializers.Serializer):
