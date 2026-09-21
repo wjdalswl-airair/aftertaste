@@ -19,6 +19,8 @@
   "coursePage": {
     "title": "路线",
     "empty": "还没有已注册的路线",
+    "searchPlaceholder": "搜索路线或拍摄地",
+    "searchEmpty": "没有搜索结果",
     "loadMore": "查看更多",
     "loadingMore": "加载中..."
   },
