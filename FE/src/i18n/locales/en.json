@@ -19,6 +19,8 @@
   "coursePage": {
     "title": "Course",
     "empty": "No courses yet",
+    "searchPlaceholder": "Search courses or filming locations",
+    "searchEmpty": "No results found",
     "loadMore": "Load more",
     "loadingMore": "Loading..."
   },
@@ -213,6 +215,7 @@
   },
   "courseCreate": {
     "title": "Suggest a course",
+    "editTitle": "Edit course",
     "titlePlaceholder": "Give your course a name",
     "tabs": {
       "FOOD_CAFE": "Food & Cafes",
@@ -227,6 +230,7 @@
   "courseDetail": {
     "notFound": "Not found",
     "placesCountSuffix": " spots",
+    "edit": "Edit",
     "delete": "Delete",
     "cancel": "Cancel"
   },

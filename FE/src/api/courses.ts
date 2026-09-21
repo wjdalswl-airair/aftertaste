@@ -67,6 +67,14 @@ export function deleteCourse(courseId: number): Promise<void> {
   return authorizedFetch<void>(`/api/courses/${courseId}/`, { method: 'DELETE' })
 }
 
+// 작성자 본인만 수정 가능(403). 성공하면 본문 없이 204 — 최신 코스는 getCourseDetail로 다시 받는다.
+export function updateCourse(courseId: number, input: CourseInput): Promise<void> {
+  return authorizedFetch<void>(`/api/courses/${courseId}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  })
+}
+
 // 내가 만든 코스 목록 (마이페이지).
 export function getMyCourses(): Promise<Course[]> {
   return authorizedFetch<{ courses: Course[] }>('/api/account/courses/').then((res) => res.courses)
@@ -82,6 +90,7 @@ export type CourseSummary = {
   latitude: number | null
   longitude: number | null
   favorite_count: number
+  created_at: string
 }
 
 export type CourseFeedPage = {

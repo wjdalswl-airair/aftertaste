@@ -162,6 +162,47 @@ describe('src/api/courses.ts', () => {
     })
   })
 
+  describe('updateCourse', () => {
+    const input = {
+      title: '경복궁 코스(수정)',
+      description: '',
+      course_places: [
+        {
+          role: 'RESTAURANT' as const,
+          name: '맛집',
+          address: '서울',
+          road_address_name: '',
+          latitude: 37.5,
+          longitude: 127,
+          category_name: '음식점',
+          kakao_place_id: null,
+        },
+      ],
+    }
+
+    it('성공하면 PATCH로 수정한다', async () => {
+      const { updateCourse } = await import('./courses')
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 204 }))
+
+      await updateCourse(1, input)
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/courses/1/'),
+        expect.objectContaining({ method: 'PATCH', body: JSON.stringify(input) }),
+      )
+    })
+
+    it('작성자가 아니면 에러를 던진다', async () => {
+      const { updateCourse } = await import('./courses')
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: false, status: 403, json: async () => ({ detail: '권한이 없습니다' }) }),
+      )
+
+      await expect(updateCourse(1, input)).rejects.toThrow('권한이 없습니다')
+    })
+  })
+
   describe('getMyCourses', () => {
     it('성공하면 내가 만든 코스 목록을 반환한다', async () => {
       const { getMyCourses } = await import('./courses')
@@ -199,6 +240,7 @@ describe('src/api/courses.ts', () => {
       latitude: 37.58,
       longitude: 126.97,
       favorite_count: 3,
+      created_at: '2026-09-21T12:00:00Z',
     }
 
     it('성공하면 코스 목록과 페이지 정보를 반환한다', async () => {

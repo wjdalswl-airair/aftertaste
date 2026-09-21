@@ -104,7 +104,9 @@ export function SpotDetailPage() {
     setCourseAiLoading(true)
     try {
       const course = await aiRecommendCourse(Number(placeId))
-      navigate(`/courses/${course.id}`)
+      // AI가 만든 코스를 바로 상세로 보내지 않고 수정 화면으로 먼저 보낸다 — 여기서 확인/조정
+      // 후 등록을 누르면(CourseCreatePage의 isEdit 흐름) 그때 상세로 이동한다.
+      navigate(`/courses/${course.id}/edit`)
     } catch (error) {
       setCourseAiError(error instanceof Error ? error.message : t('spotDetail.courseAiError'))
     } finally {
@@ -428,7 +430,7 @@ function SpotMap({ place }: { place: PlaceDetail }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="relative h-[240px] w-full overflow-hidden rounded-2xl bg-accent/15">
+      <div className="relative h-[280px] w-full overflow-hidden rounded-2xl bg-accent/15">
         <div ref={mapRef} className="h-full w-full" />
         {status !== 'ready' && (
           <div className="absolute inset-0 flex items-center justify-center bg-accent/15 text-sm text-ink-tertiary">
@@ -492,7 +494,7 @@ function SpotDetailSkeleton() {
       <div className="flex flex-col gap-3 px-4">
         <Skeleton className="h-5 w-1/3 rounded-sm" />
         <div className="flex flex-col gap-3">
-          <Skeleton className="h-[240px] w-full rounded-2xl" />
+          <Skeleton className="h-[280px] w-full rounded-2xl" />
           <Skeleton className="h-11 w-full rounded-full" />
         </div>
       </div>
