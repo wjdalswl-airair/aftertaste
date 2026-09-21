@@ -6,12 +6,6 @@ import { getCourseFeed, type CourseSummary } from '../api/courses'
 import { BottomNav } from '../components/BottomNav'
 import { Skeleton } from '../components/Skeleton'
 
-function formatDate(isoString: string) {
-  const date = new Date(isoString)
-  const pad = (value: number) => String(value).padStart(2, '0')
-  return `${date.getFullYear()}.${pad(date.getMonth() + 1)}.${pad(date.getDate())}`
-}
-
 // 코스 탭 — 등록된 모든 코스를 최신순으로 보여준다 (issue #74 API 기준).
 // 명소별 좌표를 지도에 찍는 건 이후에 붙이고, 지금은 세로 목록만 우선 구현한다.
 export function CoursePage() {
@@ -88,8 +82,6 @@ export function CoursePage() {
                 <p className="truncate text-base font-bold text-ink">{course.title}</p>
                 <div className="mt-1 flex items-center gap-1 text-xs text-ink-secondary">
                   <span>{course.place_name}</span>
-                  <span className="text-ink-tertiary">·</span>
-                  <span>{formatDate(course.created_at)}</span>
                   {course.favorite_count > 0 && (
                     <>
                       <span className="text-ink-tertiary">·</span>

@@ -240,7 +240,6 @@ describe('src/api/courses.ts', () => {
       latitude: 37.58,
       longitude: 126.97,
       favorite_count: 3,
-      created_at: '2026-09-21T12:00:00Z',
     }
 
     it('성공하면 코스 목록과 페이지 정보를 반환한다', async () => {

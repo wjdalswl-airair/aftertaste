@@ -90,7 +90,6 @@ export type CourseSummary = {
   latitude: number | null
   longitude: number | null
   favorite_count: number
-  created_at: string
 }
 
 export type CourseFeedPage = {
