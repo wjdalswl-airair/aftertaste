@@ -47,10 +47,28 @@ class CourseListTests(TestCase):
                 "title": "궁궐 나들이",
                 "place_id": self.place.id,
                 "place_name": "경복궁",
+                "creator_nickname": None,
                 "latitude": 37.579771,
                 "longitude": 126.977041,
                 "favorite_count": 0,
             },
+        )
+
+    def test_list_includes_creator_nickname(self):
+        creator = create_member("maker")
+        withdrawn = create_member("gone")
+        withdrawn.is_withdrawn = True
+        withdrawn.save()
+        Course.objects.create(place=self.place, title="내가 만든", creator=creator)
+        Course.objects.create(place=self.place, title="탈퇴자가 만든", creator=withdrawn)
+        Course.objects.create(place=self.place, title="관리자가 만든")
+
+        response = self.client.get(COURSE_LIST_URL)
+
+        nicknames = {c["title"]: c["creator_nickname"] for c in response.data["courses"]}
+        self.assertEqual(
+            nicknames,
+            {"내가 만든": "maker", "탈퇴자가 만든": "탈퇴한 사용자", "관리자가 만든": None},
         )
 
     def test_invalid_token_does_not_block_listing(self):
@@ -105,9 +123,10 @@ class CourseListTests(TestCase):
         self.assertIsNone(page2.data["next"])
 
     def test_list_query_count_does_not_grow_with_courses(self):
+        creator = create_member("maker")
         for i in range(5):
-            Course.objects.create(place=self.place, title=f"코스{i}")
+            Course.objects.create(place=self.place, title=f"코스{i}", creator=creator)
 
-        # 개수 조회 1 + 목록 조회 1 (place는 join, favorite_count는 annotate).
+        # 개수 조회 1 + 목록 조회 1 (place·creator는 join, favorite_count는 annotate).
         with self.assertNumQueries(2):
             self.client.get(COURSE_LIST_URL)

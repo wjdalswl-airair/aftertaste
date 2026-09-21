@@ -45,14 +45,14 @@ class CourseListView(APIView):
     @extend_schema(
         summary="전체 코스 목록 조회",
         description=(
-            "등록된 모든 코스를 최신순으로 페이지네이션해 반환한다. 각 코스에 기준 명소의 좌표와 "
-            "즐겨찾기 수가 함께 담긴다. 로그인이 필요 없다."
+            "등록된 모든 코스를 최신순으로 페이지네이션해 반환한다. 각 코스에 기준 명소의 좌표, "
+            "즐겨찾기 수, 작성자 닉네임이 함께 담긴다. 로그인이 필요 없다."
         ),
         responses={200: CourseSummaryListResponseSerializer},
     )
     def get(self, request):
         courses = (
-            Course.objects.select_related("place")
+            Course.objects.select_related("place", "creator")
             .annotate(favorite_count=Count("favorited_by"))
             .order_by("-created_at", "-id")
         )
