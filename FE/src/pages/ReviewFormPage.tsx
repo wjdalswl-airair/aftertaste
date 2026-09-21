@@ -210,7 +210,7 @@ export function ReviewFormPage() {
 
   return (
     <main className="flex min-h-dvh flex-col gap-6 pb-24">
-      <header className="grid min-h-16 grid-cols-[24px_1fr_24px] items-center px-4 pt-2">
+      <header className="-mb-6 grid min-h-16 grid-cols-[24px_1fr_24px] items-center px-4 pt-2">
         <button type="button" onClick={handleBack} aria-label="뒤로가기">
           <ArrowLeft size={24} className="text-ink" />
         </button>

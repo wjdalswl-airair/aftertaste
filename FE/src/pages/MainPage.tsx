@@ -23,9 +23,11 @@ export function MainPage() {
   const { status, coords, showConsentModal, handleAllow, handleDeny } = useGeolocation()
 
   return (
-    <main className="flex min-h-dvh flex-col gap-6 pb-24">
-      <header className="flex items-center justify-between px-4 pt-4">
-        <Link to="/" className="font-brand text-2xl font-bold text-primary">여운</Link>
+    <>
+      <header className="flex items-center justify-between px-4 py-4">
+        <Link to="/" className="font-brand text-2xl font-bold text-primary">
+          여운
+        </Link>
         <div className="flex items-center gap-4">
           <LanguageSheet />
           {!isLoading && !member && (
@@ -35,39 +37,40 @@ export function MainPage() {
           )}
         </div>
       </header>
+      <main className="flex min-h-dvh flex-col gap-8 pb-24">
+        <div className="flex flex-col gap-2 px-4">
+          <div className="flex justify-end">
+            <WeatherWidget status={status} coords={coords} />
+          </div>
 
-      <div className="flex flex-col gap-2 px-4">
-        <div className="flex justify-end">
-          <WeatherWidget status={status} coords={coords} />
+          <div className="flex items-center gap-2 rounded-lg bg-accent/15 p-4">
+            <Search size={16} className="text-ink-tertiary" />
+            <input
+              type="text"
+              onFocus={() => navigate('/search')}
+              placeholder={t('searchPage.placeholder')}
+              className="flex-1 bg-transparent text-sm text-ink placeholder:text-ink-tertiary outline-none"
+            />
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 rounded-lg bg-accent/15 p-4">
-          <Search size={16} className="text-ink-tertiary" />
-          <input
-            type="text"
-            onFocus={() => navigate('/search')}
-            placeholder={t('searchPage.placeholder')}
-            className="flex-1 bg-transparent text-sm text-ink placeholder:text-ink-tertiary outline-none"
-          />
+        <div className="px-4">
+          <h1 className="text-xl font-bold text-ink">
+            {t('mainPage.greeting.hello')}
+            {!isLoading && member && t('mainPage.greeting.nameSuffix', { name: member.nickname })}
+          </h1>
+          <p className=" text-ink-secondary">{t('mainPage.greeting.subtitle')}</p>
         </div>
-      </div>
 
-      <div className="px-4">
-        <h1 className="text-xl font-bold text-ink">
-          {t('mainPage.greeting.hello')}
-          {!isLoading && member && t('mainPage.greeting.nameSuffix', { name: member.nickname })}
-        </h1>
-        <p className=" text-ink-secondary">{t('mainPage.greeting.subtitle')}</p>
-      </div>
+        <Hero />
+        <RecommendedSpots status={status} coords={coords} />
+        <TopPlacesCarousel />
+        <RegionalTopPlacesCarousel />
 
-      <Hero />
-      <RecommendedSpots status={status} coords={coords} />
-      <TopPlacesCarousel />
-      <RegionalTopPlacesCarousel />
+        {showConsentModal && <LocationPermissionModal onAllow={handleAllow} onDeny={handleDeny} />}
 
-      {showConsentModal && <LocationPermissionModal onAllow={handleAllow} onDeny={handleDeny} />}
-
-      <BottomNav />
-    </main>
+        <BottomNav />
+      </main>
+    </>
   )
 }
